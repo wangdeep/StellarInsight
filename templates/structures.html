@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.st-wrap { max-width: 1100px; margin: 0 auto; padding: 0 0 40px; }
+
+/* ── Header ── */
+.st-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px; }
+.st-title { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+.st-controls { display:flex; gap:8px; align-items:center; }
+
+/* ── Cinematic structure panel ── */
+.struct-panel {
+  position:relative; overflow:hidden; border-radius:12px;
+  border:1px solid rgba(50,182,255,.15);
+  min-height:320px; display:flex; flex-direction:column;
+  margin-bottom:16px;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+
+/* Background layers: structure render right-side, dark gradient left */
+.struct-bg {
+  position:absolute; inset:0;
+  background: linear-gradient(to right, rgba(4,8,18,.82) 0%, rgba(4,8,18,.6) 30%, rgba(4,8,18,.55) 50%, rgba(4,8,18,.25) 70%, rgba(4,8,18,.0) 100%);
+  z-index:1;
+}
+.struct-render {
+  position:absolute; right:-2%; top:-5%; bottom:-5%; width:68%;
+  background-size:contain; background-position:center right 5%;
+  background-repeat:no-repeat;
+  mask-image:linear-gradient(to left, rgba(0,0,0,.85) 35%, rgba(0,0,0,.3) 65%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image:linear-gradient(to left, rgba(0,0,0,.85) 35%, rgba(0,0,0,.3) 65%, rgba(0,0,0,0) 100%);
+  filter:brightness(1.05) saturate(1.1);
+}
+.struct-corp-bg {
+  position:absolute; left:0; top:0; width:55%; bottom:0;
+  background-size:cover; background-position:center left;
+  background-repeat:no-repeat;
+  opacity:0.18;
+  mask-image:linear-gradient(to right, rgba(0,0,0,.7) 0%, rgba(0,0,0,.4) 40%, rgba(0,0,0,0) 100%);
+  -webkit-mask-image:linear-gradient(to right, rgba(0,0,0,.7) 0%, rgba(0,0,0,.4) 40%, rgba(0,0,0,0) 100%);
+  filter:saturate(0.25) brightness(0.6);
+}
+
+/* Content overlay */
+.struct-content {
+  position:relative; z-index:2;
+  padding:24px 28px;
+  display:flex; flex-direction:column; gap:14px;
+  flex:1;
+}
+
+/* Name + badge row */
+.struct-name-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.struct-name { font-size:24px; font-weight:800; color:var(--text); line-height:1.1; }
+.struct-state-badge {
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+  padding:3px 10px; border-radius:20px;
+}
+.badge-anchored { background:rgba(34,197,94,.12); border:1px solid rgba(34,197,94,.3); color:#22c55e; }
+.badge-reinforced { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); color:#ef4444; }
+.badge-unanchoring { background:rgba(251,146,60,.12); border:1px solid rgba(251,146,60,.3); color:#fb923c; }
+.badge-other { background:rgba(50,182,255,.10); border:1px solid rgba(50,182,255,.2); color:var(--accent); }
+
+/* Meta row */
+.struct-meta { display:flex; gap:20px; flex-wrap:wrap; }
+.struct-meta-item { display:flex; flex-direction:column; gap:2px; }
+.struct-meta-lbl { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.struct-meta-val { font-size:13px; color:var(--text); font-weight:500; }
+
+/* Fuel section */
+.struct-fuel-wrap { max-width:420px; }
+.struct-fuel-header { display:flex; justify-content:space-between; margin-bottom:5px; }
+.struct-fuel-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+.struct-fuel-days { font-size:13px; font-weight:700; }
+.struct-fuel-bar { height:10px; background:rgba(255,255,255,.08); border-radius:5px; overflow:hidden; }
+.struct-fuel-fill { height:100%; border-radius:5px; transition:width .6s; }
+.struct-fuel-expires { font-size:10px; color:var(--muted); margin-top:4px; }
+
+/* Services grid */
+.struct-services { display:flex; flex-wrap:wrap; gap:6px; }
+.struct-svc {
+  font-size:11px; padding:4px 12px; border-radius:20px;
+  display:flex; align-items:center; gap:5px;
+}
+.struct-svc.online { background:rgba(34,197,94,.1); border:1px solid rgba(34,197,94,.25); color:#22c55e; }
+.struct-svc.offline { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); color:var(--muted); opacity:.6; }
+.struct-svc-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.struct-svc.online .struct-svc-dot { background:#22c55e; box-shadow:0 0 4px #22c55e; }
+.struct-svc.offline .struct-svc-dot { background:rgba(255,255,255,.2); }
+
+/* Vuln window */
+.struct-vuln {
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(251,146,60,.08); border:1px solid rgba(251,146,60,.2);
+  border-radius:8px; padding:6px 14px; font-size:12px; color:#fb923c;
+}
+
+/* Bottom stat bar */
+.struct-stat-bar {
+  display:flex; gap:24px; flex-wrap:wrap;
+  padding:14px 20px;
+  position:relative; z-index:3;
+  background: rgba(0,0,0,0.8);
+  border-top:1px solid rgba(50,182,255,.2);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+}
+.struct-stat { display:flex; flex-direction:column; gap:2px; }
+.struct-stat-lbl { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:rgba(160,185,220,.9); font-weight:700; }
+.struct-stat-val { font-size:14px; font-weight:700; color:#eef2ff; text-shadow:0 1px 4px rgba(0,0,0,.8); }
+
+/* Empty state */
+.st-empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:13px; }
+</style>
+
+<div class="st-wrap">
+  <div class="st-header">
+    <div class="st-title">🏗️ Structures</div>
+    <div class="st-controls">
+      <select id="aliasSelect" class="input" style="width:180px;" onchange="ldStructures()">
+        {% for c in chars %}
+        <option value="{{ c.alias or c.character_name }}">{{ c.character_name }}{% if c.alias %} ({{ c.alias }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" onclick="ldStructures()">⟳ Refresh</button>
+    </div>
+  </div>
+
+  <div id="stContainer"><div class="st-empty">Select a character to load structures.</div></div>
+</div>
+
+<script>
+const API = '/app/api';
+
+function fmtIsk(v){
+  if(!v)return'—';v=parseFloat(v);
+  if(v>=1e12)return(v/1e12).toFixed(2)+'T ISK';
+  if(v>=1e9)return(v/1e9).toFixed(2)+'B ISK';
+  if(v>=1e6)return(v/1e6).toFixed(1)+'M ISK';
+  return v.toLocaleString()+' ISK';
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+async function ldStructures(){
+  const alias = document.getElementById('aliasSelect').value;
+  const container = document.getElementById('stContainer');
+  if(!alias){return;}
+  container.innerHTML = '<div class="st-empty">⏳ Loading structures…</div>';
+  try{
+    const r = await fetch(`${API}/structures/list?alias=${encodeURIComponent(alias)}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){container.innerHTML=`<div class="st-empty">${esc(d.detail||'Error loading structures.')}</div>`;return;}
+    if(!d.structures||!d.structures.length){
+      container.innerHTML='<div class="st-empty">No structures found for this corp, or missing <code>esi-corporations.read_structures.v1</code> scope.</div>';
+      return;
+    }
+    container.innerHTML = d.structures.map(s=>renderStructure(s, d.corp_id, d.corp_name||'')).join('');
+  }catch(e){
+    container.innerHTML=`<div class="st-empty" style="color:var(--danger);">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderStructure(s, corpId, corpName){
+  const typeId      = s.type_id;
+  const renderUrl   = typeId ? `https://images.evetech.net/types/${typeId}/render?size=1024` : '';
+  const days        = s.days_remaining;
+  const pct         = s.fuel_pct ?? 0;
+  const fuelColor   = days==null?'rgba(50,182,255,.5)':days<2?'#ef4444':days<5?'#f97316':'#22c55e';
+
+  // State badge
+  const state = (s.state||'').toLowerCase();
+  let stateBadgeCls = 'badge-other';
+  let stateLabel = s.state || 'Unknown';
+  if(state==='shield_reinforce'||state==='hull_reinforce'||state==='anchor_vulnerable'){stateBadgeCls='badge-reinforced';}
+  else if(state==='anchored'||state==='online'){stateBadgeCls='badge-anchored'; stateLabel='Online';}
+  else if(state==='unanchoring'){stateBadgeCls='badge-unanchoring';}
+
+  // Services
+  const services = (s.services||[]).map(sv=>{
+    const online = sv.state==='online';
+    return `<div class="struct-svc ${online?'online':'offline'}">
+      <div class="struct-svc-dot"></div>${esc(sv.name)}
+    </div>`;
+  }).join('');
+
+  // Vulnerability window
+  const vulnHtml = s.reinforce_hour!=null
+    ? `<div class="struct-vuln">🛡 Vulnerability window: <b>${s.reinforce_hour}:00 – ${(s.reinforce_hour+1)%24}:00 EVE</b></div>`
+    : '';
+
+  // Fuel expiry formatted
+  const fuelExpiresStr = s.fuel_expires
+    ? new Date(s.fuel_expires).toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',timeZone:'UTC'})+' UTC'
+    : '—';
+
+  const onlineCount  = (s.services||[]).filter(sv=>sv.state==='online').length;
+  const offlineCount = (s.services||[]).filter(sv=>sv.state!=='online').length;
+
+  return `
+    <div class="struct-panel">
+      <!-- Background layers -->
+      ${renderUrl?`<div class="struct-render" style="background-image:url('${renderUrl}');"></div>`:''}
+      ${corpId?`<div class="struct-corp-bg" style="background-image:url('https://images.evetech.net/corporations/${corpId}/logo?size=256');background-size:320px 320px;"></div>`:''}
+      <div class="struct-bg"></div>
+
+      <!-- Main content -->
+      <div class="struct-content">
+        <!-- Corp logo visible top-left -->
+        ${corpId?`<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+          <img src="https://images.evetech.net/corporations/${corpId}/logo?size=64"
+            style="width:40px;height:40px;border-radius:6px;border:1px solid rgba(50,182,255,.2);background: rgba(0,0,0,0.4);"
+            onerror="this.style.display='none'">
+          <span style="font-size:11px;color:var(--muted);">${esc(corpName||'Corporation')}</span>
+        </div>`:''}
+        <div class="struct-name-row">
+          <div class="struct-name">${esc(s.name)}</div>
+          <div class="struct-state-badge ${stateBadgeCls}">${esc(stateLabel)}</div>
+          ${s.low_fuel?`<div class="struct-state-badge ${days<2?'badge-reinforced':'badge-unanchoring'}">${days<2?'🚨 CRITICAL':'⚠️ LOW FUEL'}</div>`:''}
+        </div>
+
+        <div class="struct-meta">
+          <div class="struct-meta-item">
+            <div class="struct-meta-lbl">Type</div>
+            <div class="struct-meta-val">${esc(s.type_name)}</div>
+          </div>
+          <div class="struct-meta-item">
+            <div class="struct-meta-lbl">System</div>
+            <div class="struct-meta-val" style="color:var(--accent);">📍 ${esc(s.system_name)}</div>
+          </div>
+          ${s.alerted?`<div class="struct-meta-item">
+            <div class="struct-meta-lbl">Alert</div>
+            <div class="struct-meta-val" style="color:#f97316;">🔔 Discord alert sent</div>
+          </div>`:''}
+        </div>
+
+        ${days!=null?`
+        <div class="struct-fuel-wrap">
+          <div class="struct-fuel-header">
+            <span class="struct-fuel-label">⛽ Fuel</span>
+            <span class="struct-fuel-days" style="color:${fuelColor};">${days.toFixed(1)} days remaining</span>
+          </div>
+          <div class="struct-fuel-bar"><div class="struct-fuel-fill" style="width:${pct}%;background:${fuelColor};"></div></div>
+          <div class="struct-fuel-expires">Expires ${fuelExpiresStr}</div>
+        </div>`:''}
+
+        ${services?`
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:6px;">Services</div>
+          <div class="struct-services">${services}</div>
+        </div>`:''}
+
+        ${vulnHtml}
+      </div>
+
+      <!-- Bottom stat bar -->
+      <div class="struct-stat-bar">
+        <div class="struct-stat">
+          <div class="struct-stat-lbl">Structure ID</div>
+          <div class="struct-stat-val" style="font-size:11px;font-family:monospace;">${s.structure_id}</div>
+        </div>
+        <div class="struct-stat">
+          <div class="struct-stat-lbl">Fuel %</div>
+          <div class="struct-stat-val" style="color:${fuelColor};">${pct}%</div>
+        </div>
+        <div class="struct-stat">
+          <div class="struct-stat-lbl">Services Online</div>
+          <div class="struct-stat-val">${onlineCount} <span style="color:var(--muted);font-size:11px;">/ ${onlineCount+offlineCount}</span></div>
+        </div>
+        ${s.reinforce_hour!=null?`<div class="struct-stat">
+          <div class="struct-stat-lbl">Reinforce Hour</div>
+          <div class="struct-stat-val">${s.reinforce_hour}:00 EVE</div>
+        </div>`:''}
+      </div>
+    </div>`;
+}
+
+window.addEventListener('DOMContentLoaded', ()=>{
+  if(document.getElementById('aliasSelect').value) ldStructures();
+});
+</script>
+{% endblock %}

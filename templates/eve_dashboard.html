@@ -1,0 +1,305 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>XYLON - EVE Overview</title>
+  {# IMPORTANT: Static is mounted under APP_PREFIX (/app). url_for resolves correct prefixed path. #}
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=11" />
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">XYLON</div>
+  <nav class="nav">
+    <a href="/app/home">Home</a>
+    <a href="/app/console">Console</a>
+    <a class="active" href="/app/eve_online">EVE Overview</a>
+    <a href="/app/console/eve">EVE Console</a>
+    <a href="/app/notifications">Feed</a>
+    <a href="/app/reminders">Reminders</a>
+  </nav>
+  <div class="right">
+    <span class="user">{{ username }}</span>
+    <a class="btn" href="/app/logout">Logout</a>
+  </div>
+</div>
+
+<div class="shell">
+  <div class="bg-blur"></div>
+  <main class="page">
+    <section class="hero">
+      <div>
+        <h1>EVE Overview</h1>
+        <p class="sub">Live dashboard for the selected character. No tools here. Use <a href="/app/console/eve">EVE Console</a> for on-demand commands and raw output.</p>
+      </div>
+      <div class="hero-right">
+        <div class="pill" id="dashStatus">Loading…</div>
+      </div>
+    </section>
+
+    <section class="controls card">
+      <div class="control-row">
+<label class="chip">
+          <span>Character</span>
+          <select id="charSelect"></select>
+        </label>
+        <div class="pill" id="lastUpdated">Last updated: —</div>
+        <div class="spacer"></div>
+        <div class="pill" id="onlinePill">—</div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="stat card">
+        <div class="k">Wallet</div>
+        <div class="v" id="walletPretty">—</div>
+        <div class="s" id="walletRaw">Raw: —</div>
+      </div>
+      <div class="stat card">
+        <div class="k">Skill Queue</div>
+        <div class="v" id="sqCount">—</div>
+        <div class="s" id="sqNext">Next: —</div>
+      </div>
+      <div class="stat card">
+        <div class="k">Industry Jobs</div>
+        <div class="v" id="ijCount">—</div>
+        <div class="s" id="ijSoon">Soonest: —</div>
+      </div>
+      <div class="stat card">
+        <div class="k">PI Planets</div>
+        <div class="v" id="piCount">—</div>
+        <div class="s" id="piHint">—</div>
+      </div>
+      <div class="stat card">
+        <div class="k">Location</div>
+        <div class="v" id="locSystem">—</div>
+        <div class="s" id="locType">—</div>
+      </div>
+      <div class="stat card">
+        <div class="k">Ship</div>
+        <div class="v" id="shipName">—</div>
+        <div class="s" id="shipType">—</div>
+      </div>
+    </section>
+
+    <section class="two">
+      <div class="card">
+        <h2>Identity</h2>
+        <div class="two-cols">
+          <div>
+            <div class="row"><span class="label">Character</span><span class="value" id="idChar">—</span></div>
+            <div class="row"><span class="label">Security</span><span class="value" id="idSec">—</span></div>
+          </div>
+          <div>
+            <div class="row"><span class="label">Corporation</span><span class="value" id="idCorp">—</span></div>
+            <div class="row"><span class="label">Scopes</span></div>
+            <pre class="mono scopes" id="idScopes">—</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Assets Overview</h2>
+      <div class="mini">
+        <div class="mini-item"><div class="k">Total stacks</div><div class="v" id="aTotal">—</div></div>
+        <div class="mini-item"><div class="k">Top location</div><div class="v" id="aTop">—</div></div>
+        <div class="mini-item"><div class="k">Sample</div><div class="v" id="aSample">—</div></div>
+      </div>
+      <div class="tablewrap">
+        <table class="tbl">
+          <thead><tr><th>Item</th><th>Qty</th><th>Where</th><th>Location</th></tr></thead>
+          <tbody id="assetsBody"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Industry Jobs</h2>
+      <div class="tablewrap">
+        <table class="tbl">
+          <thead><tr><th>Status</th><th>Activity</th><th>Runs</th><th>Ends</th></tr></thead>
+          <tbody id="jobsBody"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Planetary Interaction</h2>
+      <div class="tablewrap">
+        <table class="tbl">
+          <thead><tr><th>Planet</th><th>Type</th><th>Last update</th></tr></thead>
+          <tbody id="piBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer">XYLON WebUI <span class="muted">/app</span></footer>
+  </main>
+</div>
+
+<script>
+  const API_PREFIX = '/app/api';
+  const APP_PREFIX = '/app';
+
+  const el = (id) => document.getElementById(id);
+  const fmtISK = (n) => {
+    if (n == null || isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    if (abs >= 1e12) return (n/1e12).toFixed(2) + 'T ISK';
+    if (abs >= 1e9)  return (n/1e9).toFixed(2)  + 'B ISK';
+    if (abs >= 1e6)  return (n/1e6).toFixed(2)  + 'M ISK';
+    return Math.round(n).toLocaleString() + ' ISK';
+  };
+
+  async function jget(url){
+    const r = await fetch(url, {credentials:'include'});
+    if(!r.ok){
+      const t = await r.text();
+      throw new Error(`${r.status} ${r.statusText}: ${t}`);
+    }
+    return await r.json();
+  }
+
+  function setStatus(msg, kind='ok'){
+    const s = el('dashStatus');
+    s.textContent = msg;
+    s.classList.toggle('bad', kind==='bad');
+    s.classList.toggle('ok', kind==='ok');
+  }
+
+  function rowsToBody(tbody, rows, cols){
+    if(!rows || !rows.length){
+      tbody.innerHTML = `<tr><td colspan="${cols}" class="muted">No data</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(r => `<tr>${r.map(c=>`<td>${c ?? '—'}</td>`).join('')}</tr>`).join('');
+  }
+
+  function pickDefaultAlias(list){
+    if(!Array.isArray(list) || !list.length) return null;
+    const d = list.find(x => x && x.is_default);
+    return (d && (d.alias || d.character_name)) || (list[0].alias || list[0].character_name);
+  }
+
+  async function loadCharacters(){
+    // expects your app has /api/eve/linked returning list; fallback to dashboard alias list.
+    try{
+      const data = await jget(`${API_PREFIX}/eve/linked`);
+      return data.characters || data || [];
+    }catch(_){
+      // If linked endpoint isn't present, the dashboard call still works when alias known.
+      return [];
+    }
+  }
+
+  async function loadDashboard(alias){
+    // Request the full dashboard payload (detail + assets + corp) so the page can render human-readable data.
+    const dash = await jget(`${API_PREFIX}/eve/dashboard?alias=${encodeURIComponent(alias||'')}&detail=true&include_assets=true&include_corp=true`);
+    const d = dash.dashboard || dash;
+
+    // header
+    el('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+
+    // identity
+    el('idChar').textContent = (d.character && (d.character.character_name || d.character_name)) || '—';
+    el('idSec').textContent = (d.security ?? '—');
+    el('idCorp').textContent = (d.corp && (d.corp.corporation_name || d.corp_name)) || d.corp_name || '—';
+    el('idScopes').textContent = (d.character && d.character.scopes) || d.scopes || '—';
+
+    // wallet
+    const w = d.wallet;
+    el('walletRaw').textContent = `Raw: ${(w && w.balance != null) ? w.balance : (d.wallet_balance ?? '—')}`;
+    const wb = (w && w.balance != null) ? w.balance : d.wallet_balance;
+    el('walletPretty').textContent = fmtISK(wb);
+
+    // online / location / ship
+    const online = (d.online && (d.online.online ?? d.online.is_online)) ?? d.is_online;
+    el('onlinePill').textContent = online ? 'Online' : 'Offline';
+
+    if(d.location){
+      el('locSystem').textContent = d.location.system_name || d.location.system || '—';
+      el('locType').textContent = d.location.location_type || '—';
+    }
+    if(d.ship){
+      el('shipName').textContent = d.ship.ship_name || '—';
+      el('shipType').textContent = d.ship.ship_type_name || d.ship.ship_type || '—';
+    }
+
+    // skill queue
+    const sq = d.skill_queue || [];
+    el('sqCount').textContent = Array.isArray(sq) ? String(sq.length) : '—';
+    el('sqNext').textContent = Array.isArray(sq) && sq[0] && sq[0].finish_date ? `Next: ${sq[0].finish_date}` : 'Next: —';
+
+    // industry
+    const jobs = d.industry_jobs || [];
+    el('ijCount').textContent = Array.isArray(jobs) ? String(jobs.length) : '—';
+    const soon = Array.isArray(jobs) ? jobs.map(j=>j.end_date).filter(Boolean).sort()[0] : null;
+    el('ijSoon').textContent = soon ? `Soonest: ${soon}` : 'Soonest: —';
+
+    // PI
+    const planets = d.pi_planets || [];
+    el('piCount').textContent = Array.isArray(planets) ? String(planets.length) : '—';
+    el('piHint').textContent = Array.isArray(planets) && planets.length ? 'Routes on console' : '—';
+
+    // assets + jobs + planets tables (separate endpoints)
+    try{
+      const a = await jget(`${API_PREFIX}/eve/character/assets?alias=${encodeURIComponent(alias||'')}`);
+      const items = a.items || a.assets || [];
+      el('aTotal').textContent = (a.total_stacks ?? (Array.isArray(items) ? items.length : '—'));
+      el('aTop').textContent = a.top_location || '—';
+      el('aSample').textContent = a.sample || '—';
+      const rows = (a.sample_items || items || []).slice(0, 12).map(it => [it.type_name||it.name||it.type_id||'—', it.qty||it.quantity||it.quantity||'—', it.where||it.flag||'—', it.location||it.location_id||'—']);
+      rowsToBody(el('assetsBody'), rows, 4);
+    }catch(err){
+      el('assetsBody').innerHTML = `<tr><td colspan="4" class="muted">Assets unavailable</td></tr>`;
+    }
+
+    // industry jobs table from dashboard payload
+    const jobRows = (Array.isArray(jobs) ? jobs : []).slice(0, 12).map(j => [j.status || j.state || '—', j.activity || j.activity_id || '—', j.runs ?? '—', j.end_date || '—']);
+    rowsToBody(el('jobsBody'), jobRows, 4);
+
+    // planets table
+    const piRows = (Array.isArray(planets) ? planets : []).slice(0, 12).map(p => [p.planet_name || p.planet_id || '—', p.planet_type || p.type || '—', p.last_update || '—']);
+    rowsToBody(el('piBody'), piRows, 3);
+
+    setStatus('Dashboard ready', 'ok');
+  }
+
+  async function init(){
+    try{
+      setStatus('Loading…','ok');
+      const sel = el('charSelect');
+
+      // try to populate from server-provided characters (preferred)
+      const chars = await loadCharacters();
+      const serverChars = Array.isArray(chars) && chars.length;
+
+      if(serverChars){
+        sel.innerHTML = chars.map(c => {
+          const label = `${c.character_name}${c.is_default ? ' [default]' : ''}`;
+          const value = c.alias || c.character_name;
+          return `<option value="${value}">${label}</option>`;
+        }).join('');
+        sel.value = pickDefaultAlias(chars) || sel.value;
+      } else {
+        // fallback: at least keep the currently selected name from cookie/session if server injected it
+        sel.innerHTML = `<option value="{{ default_alias }}">{{ default_alias }} [default]</option>`;
+      }
+
+      await loadDashboard(sel.value);
+
+      sel.addEventListener('change', async () => {
+        setStatus('Loading…','ok');
+        await loadDashboard(sel.value);
+      });
+
+    }catch(e){
+      console.error(e);
+      setStatus('Error loading dashboard','bad');
+    }
+  }
+  init();
+</script>
+</body>
+</html>

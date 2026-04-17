@@ -1,0 +1,1309 @@
+:root {
+  color-scheme: dark;
+  --topbar-h: 72px;
+  --ticker-h: 32px;
+}
+
+* { box-sizing: border-box; }
+
+body{
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background-color: #05070c;
+  min-height: 100vh;
+}
+
+
+/* Standalone desktop app: star/dust particle layers removed */
+
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px;
+  position: relative;
+  z-index: 5;
+}
+
+/* Fixed header: ensure initial render starts below the topbar.
+   Content will still scroll underneath the translucent header as you scroll. */
+main.wrap {
+  padding-top: calc(var(--topbar-h) + var(--ticker-h) + 18px);
+}
+
+
+.topbar {
+  position: fixed;
+left: 0;
+  right: 0;
+background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+border-bottom: 1px solid rgba(154,164,178,0.14);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+
+  width: 100%;
+  top: var(--ticker-h);
+  z-index: 4000;
+}
+
+.topbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  height: var(--topbar-h);
+  box-sizing: border-box;
+}
+
+.ticker { height: var(--ticker-h); width: 100%; background: rgba(20, 5, 40, 0.92); border-top: 1px solid rgba(255, 140, 0, 0.25); border-bottom: 1px solid rgba(128, 0, 255, 0.35); overflow: hidden; display: flex; align-items: center; font-size: 13px; letter-spacing: 0.4px; color: rgba(255, 140, 0, 0.95);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5000;
+}
+.ticker-track {
+  white-space: nowrap;
+  display: inline-block;
+  padding-left: 100%;
+  animation: xylonTickerScroll 26s linear infinite;
+  will-change: transform;
+}
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+@keyframes xylonTickerScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.brand.big { font-size: 22px; }
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  box-shadow: 0 0 18px rgba(79,140,255,0.35);
+}
+
+.nav {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.nav::-webkit-scrollbar { display: none; }
+
+.nav a {
+  text-decoration: none;
+  color: var(--muted);
+  padding: 8px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.nav a:hover {
+  color: var(--text);
+  background: rgba(0,0,0,0.4);
+}
+.nav a.active{
+  color: var(--text);
+  background: rgba(50,182,255,0.10);
+  border: 1px solid rgba(50,182,255,0.22);
+  box-shadow: 0 0 0 3px rgba(50,182,255,0.06);
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.card {
+  grid-column: span 12;
+  border-radius: 18px;
+  padding: 16px;
+}
+.card{ background: rgba(0,0,0,0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(50,182,255,.12); box-shadow: 0 8px 24px rgba(0,0,0,0.40); }
+
+@media (min-width: 900px) {
+  .grid > .card:nth-child(1) { grid-column: span 6; }
+  .grid > .card:nth-child(2) { grid-column: span 6; }
+  .grid > .card:nth-child(3) { grid-column: span 12; }
+}
+
+h2 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.muted { color: var(--muted); }
+.tiny { font-size: 13px; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+.pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.row.left { justify-content: flex-start; }
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(154,164,178,0.25);
+  background: rgba(0,0,0,0.4);
+  object-fit: cover;
+}
+
+.list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(50,182,255,.10);
+}
+
+.title { font-weight: 700; }
+.body { margin-top: 6px; color: var(--text); opacity: 0.95; }
+
+.btn {
+  appearance: none;
+  border: 1px solid rgba(154,164,178,0.25);
+  background: rgba(0,0,0,0.4);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.btn:hover { background: rgba(0,0,0,0.4); }
+
+.btn.primary {
+  border: none;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
+
+/* r203: EVE panel-style button — matches toolbar/map button aesthetic */
+.btn-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: rgba(0,0,0,0.8);
+  border: 1px solid rgba(50,182,255,.2);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  white-space: nowrap;
+}
+.btn-panel:hover {
+  background: rgba(50,182,255,.14);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-panel svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.select {
+  appearance: none;
+  border: 1px solid rgba(154,164,178,0.25);
+  background: rgba(0,0,0,0.4);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 12px;
+  min-width: 240px;
+}
+
+.select:focus { outline: 2px solid rgba(47,182,255,0.35); outline-offset: 2px; }
+
+.badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(154,164,178,0.25);
+  background: rgba(0,0,0,0.4);
+  color: var(--text);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 0;
+  opacity: 0.8;
+}
+
+.center {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.login { max-width: 520px; }
+.hr { height: 1px; background: rgba(0,0,0,0.4); margin: 14px 0; }
+.mt { margin-top: 10px; }
+
+/* --- Console --- */
+.grid-two {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 900px) {
+  .grid-two {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(154,164,178,0.20);
+  background: rgba(0,0,0,0.8);
+  font-size: 13px;
+}
+
+.console {
+  height: 420px;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(154,164,178,0.15);
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(50,182,255,.12);
+}
+
+/* --- EVE Online dashboard --- */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+}
+
+.dash-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.dash-title{display:flex;align-items:center;gap:10px;font-weight:900;letter-spacing:0.02em;}
+.dash-meta{display:flex;align-items:center;gap:8px;}
+.dash-body{margin-top:10px;}
+.dash-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.dash-details{margin-top:10px;border-top:1px solid rgba(232,238,252,0.10);padding-top:10px;}
+
+.pill-status{border-color:rgba(232,238,252,0.16);background:rgba(232,238,252,0.06);}
+.pill-ok{border-color:rgba(50,182,255,0.35);background:rgba(50,182,255,0.10);}
+.pill-warn{border-color:rgba(255,171,64,0.38);background:rgba(255,171,64,0.10);}
+.pill-err{border-color:rgba(255,84,84,0.38);background:rgba(255,84,84,0.10);}
+.pill-load{border-color:rgba(139,92,246,0.38);background:rgba(139,92,246,0.10);}
+
+.data-table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:14px;border:1px solid rgba(232,238,252,0.10);background: rgba(0,0,0,0.4);}
+.data-table thead th{font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);text-align:left;padding:10px 10px;border-bottom:1px solid rgba(232,238,252,0.10);}
+.data-table tbody td{padding:10px 10px;border-bottom:1px solid rgba(232,238,252,0.06);font-size:14px;vertical-align:top;}
+.data-table tbody tr:last-child td{border-bottom:none;}
+
+.dash-card {
+  grid-column: span 12;
+  border-radius: 18px;
+  padding: 14px 16px;
+  min-height: 92px;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(50,182,255,.12);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+}
+
+@media (min-width: 700px) {
+  .dash-card { grid-column: span 6; }
+}
+
+@media (min-width: 1000px) {
+  .dash-card { grid-column: span 3; }
+  #corpCard { grid-column: span 6; }
+}
+
+.dash-k { font-size: 13px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.dash-v { font-size: 22px; font-weight: 800; margin-top: 6px; }
+.dash-s { font-size: 13px; margin-top: 6px; }
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 12px;
+}
+
+@media (min-width: 900px) {
+  .tool-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+.msg { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.msg .meta { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.msg .bubble {
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(154,164,178,0.12);
+  background: rgba(0,0,0,0.4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.msg.user .bubble {
+  border-color: rgba(79,140,255,0.25);
+  background: rgba(79,140,255,0.10);
+}
+
+.msg.assistant .bubble {
+  border-color: rgba(139,92,246,0.25);
+  background: rgba(139,92,246,0.10);
+}
+
+.console-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.console-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(154,164,178,0.20);
+  background: rgba(0,0,0,0.4);
+  color: var(--text);
+}
+
+.console-form input:focus { outline: none; border-color: rgba(79,140,255,0.55); }
+
+/* === UI v7.1+: dashboard + tiles === */
+.hero{
+  padding: 26px 0 10px 0;
+}
+.hero-inner{
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 980px){
+  .hero-inner{ grid-template-columns: 1fr; }
+}
+.hero-title{
+  margin: 0;
+  font-size: 44px;
+  letter-spacing: 0.08em;
+}
+.hero-subtitle{
+  margin: 8px 0 0 0;
+  color: var(--muted);
+  max-width: 70ch;
+}
+.hero-cta{
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.status-row{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.grid-1{ display:grid; grid-template-columns: 1fr; gap: 12px; }
+.grid-2{ display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.grid-3{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+@media (max-width: 980px){ .grid-3{ grid-template-columns: 1fr; } .grid-2{ grid-template-columns: 1fr; } }
+
+.tile{
+  display: block;
+  text-decoration: none;
+  padding: 14px 14px 12px 14px;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(154,164,178,0.14);
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.tile:hover{
+  transform: translateY(-1px);
+  border-color: rgba(154,164,178,0.22);
+  background: rgba(0,0,0,0.4);
+}
+.tile-title{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+}
+.tile-desc{
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text);
+  background: rgba(50,182,255,0.12);
+  border: 1px solid rgba(50,182,255,0.25);
+}
+
+.card-h{
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.input, select.input{
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(154,164,178,0.16);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  outline: none;
+}
+.input:focus, select.input:focus{
+  border-color: rgba(50,182,255,0.45);
+  box-shadow: 0 0 0 3px rgba(50,182,255,0.12);
+}
+
+.kpi{
+  display:flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(154,164,178,0.14);
+  background: rgba(0,0,0,0.4);
+}
+.kpi .kpi-label{ color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; }
+.kpi .kpi-val{ font-size: 22px; font-weight: 800; letter-spacing: 0.02em; }
+
+.split{
+  display:grid;
+  grid-template-columns: 0.95fr 1.05fr;
+  gap: 14px;
+}
+@media (max-width: 980px){ .split{ grid-template-columns: 1fr; } }
+
+.console-wrap{
+  border-radius: 16px;
+  border: 1px solid rgba(154,164,178,0.14);
+  overflow: hidden;
+}
+.console-head{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.4);
+  border-bottom: 1px solid rgba(154,164,178,0.14);
+}
+.console-head .muted{ font-size: 12px; }
+.console-body{
+  padding: 12px;
+  max-height: 520px;
+  overflow: auto;
+  background: rgba(0,0,0,0.6);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.footer{
+  margin-top: 22px;
+  padding: 18px 0 34px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.badge-ok{ background: rgba(46, 204, 113, 0.14); border-color: rgba(46, 204, 113, 0.28); }
+.badge-warn{ background: rgba(255, 193, 7, 0.12); border-color: rgba(255, 193, 7, 0.25); }
+.badge-bad{ background: rgba(255, 77, 109, 0.12); border-color: rgba(255, 77, 109, 0.28); }
+
+
+/* KPI + key/value blocks */
+.kpi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:10px;}
+.kpi{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px;}
+.kpi-label{font-size:13px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase;}
+.kpi-value{font-size:22px;font-weight:700;margin-top:6px;}
+.kpi-sub{margin-top:6px;}
+.kv{margin-top:10px;display:flex;flex-direction:column;gap:8px;}
+.kv-row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;}
+.kv-row > div:last-child{text-align:right;max-width:70%;}
+
+
+/* --- Space Glass System (Patch A) --- */
+.glass{
+  background: rgba(0,0,0,0.8);
+  border: 1px solid rgba(232,238,252,0.10);
+  box-shadow:
+    0 12px 34px rgba(0,0,0,0.40),
+    0 0 0 1px rgba(50,182,255,0.06) inset;
+}
+.glow-blue{
+  box-shadow:
+    0 12px 34px rgba(0,0,0,0.40),
+    0 0 0 1px rgba(50,182,255,0.08) inset,
+    0 0 28px rgba(50,182,255,0.10);
+}
+.glow-purple{
+  box-shadow:
+    0 12px 34px rgba(0,0,0,0.40),
+    0 0 0 1px rgba(168,85,247,0.08) inset,
+    0 0 28px rgba(168,85,247,0.10);
+}
+.accent-dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--pop);
+  box-shadow: 0 0 18px rgba(255,138,61,0.18);
+}
+
+
+/* --- EVE icons --- */
+.type-icon{width:18px;height:18px;border-radius:4px;vertical-align:middle;display:inline-block;}
+.kpi-isk{display:inline-flex;align-items:center;margin-right:6px;opacity:.95;}
+.isk-ico{width:16px;height:16px;display:block;}
+
+/* Developer-only UI (hidden unless Developer accordion is opened) */
+body:not(.dev-open) .dev-only{ display:none !important; }
+.dev-accordion > summary{ cursor:pointer; user-select:none; }
+.scope-dd > summary{ cursor:pointer; user-select:none; }
+.linkish{ color: var(--accent2); }
+.linkish:hover{ text-decoration: underline; }
+
+
+/* ============================================================
+   EVE ONLINE IN-GAME UI REPLICATION — r93+ 
+   Shared styles for Industry / Market / Fitting pages
+   ============================================================ */
+
+/* --- EVE Window Frame --- */
+.eve-window{
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(50,182,255,.12);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.40);
+  font-family: 'Segoe UI', 'Noto Sans', system-ui, sans-serif;
+  font-size: 11px;
+  color: #c5cdd8;
+  position: relative;
+}
+.eve-window-title{
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(50,182,255,.12);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #e8ecf2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.eve-window-body{
+  padding: 0;
+}
+
+/* --- EVE Panel (sub-sections inside a window) --- */
+.eve-panel{
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(50,182,255,.12);
+  margin: 4px;
+}
+.eve-panel-hdr{
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(50,182,255,.10);
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b939e;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  user-select: none;
+}
+.eve-panel-body{
+  padding: 4px;
+}
+
+/* --- EVE Tab Bar --- */
+.eve-tabs{
+  display: flex;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(80,100,130,0.25);
+  gap: 0;
+  padding: 0;
+}
+.eve-tab{
+  padding: 5px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  transition: color 0.1s, background 0.1s;
+  user-select: none;
+}
+.eve-tab:hover{
+  color: #c5cdd8;
+  background: rgba(255,255,255,0.03);
+}
+.eve-tab.active{
+  color: #e8ecf2;
+  background: rgba(50,182,255,0.10);
+  border-color: rgba(50,182,255,0.30);
+  border-bottom: 1px solid rgba(0,0,0,0);
+  margin-bottom: -1px;
+}
+
+/* --- EVE Tree View --- */
+.eve-tree{
+  font-size: 11px;
+  overflow-y: auto;
+}
+.eve-tree-node{
+  padding: 0;
+}
+.eve-tree-label{
+  padding: 2px 4px 2px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  transition: background 0.08s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eve-tree-label:hover{
+  background: rgba(50,160,220,0.08);
+}
+.eve-tree-label.active{
+  background: rgba(50,160,220,0.15);
+  color: #fff;
+}
+.eve-tree-toggle{
+  width: 12px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 8px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.eve-tree-children{
+  margin-left: 12px;
+  display: none;
+}
+.eve-tree-children.open{
+  display: block;
+}
+
+/* --- EVE Data Table --- */
+.eve-table{
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.eve-table thead th{
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(60,80,110,0.22);
+  padding: 3px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8b939e;
+  text-align: left;
+  white-space: nowrap;
+  cursor: default;
+}
+.eve-table tbody td{
+  padding: 3px 6px;
+  border-bottom: 1px solid rgba(46,51,59,0.5);
+  vertical-align: middle;
+}
+.eve-table tbody tr:hover{
+  background: rgba(50,160,220,0.06);
+}
+.eve-table tbody tr.selected{
+  background: rgba(50,160,220,0.14);
+}
+
+/* --- EVE Input --- */
+.eve-input{
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(60,80,110,0.30);
+  color: #c5cdd8;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+}
+.eve-input:focus{
+  border-color: #4a8ab5;
+  box-shadow: 0 0 0 1px rgba(74,138,181,0.3);
+}
+.eve-input::placeholder{
+  color: #4a5060;
+}
+
+/* --- EVE Select / Dropdown --- */
+.eve-select{
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(60,80,110,0.30);
+  color: #c5cdd8;
+  padding: 3px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+.eve-select:focus{
+  border-color: #4a8ab5;
+}
+
+/* --- EVE Button --- */
+.eve-btn{
+  background: rgba(0,0,0,0.8);
+  border: 1px solid rgba(80,100,130,0.35);
+  color: #c5cdd8;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+  font-family: inherit;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.eve-btn:hover{
+  background: rgba(50,182,255,0.12);
+  border-color: rgba(50,182,255,0.40);
+  color: #e8ecf2;
+}
+.eve-btn.primary{
+  background: linear-gradient(180deg, #1a5c2e 0%, #0e3d1c 100%);
+  border-color: #2a7a40;
+  color: #b0e8b8;
+}
+.eve-btn.primary:hover{
+  background: linear-gradient(180deg, #1f6e36 0%, #124824 100%);
+  color: #d0f8d8;
+}
+.eve-btn.danger{
+  background: linear-gradient(180deg, #5c1a1a 0%, #3d0e0e 100%);
+  border-color: #7a2a2a;
+  color: #e8b0b0;
+}
+
+/* --- EVE Scrollbar --- */
+.eve-scroll::-webkit-scrollbar{width:6px;height:6px;}
+.eve-scroll::-webkit-scrollbar-track{background:#12161c;}
+.eve-scroll::-webkit-scrollbar-thumb{background:#3a3f48;border-radius:3px;}
+.eve-scroll::-webkit-scrollbar-thumb:hover{background:#4a5060;}
+
+/* --- EVE Colors --- */
+.eve-green{color:#2fef2f;}.eve-yellow{color:#efef2f;}.eve-orange{color:#ef8f2f;}
+.eve-red{color:#ef2f2f;}.eve-cyan{color:#2fefef;}.eve-blue{color:#4aa8e8;}
+.eve-purple{color:#c080ff;}.eve-white{color:#e8ecf2;}
+.eve-faction{color:#ef8f2f;}.eve-t2{color:#efef2f;}.eve-t1{color:#c5cdd8;}
+
+/* --- EVE Stat Bars (for fitting) --- */
+.eve-stat-bar{
+  height: 4px;
+  background: rgba(0,0,0,0.6);
+  border: 1px solid rgba(60,80,110,0.22);
+  position: relative;
+  overflow: hidden;
+}
+.eve-stat-fill{
+  height: 100%;
+  transition: width 0.3s ease;
+}
+.eve-stat-fill.ok{background: linear-gradient(90deg, #1a5c2e, #2fef2f);}
+.eve-stat-fill.warn{background: linear-gradient(90deg, #5c4a1a, #efef2f);}
+.eve-stat-fill.over{background: linear-gradient(90deg, #5c1a1a, #ef2f2f);}
+
+/* --- EVE Slot Styling (for fitting) --- */
+.eve-slot{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border: 1px solid rgba(60,80,110,0.28);
+  background: rgba(0,0,0,0.6);
+  min-height: 28px;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+  font-size: 10px;
+}
+.eve-slot:hover{
+  border-color: #4a8ab5;
+  background: rgba(50,160,220,0.06);
+}
+.eve-slot.filled{
+  background: rgba(0,0,0,0.8);
+}
+.eve-slot img{
+  width: 24px;
+  height: 24px;
+  border: 1px solid #2e333b;
+}
+.eve-slot-high{border-left: 2px solid #ef4040;}
+.eve-slot-med{border-left: 2px solid #40c8ef;}
+.eve-slot-low{border-left: 2px solid #efef40;}
+.eve-slot-rig{border-left: 2px solid #c080ff;}
+
+/* --- EVE ISK formatting --- */
+.eve-isk{font-family: 'Consolas','Monaco','Courier New',monospace;font-weight:600;}
+
+/* --- EVE Layout helpers --- */
+.eve-hbox{display:flex;gap:4px;align-items:center;}
+.eve-vbox{display:flex;flex-direction:column;gap:2px;}
+
+/* --- EVE Breadcrumb --- */
+.eve-breadcrumb{
+  font-size: 10px;
+  color: #6b7280;
+  padding: 3px 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.eve-breadcrumb a{
+  color: #4aa8e8;
+  text-decoration: none;
+}
+.eve-breadcrumb a:hover{
+  color: #6bc0f0;
+  text-decoration: underline;
+}
+
+/* --- EVE Badge / Tag --- */
+.eve-badge{
+  display: inline-block;
+  padding: 0px 4px;
+  font-size: 9px;
+  font-weight: 700;
+  border: 1px solid;
+}
+.eve-badge-bpo{background:rgba(47,239,239,0.08);border-color:rgba(47,239,239,0.25);color:#2fefef;}
+.eve-badge-bpc{background:rgba(239,239,47,0.08);border-color:rgba(239,239,47,0.25);color:#efef2f;}
+.eve-badge-me{background:rgba(47,239,47,0.06);border-color:rgba(47,239,47,0.2);color:#4ae84a;}
+.eve-badge-te{background:rgba(50,160,220,0.06);border-color:rgba(50,160,220,0.2);color:#4aa8e8;}
+
+/* --- EVE Page-level layout override (wider for EVE tools) --- */
+.eve-page-wide{
+  max-width: 1400px;
+}
+/* Override .wrap max-width when EVE tools are present */
+main.wrap:has(.eve-window) {
+  max-width: 1400px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+
+/* ── r135: Global smoked glass — all panels, modals, dropdowns ─── */
+.eve-window-title {
+  background: rgba(0,0,0,0.4) !important;
+}
+.eve-panel-hdr {
+  background: rgba(0,0,0,0.4) !important;
+}
+.eve-panel-body {
+  background: rgba(0,0,0,0.4) !important;
+}
+
+/* r191: Sidebar backdrop — hidden by default, only shown on mobile */
+#sidebar-backdrop { display: none; }
+
+/* ══════════════════════════════════════════════════════════════
+   r191: MOBILE RESPONSIVE — Phase 1 Global Shell
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Mobile: phones < 768px ───────────────────────────────── */
+@media (max-width: 767px) {
+  :root {
+    --topbar-h: 50px;
+    --ticker-h: 0px;
+    --sidebar-w: 56px;
+  }
+
+  /* Hide ticker on mobile — saves 32px vertical */
+  .ticker { display: none !important; }
+
+  /* Compact topbar */
+  .topbar { top: 0; }
+  .topbar-inner { padding: 6px 12px; gap: 10px; }
+  .brand { font-size: 14px; gap: 6px; }
+  .brand .dot { width: 8px; height: 8px; }
+  .user { font-size: 12px; }
+  .user .btn { padding: 4px 10px; font-size: 11px; }
+
+  /* Content — full width, no sidebar offset */
+  main.wrap, footer.wrap {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-top: calc(var(--topbar-h) + 12px);
+  }
+  .wrap { max-width: 100%; padding: 12px; }
+
+  body.sidebar-open main.wrap,
+  body.sidebar-open footer.wrap {
+    padding-left: 12px !important;
+  }
+
+  /* Sidebar — overlay mode on mobile, icon-only (r199/r200) */
+  #xylon-sidebar {
+    top: var(--topbar-h);
+    width: 64px;
+    padding: 12px 8px 16px;
+    background: rgba(0,0,0,0.8);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(50,182,255,.25);
+    box-shadow: 4px 0 24px rgba(0,0,0,.8);
+    z-index: 5500;
+    pointer-events: auto;
+  }
+  #xylon-sidebar .snav-item {
+    width: 100%;
+    height: 44px;
+    border-radius: 8px;
+    justify-content: center;
+    padding-left: 0;
+    gap: 0;
+    pointer-events: auto;
+    cursor: pointer;
+    position: relative;
+    z-index: 5501;
+  }
+  #xylon-sidebar .snav-item svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: block;
+  }
+  /* r199: Icon-only on mobile — no labels ever */
+  #xylon-sidebar .snav-item .snav-tip {
+    display: none !important;
+  }
+  #xylon-sidebar .snav-div {
+    width: 100%;
+    margin: 4px 0;
+  }
+
+  /* Sidebar backdrop overlay — r202: left offset by sidebar width so backdrop
+     doesn't cover the sidebar icons and eat their touch events */
+  #sidebar-backdrop {
+    display: none;
+    position: fixed;
+    top: var(--topbar-h);
+    left: 64px;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 5400;
+  }
+  body.sidebar-open #sidebar-backdrop { display: block; }
+
+  /* Footer compact */
+  .footer { font-size: 10px; padding: 8px 12px; }
+
+  /* Touch-friendly tap targets */
+  .btn, button, a.btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Except inline small buttons */
+  .btn-sm, .tb-btn {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}
+
+/* ── Tablet: 768px–1024px ─────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  :root {
+    --topbar-h: 56px;
+    --ticker-h: 28px;
+  }
+  .topbar-inner { padding: 8px 14px; }
+  .wrap { max-width: 100%; padding: 14px; }
+  main.wrap { padding-top: calc(var(--topbar-h) + var(--ticker-h) + 14px); }
+  .ticker { font-size: 11px; }
+}
+
+/* ── Landscape-only hint for complex pages ────────────────── */
+.landscape-only-hint {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text);
+  text-align: center;
+  padding: 24px;
+}
+.landscape-only-hint .hint-icon {
+  font-size: 48px;
+  animation: rotate-hint 2s ease-in-out infinite;
+}
+.landscape-only-hint .hint-text {
+  font-size: 16px;
+  font-weight: 600;
+  max-width: 280px;
+}
+.landscape-only-hint .hint-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+@keyframes rotate-hint {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-90deg); }
+  75% { transform: rotate(-90deg); }
+}
+/* Show hint on portrait phones for pages that opt in */
+@media (max-width: 767px) and (orientation: portrait) {
+  .landscape-required .landscape-only-hint { display: flex; }
+  .landscape-required > *:not(.landscape-only-hint) { display: none !important; }
+}
+/* Also hide it in landscape — page is usable */
+@media (orientation: landscape) {
+  .landscape-only-hint { display: none !important; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   GLOBAL GLASS PANEL UNIFICATION
+   Canonical smoked-glass token:
+     bg      rgba(0,0,0,0.45)
+     blur    backdrop-filter: blur(12px)
+     border  1px solid rgba(50,182,255,.12)
+     shadow  0 8px 24px rgba(0,0,0,.40)
+   All page-specific panels unified to this standard.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Structures ──────────────────────────────────────────────────────── */
+.struct-panel {
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(50,182,255,.12) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.40) !important;
+}
+.struct-stat-bar {
+  background: rgba(0,0,0,0.6) !important;
+  border-top-color: rgba(50,182,255,.12) !important;
+}
+
+/* ── Skills — queue tab ──────────────────────────────────────────────── */
+.sq-hero {
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(50,182,255,.12) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.40) !important;
+}
+.sq-item {
+  background: rgba(0,0,0,0.4) !important;
+  border-color: rgba(50,182,255,.08) !important;
+}
+.sq-item:hover { background: rgba(50,182,255,.06) !important; border-color: rgba(50,182,255,.18) !important; }
+.sq-item.training { background: rgba(50,182,255,.07) !important; border-color: rgba(50,182,255,.22) !important; }
+.sq-summary {
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(50,182,255,.12) !important;
+}
+
+/* ── Skills — planner tab ────────────────────────────────────────────── */
+.sp-attr-strip {
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(50,182,255,.12) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35) !important;
+}
+.sp-attr-cell {
+  background: rgba(0,0,0,0.4) !important;
+  border-right-color: rgba(50,182,255,.08) !important;
+}
+.sp-browser {
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(50,182,255,.12) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.40) !important;
+}
+.sp-browser-head {
+  background: rgba(0,0,0,0.4) !important;
+  border-bottom-color: rgba(50,182,255,.10) !important;
+}
+.sp-plan-item {
+  background: rgba(0,0,0,0.4) !important;
+  border-color: rgba(50,182,255,.08) !important;
+}
+.sp-plan-item:hover { background: rgba(50,182,255,.05) !important; }
+.sp-total-card {
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(50,182,255,.12) !important;
+}
+.sp-sync-card {
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(50,182,255,.12) !important;
+}
+
+/* ── Industry ────────────────────────────────────────────────────────── */
+.mfg-wrap {
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(50,182,255,.12) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.40);
+  border-radius: 12px;
+  overflow: hidden;
+}
+/* Inner columns: transparent so parent blur shows, not double-blurred */
+.mfg-left, .mfg-right {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.mfg-left-head, .mfg-prod-head, .mfg-cfg, .mfg-results-bar, .mfg-presets-section {
+  background: rgba(0,0,0,0.4) !important;
+}
+.mfg-left { border-right-color: rgba(50,182,255,.10) !important; }
+.mfg-bp-row { border-bottom-color: rgba(50,182,255,.06) !important; }
+.mfg-mat-row { border-bottom-color: rgba(50,182,255,.05) !important; }
+.mfg-mat-total-row { border-top-color: rgba(50,182,255,.12) !important; background: rgba(0,0,0,0.4) !important; }
+
+/* ── Fitting ─────────────────────────────────────────────────────────── */
+/* Title bar + char bar already inline; unify fit-outer and inner columns */
+.fit-outer {
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(50,182,255,.12);
+  border-top: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,.40);
+  overflow: hidden;
+}
+.fit-left, .fit-center, .fit-right {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.fit-left  { border-right-color:  rgba(50,182,255,.10) !important; }
+.fit-right { border-left-color:   rgba(50,182,255,.10) !important; }
+.fit-bottom {
+  background: rgba(0,0,0,0.4) !important;
+  border-top-color: rgba(50,182,255,.10) !important;
+}
+.fit-resource { border-right-color: rgba(50,182,255,.08) !important; }
+.stat-section { border-bottom-color: rgba(50,182,255,.08) !important; }
+.mod-filter-bar, .eft-section { border-color: rgba(50,182,255,.08) !important; }
+.mod-item { border-bottom-color: rgba(50,182,255,.05) !important; }
+
+/* ── Market ──────────────────────────────────────────────────────────── */
+/* Outer .eve-window already has glass inline; unify inner columns */
+.mkt-left, .mkt-right {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.mkt-left  { border-right-color: rgba(50,182,255,.10) !important; }
+.mkt-detail-hdr { background: rgba(0,0,0,0.4) !important; border-bottom-color: rgba(50,182,255,.10) !important; }
+.best-prices { border-bottom-color: rgba(50,182,255,.08) !important; }
+.best-stat   { border-right-color:  rgba(50,182,255,.08) !important; }
+.hist-wrap   { border-top-color:    rgba(50,182,255,.08) !important; }

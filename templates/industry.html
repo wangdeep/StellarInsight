@@ -1,0 +1,923 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  main.wrap{max-width:100% !important;padding-top:calc(var(--topbar-h,72px) + var(--ticker-h,32px) + 4px) !important;padding-right:8px !important;padding-bottom:0 !important;}
+  body:not(.sidebar-open) main.wrap{padding-left:8px !important;}
+
+  /* ── Layout ── */
+  .mfg-wrap{display:grid;grid-template-columns:320px 1fr;gap:0;height:calc(100vh - var(--topbar-h,72px) - var(--ticker-h,32px) - 8px);min-height:600px;}
+  @media(max-width:900px){.mfg-wrap{grid-template-columns:1fr;height:auto;}}
+
+  /* ── Left panel: blueprint list ── */
+  .mfg-left{display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.6);backdrop-filter:blur(12px);border-right:1px solid rgba(50,182,255,.12);}
+  .mfg-left-head{padding:8px;border-bottom:1px solid rgba(50,182,255,.1);display:flex;flex-direction:column;gap:6px;flex-shrink:0;}
+  .mfg-search{width:100%;background: rgba(0,0,0,0.4);border:1px solid rgba(50,182,255,.2);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;outline:none;}
+  .mfg-search:focus{border-color:rgba(50,182,255,.5);}
+  .mfg-act-tabs{display:flex;gap:3px;}
+  .mfg-act-tab{flex:1;padding:3px 4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:4px;cursor:pointer;border:1px solid rgba(50,182,255,.15);background: rgba(0,0,0,0.4);color:var(--muted);text-align:center;}
+  .mfg-act-tab.active{background:rgba(50,182,255,.15);color:var(--accent);border-color:var(--accent);}
+  .mfg-bp-list{flex:1;overflow-y:auto;}
+  .mfg-bp-row{display:flex;align-items:center;gap:8px;padding:5px 8px;cursor:pointer;border-bottom:1px solid rgba(46,51,59,.4);transition:background .08s;}
+  .mfg-bp-row:hover{background:rgba(50,182,255,.06);}
+  .mfg-bp-row.sel{background:rgba(50,182,255,.14);border-left:2px solid var(--accent);}
+  .mfg-bp-row img{width:32px;height:32px;border:1px solid rgba(60,80,110,.3);border-radius:3px;background: rgba(0,0,0,0.6);flex-shrink:0;}
+  .mfg-bp-name{font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+  .mfg-bp-meta{font-size:9px;color:var(--muted);}
+  .mfg-section-hdr{padding:4px 8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(50,182,255,.08);position:sticky;top:0;z-index:2;}
+  .mfg-presets-section{border-top:1px solid rgba(50,182,255,.1);flex-shrink:0;max-height:160px;overflow-y:auto;}
+
+  /* ── Right panel ── */
+  .mfg-right{display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);backdrop-filter:blur(12px);}
+  .mfg-right-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;flex-direction:column;gap:8px;}
+
+  /* ── Product header ── */
+  .mfg-prod-head{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid rgba(50,182,255,.1);background: rgba(0,0,0,0.4);flex-shrink:0;}
+  .mfg-prod-icon{width:52px;height:52px;border:1px solid rgba(50,182,255,.2);border-radius:6px;background: rgba(0,0,0,0.6);}
+  .mfg-prod-name{font-size:18px;font-weight:700;color:var(--text);}
+  .mfg-prod-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .mfg-save-preset{margin-left:auto;padding:5px 12px;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:var(--accent);border-radius:6px;cursor:pointer;font-size:11px;}
+  .mfg-save-preset:hover{background:rgba(50,182,255,.2);}
+
+  /* ── Config bar ── */
+  .mfg-cfg{display:flex;flex-wrap:wrap;gap:10px;padding:8px 14px;border-bottom:1px solid rgba(50,182,255,.08);background: rgba(0,0,0,0.4);flex-shrink:0;align-items:flex-end;}
+  .mfg-field{display:flex;flex-direction:column;gap:3px;}
+  .mfg-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+  .mfg-inp{background: rgba(0,0,0,0.6);border:1px solid rgba(50,182,255,.18);color:var(--text);padding:4px 8px;border-radius:5px;font-size:12px;width:70px;outline:none;font-family:monospace;}
+  .mfg-inp:focus{border-color:rgba(50,182,255,.5);}
+  .mfg-inp.wide{width:130px;}
+  .mfg-inp.xwide{width:180px;}
+  select.mfg-inp{width:auto;min-width:90px;cursor:pointer;}
+  .mfg-calc-btn{padding:6px 16px;background:linear-gradient(90deg,rgba(50,182,255,.25),rgba(168,85,247,.2));border:1px solid rgba(50,182,255,.3);color:var(--accent);border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap;}
+  .mfg-calc-btn:hover{background:linear-gradient(90deg,rgba(50,182,255,.35),rgba(168,85,247,.3));}
+
+  /* ── Results stat bar ── */
+  .mfg-results-bar{display:flex;gap:0;border-bottom:1px solid rgba(50,182,255,.1);flex-shrink:0;background: rgba(0,0,0,0.4);}
+  .mfg-stat{flex:1;padding:8px 12px;border-right:1px solid rgba(50,182,255,.08);text-align:center;}
+  .mfg-stat:last-child{border-right:none;}
+  .mfg-stat-lbl{font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+  .mfg-stat-val{font-size:16px;font-weight:700;color:var(--text);margin-top:2px;font-family:monospace;}
+  .mfg-stat-val.profit-pos{color:#22c55e;}
+  .mfg-stat-val.profit-neg{color:#ef4444;}
+  .mfg-stat-val.margin-pos{color:#22c55e;}
+  .mfg-stat-val.margin-neg{color:#ef4444;}
+
+  /* ── Lower split: materials + job cost ── */
+  .mfg-lower{display:flex;flex:1;overflow:hidden;min-height:0;}
+  .mfg-materials{flex:1;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid rgba(50,182,255,.08);}
+  .mfg-job-panel{width:280px;flex-shrink:0;display:flex;flex-direction:column;overflow-y:auto;padding:12px;gap:10px;}
+
+  /* ── Materials table ── */
+  .mfg-mat-head{display:flex;padding:4px 8px;background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(50,182,255,.1);flex-shrink:0;}
+  .mfg-mat-head span{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
+  .mfg-mat-scroll{flex:1;overflow-y:auto;}
+  .mfg-mat-row{display:flex;align-items:center;gap:6px;padding:3px 8px;border-bottom:1px solid rgba(46,51,59,.3);font-size:11px;}
+  .mfg-mat-row:hover{background:rgba(50,182,255,.04);}
+  .mfg-mat-row img{width:24px;height:24px;border:1px solid rgba(60,80,110,.25);border-radius:3px;background: rgba(0,0,0,0.6);flex-shrink:0;}
+  .mfg-mat-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+  .mfg-mat-qty{width:80px;text-align:right;font-family:monospace;color:var(--text);font-weight:600;}
+  .mfg-mat-waste{width:55px;text-align:right;font-family:monospace;color:#f97316;font-size:10px;}
+  .mfg-mat-buy-sel{width:80px;}
+  .mfg-mat-price-sel{width:100px;text-align:right;font-family:monospace;}
+  .mfg-mat-cost{width:100px;text-align:right;font-family:monospace;font-weight:600;color:var(--accent);}
+  .mfg-mat-net{width:100px;text-align:right;font-family:monospace;font-weight:600;color:#22c55e;}
+  .mfg-mat-total-row{display:flex;justify-content:flex-end;padding:6px 8px;border-top:1px solid rgba(50,182,255,.15);background: rgba(0,0,0,0.4);gap:12px;font-size:11px;font-weight:700;flex-shrink:0;}
+
+  /* ── Job cost panel ── */
+  .mfg-section-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);border-bottom:1px solid rgba(50,182,255,.1);padding-bottom:5px;}
+  .mfg-jrow{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:11px;}
+  .mfg-jrow-lbl{color:var(--muted);}
+  .mfg-jrow-val{font-family:monospace;font-weight:600;color:var(--text);}
+  .mfg-output-box{background:rgba(50,182,255,.06);border:1px solid rgba(50,182,255,.15);border-radius:6px;padding:8px 10px;display:flex;align-items:center;gap:8px;}
+  .mfg-output-box img{width:32px;height:32px;border-radius:4px;border:1px solid rgba(50,182,255,.2);}
+
+  /* ── Char/structure info ── */
+  .mfg-auto-row{display:flex;align-items:center;gap:8px;font-size:10px;color:var(--muted);padding:3px 0;}
+  .mfg-auto-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0;}
+
+  /* scrollbars */
+  .mfg-bp-list::-webkit-scrollbar,.mfg-mat-scroll::-webkit-scrollbar,.mfg-job-panel::-webkit-scrollbar{width:4px;}
+  .mfg-bp-list::-webkit-scrollbar-thumb,.mfg-mat-scroll::-webkit-scrollbar-thumb,.mfg-job-panel::-webkit-scrollbar-thumb{background:rgba(50,182,255,.2);border-radius:2px;}
+</style>
+
+<div class="mfg-wrap">
+
+  <!-- LEFT: Blueprint search + presets -->
+  <div class="mfg-left">
+    <div class="mfg-left-head">
+      <input class="mfg-search" id="bpSearch" placeholder="Filter blueprints…" oninput="filterBPList()" autocomplete="off">
+      <div class="mfg-act-tabs">
+        <div class="mfg-act-tab active" data-act="1"  onclick="setActivity(1)">Mfg</div>
+        <div class="mfg-act-tab"        data-act="11" onclick="setActivity(11)">React</div>
+        <div class="mfg-act-tab"        data-act="8"  onclick="setActivity(8)">Invent</div>
+        <div class="mfg-act-tab"        data-act="5"  onclick="setActivity(5)">Copy</div>
+      </div>
+    </div>
+
+    <div class="mfg-bp-list" id="bpList">
+      <div style="padding:20px;color:var(--muted);font-size:12px;text-align:center;">⏳ Loading blueprints…</div>
+    </div>
+
+    <!-- Saved presets -->
+    <div class="mfg-presets-section" id="presetsSection">
+      <div class="mfg-section-hdr">⭐ Saved Presets</div>
+      <div id="presetsList"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Calculator -->
+  <div class="mfg-right" id="mfgRight">
+    <div class="mfg-right-empty" id="mfgEmpty">
+      <div style="font-size:32px;">🏭</div>
+      <div>Select a blueprint to calculate</div>
+    </div>
+    <div id="mfgCalc" style="display:none;flex:1;flex-direction:column;overflow:hidden;display:none;">
+
+      <!-- Product header -->
+      <div class="mfg-prod-head">
+        <img id="calcIcon" class="mfg-prod-icon" src="" alt="">
+        <div>
+          <div class="mfg-prod-name" id="calcName">—</div>
+          <div class="mfg-prod-sub" id="calcSub">—</div>
+        </div>
+        <button class="mfg-save-preset" onclick="savePreset()">⭐ Save Preset</button>
+      </div>
+
+      <!-- Config inputs -->
+      <div class="mfg-cfg" id="mfgCfg">
+        <div class="mfg-field">
+          <div class="mfg-lbl">Runs</div>
+          <input class="mfg-inp" id="cfgRuns" type="number" min="1" value="1" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">ME %</div>
+          <input class="mfg-inp" id="cfgME" type="number" min="0" max="10" value="0" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">TE %</div>
+          <input class="mfg-inp" id="cfgTE" type="number" min="0" max="20" value="0" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">System</div>
+          <input class="mfg-inp wide" id="cfgSystem" type="text" value="Gamdis" onblur="fetchCostIndex()" onchange="">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Cost Index %</div>
+          <input class="mfg-inp" id="cfgCostIndex" type="number" min="0" step="0.01" value="0" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Facility Tax %</div>
+          <input class="mfg-inp" id="cfgFacTax" type="number" min="0" step="0.1" value="0" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">SCC %</div>
+          <input class="mfg-inp" id="cfgSCC" type="number" min="0" step="0.1" value="4" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Buy Broker %</div>
+          <input class="mfg-inp" id="cfgBuyBroker" type="number" min="0" max="10" step="0.1" value="1" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Sell Broker %</div>
+          <input class="mfg-inp" id="cfgSellBroker" type="number" min="0" max="10" step="0.1" value="1" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Sales Tax %</div>
+          <input class="mfg-inp" id="cfgSalesTax" type="number" min="0" max="10" step="0.1" value="3.6" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Mat Hub</div>
+          <select class="mfg-inp" id="cfgMatHub" onchange="calc()">
+            <option>Jita</option><option>Amarr</option><option>Dodixie</option><option>Rens</option><option>Hek</option>
+          </select>
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Mat Price</div>
+          <select class="mfg-inp" id="cfgMatOrder" onchange="calc()">
+            <option value="sell">Sell orders</option>
+            <option value="buy">Buy orders</option>
+          </select>
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Out Hub</div>
+          <select class="mfg-inp" id="cfgOutHub" onchange="calc()">
+            <option>Jita</option><option>Amarr</option><option>Dodixie</option><option>Rens</option><option>Hek</option>
+          </select>
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Out Price</div>
+          <select class="mfg-inp" id="cfgOutOrder" onchange="calc()">
+            <option value="sell">Sell orders</option>
+            <option value="buy">Buy orders</option>
+          </select>
+        </div>
+        <div class="mfg-field" id="charBonusField" style="display:none;">
+          <div class="mfg-lbl">TE Bonus %</div>
+          <input class="mfg-inp" id="cfgCharTE" type="number" min="0" step="1" value="0" oninput="calcDebounced()">
+        </div>
+        <div class="mfg-field" id="structMEField" style="display:none;">
+          <div class="mfg-lbl">Structure ME %</div>
+          <input class="mfg-inp" id="cfgStructME" type="number" min="0" step="0.1" value="0" oninput="_structME=parseFloat(this.value)||0;showAutoInfo();calcDebounced()">
+        </div>
+        <div class="mfg-field" id="structTEField" style="display:none;">
+          <div class="mfg-lbl">Structure TE %</div>
+          <input class="mfg-inp" id="cfgStructTE" type="number" min="0" step="0.1" value="0" oninput="_structTE=parseFloat(this.value)||0;showAutoInfo();calcDebounced()">
+        </div>
+        <div class="mfg-field">
+          <div class="mfg-lbl">Facility</div>
+          <select class="mfg-inp xwide" id="structSelect" onchange="applyStructBonuses()">
+            <option value="">— None / Custom —</option>
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;gap:4px;margin-left:auto;">
+          <select class="mfg-inp" id="charSelect" style="min-width:120px;" onchange="loadCharBonuses();loadStructBonuses();loadCharBlueprints();">
+            {% for c in chars %}<option value="{{ c.alias or c.character_name }}">{{ c.character_name }}</option>{% endfor %}
+          </select>
+          <button class="mfg-calc-btn" onclick="calcWithCheck()">⟳ Calculate</button>
+        </div>
+      </div>
+
+      <!-- Auto-populated indicator -->
+      <div id="autoInfo" style="padding:4px 14px;background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(50,182,255,.06);display:flex;gap:16px;flex-wrap:wrap;flex-shrink:0;"></div>
+
+      <!-- Results stat bar -->
+      <div class="mfg-results-bar" id="resultsBar" style="display:none;">
+        <div class="mfg-stat">
+          <div class="mfg-stat-lbl">Total Cost</div>
+          <div class="mfg-stat-val" id="rTotalCost">—</div>
+        </div>
+        <div class="mfg-stat">
+          <div class="mfg-stat-lbl">Gross Sell</div>
+          <div class="mfg-stat-val" id="rSellSell">—</div>
+        </div>
+        <div class="mfg-stat">
+          <div class="mfg-stat-lbl">Net Sell</div>
+          <div class="mfg-stat-val" id="rNetSell">—</div>
+        </div>
+        <div class="mfg-stat">
+          <div class="mfg-stat-lbl">Profit</div>
+          <div class="mfg-stat-val" id="rProfit">—</div>
+        </div>
+        <div class="mfg-stat">
+          <div class="mfg-stat-lbl">Margin</div>
+          <div class="mfg-stat-val" id="rMargin">—</div>
+        </div>
+        <div class="mfg-stat">
+          <div class="mfg-stat-lbl">ISK / Hour</div>
+          <div class="mfg-stat-val" id="rIskHour">—</div>
+        </div>
+        <div class="mfg-stat">
+          <div class="mfg-stat-lbl">Job Time</div>
+          <div class="mfg-stat-val" id="rJobTime" style="font-size:13px;">—</div>
+        </div>
+      </div>
+
+      <!-- Lower: materials + job panel -->
+      <div class="mfg-lower">
+
+        <!-- Materials table -->
+        <div class="mfg-materials">
+          <div class="mfg-mat-head">
+            <span style="flex:1;">Item</span>
+            <span style="width:80px;text-align:right;">Qty (adj)</span>
+            <span style="width:55px;text-align:right;">Waste</span>
+            <span style="width:80px;text-align:center;">Order</span>
+            <span style="width:100px;text-align:right;">Unit Price</span>
+            <span style="width:100px;text-align:right;">Gross Cost</span>
+            <span style="width:100px;text-align:right;">Net Cost</span>
+          </div>
+          <div class="mfg-mat-scroll" id="matScroll">
+            <div style="padding:20px;color:var(--muted);text-align:center;font-size:12px;">Press Calculate to load materials</div>
+          </div>
+          <div class="mfg-mat-total-row" id="matTotalRow" style="display:none;">
+            <span style="color:var(--muted);">Gross (sell):</span>
+            <span style="color:var(--accent);font-family:monospace;" id="matTotalSell">—</span>
+            <span style="color:var(--muted);margin-left:8px;">Net (sell):</span>
+            <span style="color:#22c55e;font-family:monospace;" id="matNetSell">—</span>
+            <span style="color:var(--muted);margin-left:8px;">Gross (buy):</span>
+            <span style="color:var(--accent);font-family:monospace;" id="matTotalBuy">—</span>
+            <span style="color:var(--muted);margin-left:8px;">Net (buy):</span>
+            <span style="color:#22c55e;font-family:monospace;" id="matNetBuy">—</span>
+          </div>
+        </div>
+
+        <!-- Job cost + output panel -->
+        <div class="mfg-job-panel" id="jobPanel">
+          <div style="color:var(--muted);font-size:11px;text-align:center;">Calculate to see job breakdown</div>
+        </div>
+
+      </div><!-- .mfg-lower -->
+    </div><!-- #mfgCalc -->
+  </div><!-- .mfg-right -->
+</div>
+
+<script>
+const API = '/app/api';
+let _currentBpId   = null;
+let _currentBpName = '';
+let _currentAct    = 1;
+let _charTE        = 0;
+let _structME      = 0;
+let _structTE      = 0;
+let _searchTimer   = null;
+
+// ── Formatters ──────────────────────────────────────────────
+function fmtIsk(v){
+  if(v==null||v===undefined)return'—';
+  v=parseFloat(v);
+  if(isNaN(v))return'—';
+  const sign = v<0?'-':'';
+  v=Math.abs(v);
+  if(v>=1e12)return sign+(v/1e12).toFixed(2)+'T';
+  if(v>=1e9) return sign+(v/1e9).toFixed(2)+'B';
+  if(v>=1e6) return sign+(v/1e6).toFixed(2)+'M';
+  if(v>=1e3) return sign+(v/1e3).toFixed(1)+'K';
+  return sign+v.toFixed(2);
+}
+function fmtNum(v){return parseInt(v||0).toLocaleString();}
+function fmtDur(s){
+  s=Math.round(s);
+  const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60),ss=s%60;
+  if(d)return`${d}d ${h}h ${m}m`;
+  if(h)return`${h}h ${m}m ${ss}s`;
+  if(m)return`${m}m ${ss}s`;
+  return`${ss}s`;
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── Activity tabs ────────────────────────────────────────────
+function setActivity(act){
+  _currentAct = act;
+  document.querySelectorAll('.mfg-act-tab').forEach(t=>{
+    t.classList.toggle('active', parseInt(t.dataset.act)===act);
+  });
+  document.getElementById('bpSearch').value='';
+  // Re-render the existing loaded list filtered for this activity
+  // If _allBPs is empty, reload from server
+  if(_allBPs.length){
+    renderBPList(getFilteredBPs());
+  } else {
+    loadCharBlueprints();
+  }
+}
+
+// Return _allBPs filtered to what's relevant for current activity
+function getFilteredBPs(){
+  if(_currentAct === 1){
+    // Manufacturing: show blueprints (exclude reaction formulas by name pattern)
+    return _allBPs.filter(b => !b.typeName.toLowerCase().includes('reaction formula'));
+  }
+  if(_currentAct === 11){
+    // Reactions: show reaction formulas
+    return _allBPs.filter(b => b.typeName.toLowerCase().includes('reaction formula'));
+  }
+  if(_currentAct === 8){
+    // Invention: show T1 BPOs (those are what you invent from)
+    return _allBPs.filter(b => b.isBPO);
+  }
+  if(_currentAct === 5){
+    // Copying: show BPOs (copy from originals only)
+    return _allBPs.filter(b => b.isBPO);
+  }
+  return _allBPs;
+}
+
+// ── Blueprint list — populated from character's actual blueprints ─────────────
+let _allBPs = [];  // [{typeId, typeName, me, te, runs, isBPO, quantity}]
+
+async function loadCharBlueprints(){
+  const alias = document.getElementById('charSelect').value;
+  if(!alias) return;
+  const list = document.getElementById('bpList');
+  list.innerHTML='<div style="padding:12px;color:var(--muted);font-size:11px;text-align:center;">⏳ Loading blueprints…</div>';
+  try{
+    const r = await fetch(`${API}/eve/character/blueprints?alias=${encodeURIComponent(alias)}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){ list.innerHTML=`<div style="padding:12px;color:#f87171;font-size:11px;">${esc(d.detail||'Error loading blueprints')}</div>`; return; }
+
+    const bps = d.blueprints||[];
+    let names = d.type_names||{};
+
+    // Resolve any missing names via SDE (handles cases where ESI universe/names fails)
+    const missingIds = [...new Set(bps.map(b=>b.type_id).filter(tid => {
+      const n = names[String(tid)] || names[tid];
+      return !n || String(n) === String(tid) || n === `Type ${tid}`;
+    }))];
+    if(missingIds.length){
+      try{
+        const snR = await fetch(`${API}/sde/type_names?type_ids=${missingIds.join(',')}`,{credentials:'include'});
+        const snD = await snR.json();
+        Object.entries(snD).forEach(([k,v])=>{
+          const name = (v && typeof v==='object') ? (v.typeName||v.name) : v;
+          if(name) names[k] = name;
+        });
+      }catch(e){}
+    }
+
+    // Build display list — dedupe by type_id, keeping best ME/TE (BPO preferred)
+    const byType = {};
+    bps.forEach(b=>{
+      const tid = b.type_id;
+      const name = names[String(tid)] || names[tid] || `Type ${tid}`;
+      const isBPO = b.quantity === -1 || b.quantity === -2;
+      if(!byType[tid] || isBPO){
+        byType[tid] = {
+          typeId:   tid,
+          typeName: typeof name === 'object' ? (name.typeName||name.name||String(tid)) : String(name),
+          me:       b.material_efficiency||0,
+          te:       b.time_efficiency||0,
+          runs:     b.runs > 0 ? b.runs : 1,
+          isBPO:    isBPO,
+          count:    (byType[tid]?.count||0) + 1,
+        };
+      }
+    });
+
+    _allBPs = Object.values(byType).sort((a,b)=>a.typeName.localeCompare(b.typeName));
+    renderBPList(getFilteredBPs());
+  }catch(e){
+    list.innerHTML=`<div style="padding:12px;color:#f87171;font-size:11px;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderBPList(bps){
+  const list = document.getElementById('bpList');
+  if(!bps.length){
+    list.innerHTML='<div style="padding:20px;color:var(--muted);font-size:12px;text-align:center;">No blueprints found.<br>Make sure ESI scope is granted.</div>';
+    return;
+  }
+
+  // Group by BPO vs BPC
+  const bpos = bps.filter(b=>b.isBPO);
+  const bpcs = bps.filter(b=>!b.isBPO);
+
+  let html = '';
+  if(bpos.length){
+    html += `<div class="mfg-section-hdr">📘 BPOs (${bpos.length})</div>`;
+    html += bpos.map(b=>bpRow(b)).join('');
+  }
+  if(bpcs.length){
+    html += `<div class="mfg-section-hdr">📄 BPCs (${bpcs.length})</div>`;
+    html += bpcs.map(b=>bpRow(b)).join('');
+  }
+  list.innerHTML = html;
+}
+
+function bpRow(b){
+  const isSel = _currentBpId === b.typeId;
+  const badge = b.isBPO
+    ? `<span style="font-size:8px;background:rgba(50,182,255,.15);border:1px solid rgba(50,182,255,.25);color:var(--accent);border-radius:3px;padding:1px 4px;">ME${b.me} TE${b.te}</span>`
+    : `<span style="font-size:8px;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.25);color:#c084fc;border-radius:3px;padding:1px 4px;">${b.runs}x</span>`;
+  return `<div class="mfg-bp-row${isSel?' sel':''}" onclick="selectBPFromChar(${b.typeId},'${esc(b.typeName)}',${b.me},${b.te},${b.runs})">
+    <img src="https://images.evetech.net/types/${b.typeId}/bp?size=32"
+         onerror="this.src='https://images.evetech.net/types/${b.typeId}/icon?size=32'" loading="lazy">
+    <div style="flex:1;min-width:0;">
+      <div class="mfg-bp-name">${esc(b.typeName)}</div>
+      <div class="mfg-bp-meta">${badge}</div>
+    </div>
+  </div>`;
+}
+
+function filterBPList(){
+  const q = document.getElementById('bpSearch').value.trim().toLowerCase();
+  const base = getFilteredBPs();
+  if(!q){ renderBPList(base); return; }
+  renderBPList(base.filter(b=>b.typeName.toLowerCase().includes(q)));
+}
+
+// Legacy debounced search kept as fallback (not used when BPs loaded)
+function debouncedSearch(){ filterBPList(); }
+
+// ── Select blueprint (from char's actual BP list, with known ME/TE) ──────────
+function selectBPFromChar(typeId, typeName, me, te, runs){
+  // Pre-fill ME/TE from actual researched blueprint
+  document.getElementById('cfgME').value  = me  || 0;
+  document.getElementById('cfgTE').value  = te  || 0;
+  document.getElementById('cfgRuns').value = runs > 0 ? runs : 1;
+  selectBP(typeId, typeName);
+}
+
+// ── Select blueprint ─────────────────────────────────────────
+function selectBP(typeId, typeName){
+  _currentBpId   = typeId;
+  _currentBpName = typeName;
+
+  // Highlight selected row
+  document.querySelectorAll('.mfg-bp-row').forEach(r=>r.classList.remove('sel'));
+  event?.currentTarget?.classList.add('sel');
+
+  // Show calculator panel
+  document.getElementById('mfgEmpty').style.display='none';
+  const calc = document.getElementById('mfgCalc');
+  calc.style.display='flex';
+  calc.style.flexDirection='column';
+  calc.style.flex='1';
+  calc.style.overflow='hidden';
+
+  // Product name (strip " Blueprint"/" Reaction Formula" for display)
+  const displayName = typeName.replace(/ Blueprint$/i,'').replace(/ Reaction Formula$/i,'');
+  document.getElementById('calcName').textContent = displayName;
+  document.getElementById('calcSub').textContent  = typeName;
+  document.getElementById('calcIcon').src = `https://images.evetech.net/types/${typeId}/bp?size=64`;
+  document.getElementById('calcIcon').onerror = function(){ this.src=`https://images.evetech.net/types/${typeId}/icon?size=64`; };
+
+  // Clear results
+  document.getElementById('resultsBar').style.display='none';
+  document.getElementById('matScroll').innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:12px;">Press Calculate</div>';
+  document.getElementById('matTotalRow').style.display='none';
+  document.getElementById('jobPanel').innerHTML='<div style="color:var(--muted);font-size:11px;text-align:center;">Calculate to see job breakdown</div>';
+
+  // Auto-load char bonuses + cost index
+  loadCharBonuses();
+  fetchCostIndex();
+}
+
+// ── Character skill bonuses ──────────────────────────────────
+async function loadCharBonuses(){
+  const alias = document.getElementById('charSelect').value;
+  if(!alias) return;
+  try{
+    const r = await fetch(`${API}/industry/char_bonuses?alias=${encodeURIComponent(alias)}`,{credentials:'include'});
+    const d = await r.json();
+    if(d.ok){
+      _charTE = d.te_bonus_pct||0;
+      document.getElementById('cfgCharTE').value = _charTE;
+      document.getElementById('charBonusField').style.display='flex';
+      showAutoInfo();
+    }
+  }catch(e){}
+}
+
+// ── Cost index fetch ─────────────────────────────────────────
+async function fetchCostIndex(){
+  const sys = document.getElementById('cfgSystem').value.trim();
+  if(!sys) return;
+  try{
+    const r = await fetch(`${API}/industry/cost_index?system_name=${encodeURIComponent(sys)}`,{credentials:'include'});
+    const d = await r.json();
+    if(d.ok){
+      const actCostMap = {1:'manufacturing',11:'reactions',8:'invention',5:'copying'};
+      const idx = d[actCostMap[_currentAct]||'manufacturing']||0;
+      document.getElementById('cfgCostIndex').value = (idx*100).toFixed(4);
+      // Store whether system was found for the autoInfo note
+      _costIndexFound = true;
+      _costIndexIsZero = idx === 0;
+      showAutoInfo();
+    } else {
+      _costIndexFound = false;
+      _costIndexIsZero = true;
+      showAutoInfo();
+    }
+  }catch(e){
+    _costIndexFound = false;
+  }
+}
+let _costIndexFound = false;
+let _costIndexIsZero = false;
+
+// ── Auto-info row ────────────────────────────────────────────
+function showAutoInfo(){
+  const items = [];
+  if(_charTE>0) items.push(`⚡ Char TE: -${_charTE}%`);
+  if(_structME>0) items.push(`🏗️ Struct ME: -${_structME.toFixed(1)}%`);
+  if(_structTE>0) items.push(`🏗️ Struct TE: -${_structTE.toFixed(1)}%`);
+  const ci = parseFloat(document.getElementById('cfgCostIndex').value||0);
+  if(_costIndexFound && _costIndexIsZero) items.push(`📊 Cost index: 0% — low activity system (install cost = facility tax + SCC only)`);
+  else if(_costIndexFound && ci>0) items.push(`📊 Cost index: ${ci.toFixed(4)}%`);
+  else if(!_costIndexFound) items.push(`⚠️ System not found in ESI industry index`);
+  // Show rig breakdown if a structure is selected
+  const sel = document.getElementById('structSelect');
+  const s = _structBonuses.find(b=>b.structure_id==sel?.value);
+  if(s?.rigs?.length){
+    s.rigs.forEach(rig=>{
+      const parts = [];
+      if(rig.me_pct) parts.push(`ME -${rig.me_pct}%`);
+      if(rig.te_pct) parts.push(`TE -${rig.te_pct}%`);
+      if(parts.length) items.push(`🔩 ${rig.name}: ${parts.join(', ')}`);
+    });
+  }
+  document.getElementById('autoInfo').innerHTML = items.map(s=>
+    `<div class="mfg-auto-row"><div class="mfg-auto-dot"></div><span>${s}</span></div>`
+  ).join('');
+}
+
+// ── Main calculate ───────────────────────────────────────────
+function calcWithCheck(){
+  calc(true);
+}
+
+// Debounced recalc for number inputs — avoids hammering on every keystroke
+let _calcTimer = null;
+function calcDebounced(){
+  clearTimeout(_calcTimer);
+  _calcTimer = setTimeout(()=>calc(false), 400);
+}
+
+async function calc(force){
+  if(!_currentBpId) return;
+  const btn = document.querySelector('.mfg-calc-btn');
+  btn.textContent='⏳ Loading…';
+  btn.disabled=true;
+
+  try{
+    const payload = {
+      bp_type_id:        _currentBpId,
+      runs:              parseInt(document.getElementById('cfgRuns').value)||1,
+      me:                parseInt(document.getElementById('cfgME').value)||0,
+      te:                parseInt(document.getElementById('cfgTE').value)||0,
+      activity:          _currentAct,
+      facility_tax:      parseFloat(document.getElementById('cfgFacTax').value)||0,
+      scc_surcharge:     parseFloat(document.getElementById('cfgSCC').value)||4,
+      cost_index:        parseFloat(document.getElementById('cfgCostIndex').value)||0,
+      mat_hub:           document.getElementById('cfgMatHub').value,
+      out_hub:           document.getElementById('cfgOutHub').value,
+      mat_order_type:    document.getElementById('cfgMatOrder').value,
+      out_order_type:    document.getElementById('cfgOutOrder').value,
+      char_te_bonus_pct: parseFloat(document.getElementById('cfgCharTE').value)||0,
+      struct_me_bonus_pct: _structME,
+      struct_te_bonus_pct: _structTE,
+      buy_broker_fee:  parseFloat(document.getElementById('cfgBuyBroker').value)||0,
+      sell_broker_fee: parseFloat(document.getElementById('cfgSellBroker').value)||0,
+      sales_tax:       parseFloat(document.getElementById('cfgSalesTax').value)||0,
+    };
+
+    const r = await fetch(`${API}/industry/calc`,{
+      method:'POST',
+      credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    const d = await r.json();
+
+    if(!d.ok){
+      document.getElementById('matScroll').innerHTML=`<div style="padding:20px;color:#f87171;text-align:center;">${esc(d.error||'Calculation failed')}</div>`;
+      return;
+    }
+
+    renderResults(d);
+  }catch(e){
+    document.getElementById('matScroll').innerHTML=`<div style="padding:20px;color:#f87171;text-align:center;">Error: ${esc(e.message)}</div>`;
+  }finally{
+    btn.textContent='⟳ Calculate';
+    btn.disabled=false;
+  }
+}
+
+// ── Render results ───────────────────────────────────────────
+function renderResults(d){
+  const t = d.totals, j = d.job, p = d.product;
+
+  // Stat bar
+  const profitPos = t.profit >= 0;
+  const outOrder  = document.getElementById('cfgOutOrder').value;
+  document.getElementById('rTotalCost').textContent = fmtIsk(t.total_cost)+' ISK';
+  document.getElementById('rSellSell').textContent  = fmtIsk(outOrder==='sell'?t.out_val_sell:t.out_val_buy)+' ISK';
+  document.getElementById('rNetSell').textContent   = fmtIsk(outOrder==='sell'?t.out_net_sell:t.out_net_buy)+' ISK';
+  document.getElementById('rProfit').textContent    = fmtIsk(t.profit)+' ISK';
+  document.getElementById('rProfit').className      = 'mfg-stat-val '+(profitPos?'profit-pos':'profit-neg');
+  document.getElementById('rMargin').textContent    = t.margin_pct.toFixed(2)+'%';
+  document.getElementById('rMargin').className      = 'mfg-stat-val '+(profitPos?'margin-pos':'margin-neg');
+  document.getElementById('rIskHour').textContent   = fmtIsk(t.isk_per_hour)+'/h';
+  document.getElementById('rJobTime').textContent   = fmtDur(j.time_secs);
+  document.getElementById('resultsBar').style.display='flex';
+
+  // Materials table
+  const matOrder = document.getElementById('cfgMatOrder').value;
+  const rows = (d.materials||[]).map(m=>{
+    const unitPrice  = matOrder==='sell' ? m.unit_sell  : m.unit_buy;
+    const grossCost  = matOrder==='sell' ? m.gross_sell : m.gross_buy;
+    const netCost    = matOrder==='sell' ? m.net_sell   : m.net_buy;
+    return `<div class="mfg-mat-row">
+      <img src="https://images.evetech.net/types/${m.type_id}/icon?size=32" loading="lazy" onerror="this.style.display='none'">
+      <span class="mfg-mat-name" title="${esc(m.name)}">${esc(m.name)}</span>
+      <span class="mfg-mat-qty">${fmtNum(m.adj_qty)}</span>
+      <span class="mfg-mat-waste">${m.waste_qty>0?'+'+fmtNum(m.waste_qty):''}</span>
+      <span class="mfg-mat-buy-sel" style="text-align:center;">
+        <select class="mfg-inp" style="width:70px;font-size:9px;padding:2px 4px;"
+          onchange="updateMatRow(this,${m.unit_sell},${m.unit_buy},${m.net_sell},${m.net_buy},${m.adj_qty})">
+          <option value="sell"${matOrder==='sell'?' selected':''}>Sell</option>
+          <option value="buy"${matOrder==='buy'?' selected':''}>Buy</option>
+        </select>
+      </span>
+      <span class="mfg-mat-price-sel" id="mp_${m.type_id}">${fmtIsk(unitPrice)}</span>
+      <span class="mfg-mat-cost" id="mc_${m.type_id}">${fmtIsk(grossCost)}</span>
+      <span class="mfg-mat-net" id="mn_${m.type_id}">${fmtIsk(netCost)}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('matScroll').innerHTML = rows || '<div style="padding:20px;color:var(--muted);text-align:center;">No materials</div>';
+  document.getElementById('matTotalSell').textContent = fmtIsk(t.mat_cost_sell)+' ISK';
+  document.getElementById('matTotalBuy').textContent  = fmtIsk(t.mat_cost_buy)+' ISK';
+  document.getElementById('matTotalRow').style.display='flex';
+  // Update net totals if elements exist
+  const ntS = document.getElementById('matNetSell');
+  const ntB = document.getElementById('matNetBuy');
+  if(ntS) ntS.textContent = fmtIsk(t.mat_net_sell)+' ISK';
+  if(ntB) ntB.textContent = fmtIsk(t.mat_net_buy)+' ISK';
+
+  // Job panel
+  const outBox = p ? `
+    <div class="mfg-output-box">
+      <img src="https://images.evetech.net/types/${p.type_id}/icon?size=32">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text);">${esc(p.name)}</div>
+        <div style="font-size:10px;color:var(--muted);">× ${fmtNum(p.quantity)} units produced</div>
+        <div style="font-size:10px;color:var(--accent);">Sell: ${fmtIsk(p.unit_sell)} | Buy: ${fmtIsk(p.unit_buy)}</div>
+      </div>
+    </div>` : '';
+
+  document.getElementById('jobPanel').innerHTML = `
+    ${outBox}
+    <div>
+      <div class="mfg-section-title">📊 Job Installation</div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">Est. Item Value (adj)</span><span class="mfg-jrow-val">${fmtIsk(j.eiv)} ISK</span></div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">Cost Index</span><span class="mfg-jrow-val">${j.cost_index.toFixed(4)}%</span></div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">System Cost</span><span class="mfg-jrow-val">${fmtIsk(j.raw_install)} ISK</span></div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">Facility Tax</span><span class="mfg-jrow-val">${fmtIsk(j.facility_tax_cost)} ISK</span></div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">SCC Surcharge</span><span class="mfg-jrow-val">${fmtIsk(j.scc_cost)} ISK</span></div>
+      <div class="mfg-jrow" style="border-top:1px solid rgba(50,182,255,.1);margin-top:4px;padding-top:4px;">
+        <span class="mfg-jrow-lbl" style="font-weight:700;color:var(--text);">Net Install Cost</span>
+        <span class="mfg-jrow-val" style="color:#f97316;">${fmtIsk(j.install_cost)} ISK</span>
+      </div>
+      ${(j.broker_cost_sell||j.sales_tax_cost)?`
+      <div class="mfg-section-title" style="margin-top:8px;">🏦 Sell Fees</div>
+      ${j.broker_cost_sell?`<div class="mfg-jrow"><span class="mfg-jrow-lbl">Sell Broker Fee</span><span class="mfg-jrow-val" style="color:#f97316;">${fmtIsk(j.broker_cost_sell)} ISK</span></div>`:''}
+      ${j.sales_tax_cost?`<div class="mfg-jrow"><span class="mfg-jrow-lbl">Sales Tax</span><span class="mfg-jrow-val" style="color:#f97316;">${fmtIsk(j.sales_tax_cost)} ISK</span></div>`:''}
+      `:''}
+    </div>
+    <div>
+      <div class="mfg-section-title">💰 Cost Breakdown</div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">Materials</span><span class="mfg-jrow-val">${fmtIsk(t.mat_cost_chosen)} ISK</span></div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">Installation</span><span class="mfg-jrow-val">${fmtIsk(t.install_cost)} ISK</span></div>
+      <div class="mfg-jrow" style="border-top:1px solid rgba(50,182,255,.1);margin-top:4px;padding-top:4px;">
+        <span class="mfg-jrow-lbl" style="font-weight:700;color:var(--text);">Total Cost</span>
+        <span class="mfg-jrow-val" style="color:#ef4444;">${fmtIsk(t.total_cost)} ISK</span>
+      </div>
+      <div class="mfg-jrow" style="margin-top:4px;">
+        <span class="mfg-jrow-lbl" style="font-weight:700;color:var(--text);">Profit</span>
+        <span class="mfg-jrow-val" style="color:${t.profit>=0?'#22c55e':'#ef4444'};">${fmtIsk(t.profit)} ISK</span>
+      </div>
+    </div>
+    <div>
+      <div class="mfg-section-title">⏱️ Time</div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">Job Time</span><span class="mfg-jrow-val">${fmtDur(j.time_secs)}</span></div>
+      <div class="mfg-jrow"><span class="mfg-jrow-lbl">ISK / Hour</span><span class="mfg-jrow-val" style="color:var(--accent);">${fmtIsk(t.isk_per_hour)}</span></div>
+    </div>`;
+}
+
+// Per-material order type toggle
+function updateMatRow(sel, unitSell, unitBuy, netSell, netBuy, qty){
+  const row = sel.closest('.mfg-mat-row');
+  const typeId = row.querySelector('img').src.match(/types\/(\d+)\//)?.[1];
+  if(!typeId) return;
+  const isSell  = sel.value === 'sell';
+  const unitPrice = isSell ? unitSell  : unitBuy;
+  const gross     = isSell ? unitSell * qty : unitBuy * qty;
+  const net       = isSell ? netSell   : netBuy;
+  const priceEl = document.getElementById(`mp_${typeId}`);
+  const costEl  = document.getElementById(`mc_${typeId}`);
+  const netEl   = document.getElementById(`mn_${typeId}`);
+  if(priceEl) priceEl.textContent = fmtIsk(unitPrice);
+  if(costEl)  costEl.textContent  = fmtIsk(gross);
+  if(netEl)   netEl.textContent   = fmtIsk(net);
+}
+
+// ── Presets ──────────────────────────────────────────────────
+async function loadPresets(){
+  try{
+    const r = await fetch(`${API}/industry/presets`,{credentials:'include'});
+    const d = await r.json();
+    const el = document.getElementById('presetsList');
+    if(!d.presets?.length){el.innerHTML='<div style="padding:8px 10px;font-size:10px;color:var(--muted);">No saved presets</div>';return;}
+    el.innerHTML = d.presets.map(p=>`
+      <div style="display:flex;align-items:center;padding:4px 8px;border-bottom:1px solid rgba(46,51,59,.3);gap:6px;cursor:pointer;"
+           onclick="loadPreset(${p.id})">
+        <img src="https://images.evetech.net/types/${p.bp_type_id}/bp?size=24" style="width:24px;height:24px;border-radius:3px;" onerror="this.src='https://images.evetech.net/types/${p.bp_type_id}/icon?size=24'">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.preset_name)}</div>
+          <div style="font-size:9px;color:var(--muted);">${esc(p.bp_name)} · ${p.runs}x · ME${p.me} TE${p.te}</div>
+        </div>
+        <span onclick="event.stopPropagation();deletePreset(${p.id})" style="color:var(--muted);cursor:pointer;padding:2px 5px;font-size:12px;" title="Delete">✕</span>
+      </div>`).join('');
+  }catch(e){}
+}
+
+async function loadPreset(id){
+  try{
+    const r = await fetch(`${API}/industry/presets/${id}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok||!d.preset) return;
+    const p = d.preset;
+    selectBP(p.bp_type_id, p.bp_name);
+    setTimeout(()=>{
+      document.getElementById('cfgRuns').value = p.runs;
+      document.getElementById('cfgME').value   = p.me;
+      document.getElementById('cfgTE').value   = p.te;
+      document.getElementById('cfgSystem').value = p.system_name||'Gamdis';
+      document.getElementById('cfgFacTax').value = p.facility_tax;
+      document.getElementById('cfgSCC').value    = p.scc_surcharge;
+      document.getElementById('cfgMatHub').value = p.mat_hub||'Jita';
+      document.getElementById('cfgOutHub').value = p.out_hub||'Jita';
+      setActivity(p.activity||1);
+      fetchCostIndex();
+    }, 100);
+  }catch(e){}
+}
+
+async function deletePreset(id){
+  await fetch(`${API}/industry/presets/${id}`,{method:'DELETE',credentials:'include'});
+  loadPresets();
+}
+
+async function savePreset(){
+  if(!_currentBpId){alert('Select a blueprint first');return;}
+  const name = prompt('Preset name:', _currentBpName.replace(/ Blueprint$/i,''));
+  if(!name) return;
+  const payload = {
+    preset_name:   name,
+    bp_type_id:    _currentBpId,
+    bp_name:       _currentBpName,
+    runs:          parseInt(document.getElementById('cfgRuns').value)||1,
+    me:            parseInt(document.getElementById('cfgME').value)||0,
+    te:            parseInt(document.getElementById('cfgTE').value)||0,
+    activity:      _currentAct,
+    facility_name: document.getElementById('cfgSystem').value,
+    facility_tax:  parseFloat(document.getElementById('cfgFacTax').value)||0,
+    scc_surcharge: parseFloat(document.getElementById('cfgSCC').value)||4,
+    system_name:   document.getElementById('cfgSystem').value,
+    cost_index:    parseFloat(document.getElementById('cfgCostIndex').value)||0,
+    mat_hub:       document.getElementById('cfgMatHub').value,
+    out_hub:       document.getElementById('cfgOutHub').value,
+  };
+  await fetch(`${API}/industry/presets`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  loadPresets();
+}
+
+// ── Structure bonuses ─────────────────────────────────────────
+let _structBonuses = [];
+
+async function loadStructBonuses(){
+  const alias = document.getElementById('charSelect').value;
+  if(!alias) return;
+  try{
+    const r = await fetch(`${API}/industry/structure_bonuses?alias=${encodeURIComponent(alias)}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok || !d.structures?.length) return;
+    _structBonuses = d.structures;
+
+    const sel = document.getElementById('structSelect');
+    sel.innerHTML = '<option value="">— None / Custom —</option>';
+    d.structures.forEach(s=>{
+      const opt = document.createElement('option');
+      opt.value = s.structure_id;
+      opt.textContent = `${s.system_name} — ${s.name} (ME:${s.total_me_pct.toFixed(1)}% TE:${s.total_te_pct.toFixed(1)}%)`;
+      opt.dataset.me = s.total_me_pct;
+      opt.dataset.te = s.total_te_pct;
+      sel.appendChild(opt);
+    });
+
+    // Auto-select the only structure if there's just one
+    if(d.structures.length === 1){
+      sel.selectedIndex = 1;
+      applyStructBonuses();
+    }
+  }catch(e){}
+}
+
+function applyStructBonuses(){
+  const sel = document.getElementById('structSelect');
+  const opt = sel.options[sel.selectedIndex];
+  if(!opt || !opt.value){
+    _structME = 0; _structTE = 0;
+    document.getElementById('cfgStructME').value = 0;
+    document.getElementById('cfgStructTE').value = 0;
+    document.getElementById('structMEField').style.display = 'none';
+    document.getElementById('structTEField').style.display = 'none';
+    showAutoInfo();
+    return;
+  }
+  _structME = parseFloat(opt.dataset.me) || 0;
+  _structTE = parseFloat(opt.dataset.te) || 0;
+  document.getElementById('cfgStructME').value = _structME.toFixed(1);
+  document.getElementById('cfgStructTE').value = _structTE.toFixed(1);
+  document.getElementById('structMEField').style.display = 'flex';
+  document.getElementById('structTEField').style.display = 'flex';
+
+  // Auto-fill system name from structure
+  const s = _structBonuses.find(b=>String(b.structure_id)===String(opt.value));
+  if(s && s.system_name){
+    document.getElementById('cfgSystem').value = s.system_name;
+    fetchCostIndex();
+  }
+  showAutoInfo();
+}
+
+
+// ── Init ─────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', ()=>{
+  loadPresets();
+  loadCharBonuses();
+  loadStructBonuses();
+  loadCharBlueprints();
+  fetchCostIndex();
+});
+</script>
+{% endblock %}

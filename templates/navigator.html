@@ -1,0 +1,1507 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+/* ── Layout ──────────────────────────────────────────────────────── */
+main.wrap{
+  max-width:100%!important;
+  padding-top:calc(var(--topbar-h,72px) + var(--ticker-h,32px))!important;
+  padding-right:0!important;
+  padding-bottom:0!important;
+}
+body:not(.sidebar-open) main.wrap { padding-left:0!important; }
+
+/* Transparent root — parallax scene shows through the whole page */
+#navRoot{display:flex;height:calc(100vh - var(--topbar-h,72px) - var(--ticker-h,32px));overflow:hidden;background:transparent;}
+
+/* ── Canvas — subtle dark tint over the space scene ─────────────── */
+#mapCanvas{flex:1;position:relative;overflow:hidden;background: rgba(0,0,0,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+#mapSvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;user-select:none;}
+
+/* ── Toolbar — smoked glass ──────────────────────────────────────── */
+#toolbar{position:absolute;top:10px;left:10px;z-index:20;display:flex;flex-direction:column;gap:5px;}
+.tb-btn{width:32px;height:32px;background: rgba(0,0,0,0.6);border:1px solid rgba(50,182,255,.2);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  color:var(--accent);border-radius:6px;cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;transition:all .15s;}
+.tb-btn:hover{background:rgba(50,182,255,.22);border-color:var(--accent);}
+
+/* ── Map selector — smoked glass ────────────────────────────────── */
+#mapSelector{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:20;
+  display:flex;gap:4px;background: rgba(0,0,0,0.6);border:1px solid rgba(50,182,255,.15);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-radius:8px;padding:4px 6px;}
+.map-tab{padding:3px 14px;border-radius:5px;font-size:11px;font-weight:600;
+  cursor:pointer;color:var(--muted);border:none;background:none;transition:all .15s;}
+.map-tab.active{background:rgba(50,182,255,.2);color:var(--accent);}
+
+/* ── Right side panel — smoked glass + region nebula ────────────── */
+#sidePanel{width:310px;flex-shrink:0;position:relative;display:flex;flex-direction:column;
+  border-left:1px solid rgba(50,182,255,.12);
+  background: rgba(0,0,0,0.6);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  overflow:hidden;}
+
+/* Nebula backdrop — dedicated div, absolutely fills the panel */
+#panelNebulaBg{
+  position:absolute;inset:-4px;z-index:0;pointer-events:none;
+  background-size:cover;background-position:center top;background-repeat:no-repeat;
+  filter:blur(3px) saturate(1.2) brightness(0.7);
+  opacity:0;transition:opacity .5s ease;}
+#panelNebulaBg.active{opacity:0.75;}
+
+/* All panel children float above the nebula layer */
+#sideTabs{position:relative;z-index:1;display:flex;border-bottom:1px solid rgba(50,182,255,.10);flex-shrink:0;background: rgba(0,0,0,0.4);}
+.side-tab{flex:1;padding:7px 2px;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;cursor:pointer;color:var(--muted);border:none;background:none;
+  border-bottom:2px solid transparent;transition:all .15s;}
+.side-tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.side-pane{position:relative;z-index:1;display:none;flex:1;min-height:0;overflow-y:auto;flex-direction:column;}
+.side-pane.active{display:flex;}
+#sysDetail{min-height:100%;}
+
+/* ── Context menu — smoked glass ────────────────────────────────── */
+#ctxMenu{position:fixed;z-index:300;background: rgba(0,0,0,0.8);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  border:1px solid rgba(50,182,255,.25);border-radius:8px;padding:4px 0;
+  min-width:168px;box-shadow:0 8px 32px rgba(0,0,0,.5);display:none;}
+.ctx-item{padding:7px 14px;font-size:12px;cursor:pointer;color:var(--text);
+  display:flex;align-items:center;gap:8px;transition:background .1s;white-space:nowrap;}
+.ctx-item:hover{background:rgba(50,182,255,.1);}
+.ctx-item.danger:hover{background:rgba(239,68,68,.12);color:#f87171;}
+.ctx-sep{height:1px;background:rgba(50,182,255,.08);margin:3px 0;}
+.ctx-head{padding:4px 14px 2px;font-size:9px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+
+/* ── Tooltip — smoked glass ──────────────────────────────────────── */
+#mapTip{position:fixed;z-index:200;background: rgba(0,0,0,0.8);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid rgba(50,182,255,.2);border-radius:7px;padding:8px 12px;
+  font-size:11px;pointer-events:none;display:none;max-width:220px;line-height:1.5;}
+
+/* ── Sig rows ────────────────────────────────────────────────────── */
+.sig-row{display:flex;gap:5px;align-items:center;padding:5px 8px;
+  border-bottom:1px solid rgba(50,182,255,.05);font-size:11px;}
+.sig-id{font-family:monospace;font-weight:700;font-size:10px;color:var(--accent);width:36px;flex-shrink:0;}
+.sig-badge{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:700;flex-shrink:0;}
+.sig-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);}
+.sig-age{font-size:9px;color:var(--muted);flex-shrink:0;}
+.sig-stale{opacity:.4;}
+
+/* ── Modals ──────────────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;z-index:400;background: rgba(0,0,0,0.6);
+  display:none;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal-box{background: rgba(0,0,0,0.8);border:1px solid rgba(50,182,255,.25);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-radius:12px;padding:20px;width:520px;max-height:80vh;
+  display:flex;flex-direction:column;gap:12px;}
+.modal-title{font-size:14px;font-weight:700;color:var(--text);}
+.modal-ta{background: rgba(0,0,0,0.4);border:1px solid rgba(50,182,255,.2);
+  border-radius:6px;color:var(--text);padding:8px;font-size:11px;
+  font-family:monospace;resize:vertical;outline:none;min-height:120px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+
+/* ── Status bar — smoked glass ───────────────────────────────────── */
+#statusBar{position:absolute;bottom:8px;left:8px;z-index:20;
+  background: rgba(0,0,0,0.6);border:1px solid rgba(50,182,255,.1);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-radius:5px;padding:3px 10px;font-size:9px;color:var(--muted);
+  display:flex;gap:12px;pointer-events:none;}
+</style>
+
+<div id="navRoot">
+
+  <!-- ── Canvas area ── -->
+  <div id="mapCanvas">
+    <div id="toolbar">
+      <button class="tb-btn" title="Fit all (Ctrl+F)" onclick="fitAll()">⊡</button>
+      <button class="tb-btn" title="Center on me" onclick="centerOnMe()">📍</button>
+      <button class="tb-btn" title="Add system" onclick="showAddSys()">＋</button>
+      <button class="tb-btn" title="Refresh" onclick="loadMap()">⟳</button>
+      <!-- Corp Sharing status indicator — only visible on corp map when sync is configured -->
+      <div id="syncStatusBadge" title="Corp Sharing" style="display:none;align-items:center;gap:5px;margin-left:6px;padding:4px 9px;border-radius:6px;background:rgba(50,182,255,.08);border:1px solid rgba(50,182,255,.15);font-size:11px;color:var(--muted);cursor:default;user-select:none;">
+        <span id="syncBadgeDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#555;flex-shrink:0;"></span>
+        <span id="syncBadgeLabel">Sync</span>
+      </div>
+    </div>
+    <div id="mapSelector">
+      <button class="map-tab active" onclick="switchMap('corp',this)">🏢 Corp</button>
+      <button class="map-tab" onclick="switchMap('personal',this)">👤 Personal</button>
+    </div>
+    <svg id="mapSvg">
+      <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <circle cx="20" cy="20" r=".6" fill="rgba(50,182,255,.05)"/>
+        </pattern>
+        <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="2.5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <!-- Clip path for system node nebula backgrounds — matches node rect shape -->
+        <clipPath id="sysNodeClip">
+          <rect width="168" height="82" rx="7"/>
+        </clipPath>
+      </defs>
+      <rect width="19999" height="19999" x="-9999" y="-9999" fill="url(#grid)"/>
+      <g id="mapG">
+        <g id="connsG"></g>
+        <g id="nodesG"></g>
+      </g>
+    </svg>
+    <div id="mapTip"></div>
+    <div id="statusBar">
+      <span id="stSys">0 systems</span>
+      <span id="stConn">0 connections</span>
+      <span id="stZoom">100%</span>
+    </div>
+  </div>
+
+  <!-- ── Right panel ── -->
+  <div id="sidePanel">
+  <div id="panelNebulaBg"></div>
+    <div id="sideTabs">
+      <button class="side-tab active" onclick="showTab('system',this)">System</button>
+      <button class="side-tab" onclick="showTab('sigs',this)">Sigs</button>
+      <button class="side-tab" onclick="showTab('structs',this)">Structs</button>
+      <button class="side-tab" onclick="showTab('routes',this)">Routes</button>
+      <button class="side-tab" onclick="showTab('pilots',this)">Pilots</button>
+    </div>
+
+    <div class="side-pane active" id="pane-system">
+      <div id="sysDetail" style="padding:20px;color:var(--muted);font-size:12px;text-align:center;">
+        Click a system to view details
+      </div>
+    </div>
+
+    <div class="side-pane" id="pane-sigs">
+      <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;align-items:center;">
+        <span id="sigSysLbl" style="font-size:11px;color:var(--muted);flex:1;">No system</span>
+        <button class="btn" style="padding:3px 10px;font-size:10px;" onclick="openPaste('sigs')">📋 Paste</button>
+        <button class="btn" style="padding:3px 10px;font-size:10px;" onclick="clearSigs()">✕ Clear</button>
+      </div>
+      <div id="sigList" style="flex:1;overflow-y:auto;">
+        <div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">Select a system first</div>
+      </div>
+    </div>
+
+    <div class="side-pane" id="pane-structs">
+      <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;align-items:center;">
+        <span id="structSysLbl" style="font-size:11px;color:var(--muted);flex:1;">No system</span>
+        <button class="btn" style="padding:3px 10px;font-size:10px;" onclick="openPaste('structs')">📡 D-Scan</button>
+      </div>
+      <div id="structList" style="flex:1;overflow-y:auto;">
+        <div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">Select a system first</div>
+      </div>
+    </div>
+
+    <div class="side-pane" id="pane-routes">
+      <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;">
+        <input id="routeInp" class="input" placeholder="System name…" style="flex:1;font-size:11px;"/>
+        <button class="btn" style="padding:3px 10px;font-size:10px;" onclick="addRoute()">＋</button>
+      </div>
+      <div id="routeList" style="flex:1;overflow-y:auto;"></div>
+    </div>
+
+    <div class="side-pane" id="pane-pilots">
+      <div id="pilotList" style="flex:1;overflow-y:auto;padding:4px 0;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div id="ctxMenu"></div>
+<!-- Tooltip -->
+<div id="mapTip"></div>
+
+<!-- Paste modal -->
+<div class="modal-overlay" id="pasteModal">
+  <div class="modal-box">
+    <div class="modal-title" id="pasteTitle">📋 Paste Signatures</div>
+    <textarea class="modal-ta" id="pasteTA" placeholder="Paste here…"></textarea>
+    <div id="pastePrev" style="font-size:10px;color:var(--muted);max-height:80px;overflow:hidden;"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closePaste()">Cancel</button>
+      <button class="btn" style="background:rgba(50,182,255,.2);color:var(--accent);"
+        onclick="applyPaste()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add system modal -->
+<div class="modal-overlay" id="addSysModal">
+  <div class="modal-box" style="width:340px;">
+    <div class="modal-title">＋ Add System</div>
+    <input id="addSysInp" class="input" placeholder="System name (e.g. J123456, Jita)…"
+      style="font-size:12px;" onkeydown="if(event.key==='Enter')doSysSearch()"/>
+    <div id="addSysRes" style="max-height:180px;overflow-y:auto;border:1px solid rgba(50,182,255,.1);border-radius:6px;"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('addSysModal').classList.remove('open')">Cancel</button>
+      <button class="btn" style="background:rgba(50,182,255,.15);color:var(--accent);"
+        onclick="doSysSearch()">Search</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API='/app/api';
+const STATIC='/app/static';
+const NW=168,NH=82; // node width/height
+
+// ── Region → local nebula image filename ─────────────────
+// Files served from /app/static/nebulae/{name}.jpg
+// Run scripts/download_nebulae.py once to populate
+const REGION_NEBULA_FILE={
+  'Aridia':'aridia','Black Rise':'black_rise','The Citadel':'the_citadel',
+  'The Forge':'the_forge','Lonetrek':'lonetrek','Domain':'domain',
+  'Kador':'kador','Kor-Azor':'kor-azor','Tash-Murkon':'tash-murkon',
+  'Devoid':'devoid','Sinq Laison':'sinq_laison','Essence':'essence',
+  'Placid':'placid','Everyshore':'everyshore','Verge Vendor':'verge_vendor',
+  'Heimatar':'heimatar','Metropolis':'metropolis','Solitude':'solitude',
+  'Pure Blind':'pure_blind','Delve':'delve','Fountain':'fountain',
+  'Querious':'querious','Period Basis':'period_basis','Esoteria':'esoteria',
+  'Paragon Soul':'paragon_soul','Catch':'catch','Providence':'providence',
+  'Stain':'stain','Derelik':'derelik','Khanid':'khanid','Genesis':'genesis',
+  'The Bleak Lands':'the_bleak_lands','Cobalt Edge':'cobalt_edge',
+  'Malpais':'malpais','Oasa':'oasa','Perrigen Falls':'perrigen_falls',
+  'The Kalevala Expanse':'the_kalevala_expanse','Outer Passage':'outer_passage',
+  'Geminate':'geminate','Vale of the Silent':'vale_of_the_silent',
+  'Tribute':'tribute','Venal':'venal','Branch':'branch','Tenal':'tenal',
+  'Deklein':'deklein','Cloud Ring':'cloud_ring','Fade':'fade',
+  'Outer Ring':'outer_ring','Syndicate':'syndicate',
+  'The Bleak Lands':'the_bleak_lands','Great Wildlands':'great_wildlands',
+  'Molden Heath':'molden_heath',
+};
+
+function regionNebulaFile(regionName, isWH){
+  if(isWH) return 'wh_generic';
+  const k=Object.keys(REGION_NEBULA_FILE).find(r=>regionName&&regionName.includes(r));
+  return k?REGION_NEBULA_FILE[k]:null;
+}
+
+// State
+let _map='corp', _data={systems:[],connections:[],routes:[],pilots:{},sig_counts:{}};
+let _sel=null,_selConn=null,_pasteMode='sigs',_addXY=null;
+let _cx=0,_cy=0,_cz=1,_dragging=false,_dsx=0,_dsy=0;
+let _dragNode=null,_dnx0=0,_dny0=0,_dnox=0,_dnoy=0;
+let _connFrom=null,_refreshTimer=null;
+
+// DOM shortcuts
+const svg=document.getElementById('mapSvg');
+const mapG=document.getElementById('mapG');
+const nodesG=document.getElementById('nodesG');
+const connsG=document.getElementById('connsG');
+
+function esc(s){const d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML;}
+function clearSysDetail(){
+  const bg=document.getElementById('panelNebulaBg');
+  if(bg){bg.style.backgroundImage='';bg.classList.remove('active');}
+  const el=document.getElementById('sysDetail');
+  el.innerHTML='<div style="padding:20px;color:var(--muted);font-size:12px;text-align:center;">Click a system to view details</div>';
+}
+function secCol(s){if(s==null)return'#c080ff';if(s>=.5)return'#2fefef';if(s>0)return'#efef2f';if(s<=-0.5||s===-1)return'#c080ff';return'#ef2f2f';}
+function fmtMass(kg){if(!kg||kg===0)return'?';if(kg>=1e9)return(kg/1e9).toFixed(2)+'Bn kg';return(kg/1e6).toFixed(0)+'M kg';}
+function fmtAge(ts){const s=Math.floor(Date.now()/1000-ts);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';return Math.floor(s/3600)+'h';}
+
+// WH types data
+const WHT={
+  K162:{d:"Exit",l:16,m:null},
+  N110:{d:"Highsec",l:24,m:20e6},J244:{d:"Lowsec",l:24,m:20e6},Z971:{d:"C1",l:16,m:20e6},
+  B274:{d:"Highsec",l:24,m:300e6},A239:{d:"Lowsec",l:24,m:300e6},D382:{d:"C2",l:16,m:300e6},O477:{d:"C3",l:16,m:300e6},
+  U210:{d:"Lowsec",l:24,m:300e6},N968:{d:"C3",l:16,m:300e6},T405:{d:"C4",l:16,m:300e6},
+  C247:{d:"C3",l:16,m:300e6},X877:{d:"C4",l:16,m:300e6},H900:{d:"C5",l:16,m:300e6},
+  D364:{d:"C5",l:16,m:300e6},M267:{d:"C3",l:16,m:300e6},H296:{d:"C5",l:16,m:1350e6},
+  V753:{d:"C6",l:16,m:1350e6},F353:{d:"Thera",l:16,m:300e6},
+  S199:{d:"Null",l:24,m:1350e6},Z142:{d:"Null(C5)",l:24,m:1350e6},
+  C140:{d:"Low(C5)",l:24,m:1350e6},N432:{d:"C5/C6",l:24,m:1350e6},
+  Q317:{d:"C1",l:16,m:500e6},E175:{d:"C4",l:16,m:300e6},
+};
+
+// ── Pan/zoom ──────────────────────────────────────────────
+function applyT(){mapG.setAttribute('transform',`translate(${_cx},${_cy}) scale(${_cz})`);document.getElementById('stZoom').textContent=Math.round(_cz*100)+'%';}
+function svgPt(ex,ey){const r=svg.getBoundingClientRect();return{x:(ex-r.left-_cx)/_cz,y:(ey-r.top-_cy)/_cz};}
+
+svg.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=svg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const f=e.deltaY<0?1.15:.87,nz=Math.max(.06,Math.min(4,_cz*f));
+  _cx=mx-(mx-_cx)*(nz/_cz);_cy=my-(my-_cy)*(nz/_cz);_cz=nz;applyT();
+},{passive:false});
+
+svg.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  if(e.target===svg||e.target.tagName==='rect'&&e.target.getAttribute('fill')==='url(#grid)'){
+    _dragging=true;_dsx=e.clientX-_cx;_dsy=e.clientY-_cy;svg.style.cursor='grabbing';
+  }
+  hideCtx();
+});
+window.addEventListener('mousemove',e=>{
+  if(_dragNode){
+    const nx=_dnox+(e.clientX-_dnx0)/_cz,ny=_dnoy+(e.clientY-_dny0)/_cz;
+    moveNodeEl(_dragNode,nx,ny);return;
+  }
+  if(_dragging){_cx=e.clientX-_dsx;_cy=e.clientY-_dsy;applyT();}
+});
+window.addEventListener('mouseup',e=>{
+  if(_dragNode){
+    const sid=_dragNode,nx=_dnox+(e.clientX-_dnx0)/_cz,ny=_dnoy+(e.clientY-_dny0)/_cz;
+    _dragNode=null;svg.style.cursor='';
+    const s=_data.systems.find(x=>x.system_id===sid);if(s){s.x_pos=nx;s.y_pos=ny;}
+    fetch(`${API}/map/system/${sid}`,{method:'PUT',credentials:'include',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({map_id:_map,x_pos:nx,y_pos:ny})});
+    return;
+  }
+  if(_connFrom){
+    const tg=e.target.closest('[data-sid]');
+    if(tg){const tid=parseInt(tg.dataset.sid);if(tid&&tid!==_connFrom)promptAddConn(_connFrom,tid);}
+    _connFrom=null;svg.style.cursor='';return;
+  }
+  _dragging=false;svg.style.cursor='';
+});
+
+svg.addEventListener('contextmenu',e=>{
+  e.preventDefault();
+  if(e.target===svg||e.target.getAttribute&&e.target.getAttribute('fill')==='url(#grid)'){
+    const pt=svgPt(e.clientX,e.clientY);_addXY={x:pt.x,y:pt.y};
+    showCtx(e.clientX,e.clientY,[
+      {label:'＋ Add System',fn:()=>showAddSys()},
+      {label:'⊡ Fit All',fn:()=>fitAll()},
+      {label:'⟳ Refresh',fn:()=>loadMap()},
+    ]);
+  }
+});
+
+// ── Load ──────────────────────────────────────────────────
+async function loadMap(){
+  try{
+    const r=await fetch(`${API}/map/state?map_id=${_map}`,{credentials:'include'});
+    if(!r.ok)return;
+    _data=await r.json();
+    render();renderRoutes();renderPilots();
+    autoSync();
+  }catch(e){console.error(e);}
+  // Signal splash screen that the app is ready to show
+  if(typeof window.__splashReady==='function') window.__splashReady();
+}
+
+async function autoSync(){
+  try{
+    const r=await fetch(`${API}/nav/flat_map`,{credentials:'include'});
+    const d=await r.json();if(!d.systems)return;
+    const onMap=new Set(_data.systems.map(s=>s.system_id));
+    let added=0;
+    for(const sys of (d.systems||[])){
+      const sid=sys.id||sys.system_id;
+      if(!sid||onMap.has(sid)||onMap.has(String(sid)))continue;
+      const ang=Math.random()*Math.PI*2,dist=150+added*70;
+      const x=300+Math.cos(ang)*dist,y=250+Math.sin(ang)*dist;
+      await fetch(`${API}/map/system`,{method:'POST',credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({system_id:sid,system_name:sys.name||sys.system_name,x,y,map_id:_map})});
+      added++;
+    }
+    for(const c of (d.connections||[])){
+      if(!c.is_wh)continue;
+      await fetch(`${API}/map/connection`,{method:'POST',credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({from_sys_id:c.from,to_sys_id:c.to,wh_type:c.wh_type||null,map_id:_map})});
+    }
+    if(added>0){const r2=await fetch(`${API}/map/state?map_id=${_map}`,{credentials:'include'});_data=await r2.json();render();}
+  }catch(e){}
+}
+
+// ── Render ────────────────────────────────────────────────
+function render(){
+  nodesG.innerHTML='';connsG.innerHTML='';
+  const byId={};for(const s of _data.systems)byId[s.system_id]=s;
+  for(const c of _data.connections)drawConn(c,byId);
+  for(const s of _data.systems)drawNode(s);
+  document.getElementById('stSys').textContent=_data.systems.length+' systems';
+  document.getElementById('stConn').textContent=_data.connections.length+' connections';
+  if(_sel){const s=_data.systems.find(x=>x.system_id===_sel);if(s)showSysDet(s);}
+  if(_selConn){const c=_data.connections.find(x=>x.id===_selConn);if(c)showConnDet(c);}
+}
+
+function connPts(a,b){return[a.x_pos+NW/2,a.y_pos+NH/2,b.x_pos+NW/2,b.y_pos+NH/2];}
+
+function drawConn(c,byId){
+  const a=byId[c.from_sys_id],b=byId[c.to_sys_id];if(!a||!b)return;
+  const[x1,y1,x2,y2]=connPts(a,b);
+  const mx=(x1+x2)/2,my=(y1+y2)/2;
+  const mc={stable:'#22c55e',destab:'#fbbf24',crit:'#ef4444',eol:'#a855f7'}[c.mass_status]||'#6b7280';
+  const isEOL=c.time_status==='eol'||c.eol_ts;
+  const isSel=c.id===_selConn;
+  const whi=WHT[c.wh_type]||{};
+  const mpct=whi.m&&c.mass_kg_passed?Math.min(1,c.mass_kg_passed/whi.m):0;
+
+  // ── Relay aging ──────────────────────────────────────
+  const isExpired = !!c.expired;
+  const nowSec = Date.now()/1000;
+  const ageSec = c.created_ts ? nowSec - c.created_ts : 0;
+  const ageH   = ageSec / 3600;
+  // age bracket: 0=fresh(<24h), 1=aging(24-36h), 2=old(36-48h), 3=expired
+  const ageBracket = isExpired ? 3 : ageH >= 36 ? 2 : ageH >= 24 ? 1 : 0;
+  const ageColor   = ['','#f97316','#ef4444','#6b7280'][ageBracket];
+  const lineColor  = isExpired ? '#4b5563' : ageBracket > 0 ? ageColor : mc;
+  const lineOpacity= isExpired ? 0.35 : isEOL ? 0.65 : 1;
+  const lineDash   = isExpired ? '4,5' : isEOL ? '6,4' : 'none';
+  const ageLabel   = ageBracket === 1 ? '24h+' : ageBracket === 2 ? '36h+' : ageBracket === 3 ? 'EXP' : '';
+
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.dataset.cid=c.id;
+  g.innerHTML=`
+    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="18" style="cursor:pointer;"/>
+    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+      stroke="${lineColor}" stroke-width="${isSel?2.5:1.5}"
+      stroke-dasharray="${lineDash}" opacity="${lineOpacity}"/>
+    ${c.save_mass?`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+      stroke="#f97316" stroke-width=".8" stroke-dasharray="2,8" opacity=".7" style="pointer-events:none;"/>`:''}
+    ${c.wh_type?`<rect x="${mx-16}" y="${my-16}" width="32" height="13" rx="3"
+        fill="rgba(6,8,22,.88)" stroke="${lineColor}" stroke-width=".8"/>
+      <text x="${mx}" y="${my-7}" text-anchor="middle" font-size="8" font-weight="700"
+        fill="${lineColor}" style="pointer-events:none;">${esc(c.wh_type)}</text>`:''}
+    ${mpct>0?`<rect x="${mx-18}" y="${my+3}" width="${36*mpct}" height="3"
+        rx="1.5" fill="${mc}" opacity=".75" style="pointer-events:none;"/>
+      <rect x="${mx-18}" y="${my+3}" width="36" height="3" rx="1.5"
+        fill="none" stroke="${mc}" stroke-width=".5" opacity=".3" style="pointer-events:none;"/>`:''}
+    ${ageLabel?`<rect x="${mx+18}" y="${my-8}" width="22" height="10" rx="3"
+        fill="rgba(6,8,22,.90)" stroke="${ageColor}" stroke-width=".7" style="pointer-events:none;"/>
+      <text x="${mx+29}" y="${my+.5}" text-anchor="middle" font-size="7" font-weight="700"
+        fill="${ageColor}" style="pointer-events:none;">${ageLabel}</text>`:''}
+  `;
+  g.addEventListener('click',e=>{e.stopPropagation();_selConn=c.id;_sel=null;render();showConnDet(c);showTab('system');});
+  g.addEventListener('contextmenu',e=>{e.preventDefault();e.stopPropagation();showConnCtx(e.clientX,e.clientY,c);});
+  g.addEventListener('mouseenter',()=>{
+    const whi2=WHT[c.wh_type]||{};
+    const pct=whi2.m&&c.mass_kg_passed?Math.round(c.mass_kg_passed/whi2.m*100):0;
+    const ageStr=ageH>=1?`${Math.round(ageH)}h old`:'<1h old';
+    const expNote=isExpired?' · ⚠ RELAY EXPIRED':ageLabel?` · ${ageLabel} relay age`:'';
+    showTip(`<b>${c.wh_type||'Connection'}</b>${whi2.d?' → '+esc(whi2.d):''}<br>
+      Mass limit: ${fmtMass(whi2.m||null)}<br>
+      Passed: ${fmtMass(c.mass_kg_passed)} (${pct}%) · ${c.ship_count||0} ships<br>
+      Status: ${ {stable:'🟢 Stable',destab:'🟡 Destab',crit:'🔴 Critical',eol:'💀 EOL'}[c.mass_status]||c.mass_status}${expNote}
+      ${c.save_mass?'<br>⚠️ Save Mass!':''}<br><span style="color:var(--muted);font-size:10px;">${ageStr}</span>`);
+  });
+  g.addEventListener('mouseleave',hideTip);
+  connsG.appendChild(g);
+}
+
+function drawNode(s){
+  const sid   = s.system_id;
+  const isWH  = /^J\d{6}$/.test(s.system_name||'');
+  const np    = (_data.pilots[sid]||[]).length;
+  const ns    = _data.sig_counts[sid]||0;
+  const isSel = sid===_sel;
+  const sc    = secCol(s.sec_status);
+  const bc    = isSel?'#32b6ff':s.locked?'#f97316':'rgba(50,182,255,.22)';
+  const sec   = s.sec_status??0;
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('class','sys-node');
+  g.setAttribute('transform',`translate(${s.x_pos},${s.y_pos})`);
+  g.dataset.sid = sid;
+
+  // Nebula image (local file, graceful 404)
+  const nebFile = regionNebulaFile(s.region_name||(isWH?'J-Space':''), isWH);
+  const nebUrl  = nebFile?`${STATIC}/nebulae/${nebFile}.jpg`:null;
+
+  // Subtle sec-class color accent (soft, behind nebula/overlay)
+  let glowC0, glowC1;
+  if(isWH){          glowC0='rgba(168,85,247,.28)'; glowC1='rgba(0,0,0,.0)'; }
+  else if(sec>=0.5){ glowC0='rgba(50,210,120,.18)'; glowC1='rgba(0,0,0,.0)'; }
+  else if(sec>0){    glowC0='rgba(255,140,30,.18)';  glowC1='rgba(0,0,0,.0)'; }
+  else{              glowC0='rgba(220,50,60,.18)';   glowC1='rgba(0,0,0,.0)'; }
+  const gradId = `ng-${sid}`;
+  const clipId = `nc-${sid}`;
+
+  // ── Stats from enriched map state ──────────────────────────────────────
+  const shipK  = s.ship_kills  ?? 0;
+  const npcK   = s.npc_kills   ?? 0;
+  const jumps  = s.ship_jumps  ?? 0;
+  const danger = s.danger_level?? 0;
+
+  // WH data
+  const whClass   = s.jspace_class  || null;
+  const whEffect  = s.jspace_effect || null;
+  const whStatics = (s.jspace_statics||[]).slice(0,3);
+
+  // ── Build rows ─────────────────────────────────────────────────────────
+  // Row 2 — region name (k-space) or effect (WH)
+  const hasTmpName = !!s.temp_name;
+  // If temp_name present, real sys name takes row 2, so region/effect shifts to row 3
+  const r2y = hasTmpName ? 39 : 29;
+  const r3y = hasTmpName ? 50 : 40;
+
+  let row2 = '', row3 = '';
+  if(isWH){
+    row2 = whEffect
+      ? `<text x="12" y="${r2y}" font-size="8" fill="#c084fc" style="pointer-events:none;">${esc(whEffect)}</text>`
+      : '';
+    const staticsStr = whStatics.length ? whStatics.join(' → ') : '';
+    row3 = staticsStr
+      ? `<text x="12" y="${r3y}" font-size="7.5" fill="rgba(200,210,255,.38)" style="pointer-events:none;">→ ${esc(staticsStr)}</text>`
+      : '';
+  } else {
+    row2 = s.region_name
+      ? `<text x="12" y="${r2y}" font-size="8" fill="rgba(180,195,255,.45)" style="pointer-events:none;">${esc(s.region_name)}</text>`
+      : '';
+    row3 = '';
+  }
+
+  // Stats row — always visible; colored when non-zero, muted when zero
+  const fmtNpc = npcK > 9999 ? '9k+' : String(npcK);
+  const statsRow = `<text x="12" y="${NH-14}" font-size="8" style="pointer-events:none;">` +
+    (shipK > 0
+      ? `<tspan fill="#f87171">⚔ ${shipK}</tspan>`
+      : `<tspan fill="rgba(200,210,255,.25)">⚔ 0</tspan>`) +
+    (npcK > 0
+      ? `<tspan fill="#fbbf24" dx="7">☠ ${fmtNpc}</tspan>`
+      : `<tspan fill="rgba(200,210,255,.25)" dx="7">☠ 0</tspan>`) +
+    (jumps > 0
+      ? `<tspan fill="#60a5fa" dx="7">⇢ ${jumps}</tspan>`
+      : `<tspan fill="rgba(200,210,255,.25)" dx="7">⇢ 0</tspan>`) +
+    `</text>`;
+
+  // Danger dots — only rendered when danger >= 1 (hidden when safe)
+  const dCols = ['#4ade80','#4ade80','#facc15','#fb923c','#ef4444','#ef4444'];
+  const dangerDots = danger > 0
+    ? Array.from({length:5},(_,i)=>
+        i < danger
+          ? `<circle cx="${NW-18-i*11}" cy="${NH-14}" r="3.5" fill="${dCols[danger]}" opacity=".9" style="pointer-events:none;"/>`
+          : `<circle cx="${NW-18-i*11}" cy="${NH-14}" r="3.5" fill="none" stroke="rgba(255,255,255,.12)" stroke-width=".8" style="pointer-events:none;"/>`
+      ).join('')
+    : '';
+
+  // Top-right: WH class badge OR sec status value
+  const secValStr = sec!==null ? (sec>0?'+':'') + sec.toFixed(1) : '';
+  const topRight = isWH && whClass
+    ? `<rect x="${NW-30}" y="5" width="24" height="14" rx="3"
+          fill="rgba(168,85,247,.18)" stroke="rgba(168,85,247,.5)" stroke-width=".8"/>
+        <text x="${NW-18}" y="15" text-anchor="middle" font-size="8.5" font-weight="700"
+          fill="#c084fc" style="pointer-events:none;">${esc(whClass)}</text>`
+    : secValStr
+      ? `<text x="${NW-7}" y="17" text-anchor="end" font-size="8" fill="${sc}" opacity=".8" style="pointer-events:none;">${esc(secValStr)}</text>`
+      : '';
+
+  g.innerHTML=`
+    <defs>
+      <radialGradient id="${gradId}" cx="15%" cy="50%" r="75%">
+        <stop offset="0%" stop-color="${glowC0}"/>
+        <stop offset="100%" stop-color="${glowC1}"/>
+      </radialGradient>
+      <clipPath id="${clipId}">
+        <rect x="0" y="0" width="${NW}" height="${NH}" rx="7"/>
+      </clipPath>
+    </defs>
+    <!-- Base: black smoked glass 80% -->
+    <rect x="0" y="0" width="${NW}" height="${NH}" rx="7"
+      fill="rgba(0,0,0,.80)" stroke="${bc}" stroke-width="${isSel?1.5:.7}"
+      ${isSel?'filter="url(#glow)"':''}/>
+    <!-- Sec-class color accent (subtle) -->
+    <rect x="0" y="0" width="${NW}" height="${NH}" rx="7" fill="url(#${gradId})"/>
+    ${nebUrl?`
+    <!-- Nebula photo at 80% opacity -->
+    <image href="${nebUrl}" x="0" y="0" width="${NW}" height="${NH}"
+      preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})" opacity=".80"/>
+    <!-- Heavy smoked-glass overlay — nebula shows as subtle texture only -->
+    <rect x="0" y="0" width="${NW}" height="${NH}" rx="7" fill="rgba(0,0,0,.68)"/>`:''}
+    <!-- Hover highlight -->
+    <rect x="0" y="0" width="${NW}" height="${NH}" rx="7"
+      fill="rgba(50,182,255,.07)" stroke="rgba(50,182,255,.5)" stroke-width="1" opacity="0"
+      class="hvr" style="transition:opacity .15s;"/>
+    <!-- Sec color bar (left edge) -->
+    <rect x="0" y="0" width="4" height="${NH}" rx="4" fill="${sc}"/>
+    <!-- Divider line above stats row -->
+    <line x1="8" y1="${NH-25}" x2="${NW-8}" y2="${NH-25}" stroke="rgba(255,255,255,.06)" stroke-width=".7" style="pointer-events:none;"/>
+    <!-- Row 1: system name -->
+    <text x="12" y="18" font-size="10.5" font-weight="700" fill="#e8eeff"
+      font-family="monospace" style="pointer-events:none;">${esc(s.temp_name||s.system_name)}</text>
+    ${hasTmpName?`<text x="12" y="29" font-size="8" fill="#a855f7" style="pointer-events:none;">${esc(s.system_name)}</text>`:''}
+    <!-- Row 2: region / WH effect -->
+    ${row2}
+    <!-- Row 3: WH statics -->
+    ${row3}
+    <!-- Top-right: class badge or sec value -->
+    ${topRight}
+    <!-- Stats row (kills · npc · jumps) -->
+    ${statsRow}
+    <!-- Danger dots (bottom-left) -->
+    ${dangerDots}
+    <!-- Sig count (top-right, below badge/sec) -->
+    ${ns>0?`<text x="${NW-7}" y="26" text-anchor="end" font-size="7.5"
+        fill="rgba(200,210,255,.32)" style="pointer-events:none;">${ns}sig</text>`:''}
+    <!-- Pilot badge (top-right area, stacked under sig count) -->
+    ${np>0?`<circle cx="${NW-11}" cy="38" r="8"
+        fill="rgba(50,182,255,.18)" stroke="var(--accent)" stroke-width="1"/>
+      <text x="${NW-11}" y="41" text-anchor="middle" font-size="8"
+        font-weight="700" fill="var(--accent)" style="pointer-events:none;">${np}</text>`:''}
+    <!-- Locked icon -->
+    ${s.locked?`<text x="${NW-8}" y="17" text-anchor="end" font-size="9" fill="#f97316" style="pointer-events:none;">🔒</text>`:''}
+    <!-- Connection anchors (invisible, used for WH linking) -->
+    ${['top','bot','lft','rgt'].map((_,i)=>{
+      const ax=[NW/2,NW/2,0,NW][i],ay=[0,NH,NH/2,NH/2][i];
+      return `<circle cx="${ax}" cy="${ay}" r="6" fill="rgba(50,182,255,.0)"
+        stroke="rgba(50,182,255,.0)" data-sid="${sid}" class="anc"
+        style="cursor:crosshair;" data-anc="1"/>`;
+    }).join('')}
+  `;
+
+  // Hover glow
+  const hvr=g.querySelector('.hvr');
+  g.addEventListener('mouseenter',()=>hvr.setAttribute('opacity','1'));
+  g.addEventListener('mouseleave',()=>hvr.setAttribute('opacity','0'));
+
+  // Drag to move
+  g.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    if(e.target.dataset.anc){
+      e.stopPropagation();_connFrom=sid;svg.style.cursor='crosshair';return;
+    }
+    if(s.locked){e.stopPropagation();return;}
+    e.stopPropagation();
+    _dragNode=sid;_dnx0=e.clientX;_dny0=e.clientY;_dnox=s.x_pos;_dnoy=s.y_pos;
+    svg.style.cursor='grabbing';
+  });
+
+  g.addEventListener('click',e=>{
+    if(e.target.dataset.anc)return;
+    if(_dragNode)return;
+    _sel=sid;_selConn=null;render();
+    const sys=_data.systems.find(x=>x.system_id===sid);
+    if(sys)showSysDet(sys);
+    showTab('system');loadSigs(sid);loadStructs(sid);
+  });
+
+  g.addEventListener('contextmenu',e=>{
+    e.preventDefault();e.stopPropagation();
+    showSysCtx(e.clientX,e.clientY,s);
+  });
+
+  nodesG.appendChild(g);
+}
+
+function moveNodeEl(sid,nx,ny){
+  const g=nodesG.querySelector(`[data-sid="${sid}"]`);
+  if(g)g.setAttribute('transform',`translate(${nx},${ny})`);
+  const s=_data.systems.find(x=>x.system_id===sid);
+  if(s){s.x_pos=nx;s.y_pos=ny;}
+  // Redraw affected connections
+  const byId={};for(const x of _data.systems)byId[x.system_id]=x;
+  for(const c of _data.connections){
+    if(c.from_sys_id!==sid&&c.to_sys_id!==sid)continue;
+    const el=connsG.querySelector(`[data-cid="${c.id}"]`);if(!el)continue;
+    const a=byId[c.from_sys_id],b=byId[c.to_sys_id];if(!a||!b)continue;
+    const[x1,y1,x2,y2]=connPts(a,b);
+    const mx=(x1+x2)/2,my=(y1+y2)/2;
+    el.querySelectorAll('line').forEach(l=>{
+      l.setAttribute('x1',x1);l.setAttribute('y1',y1);
+      l.setAttribute('x2',x2);l.setAttribute('y2',y2);
+    });
+    const rt=el.querySelector('rect:not(:first-child)');
+    if(rt){rt.setAttribute('x',mx-16);rt.setAttribute('y',my-16);}
+    const tx=el.querySelector('text');
+    if(tx){tx.setAttribute('x',mx);tx.setAttribute('y',my-7);}
+  }
+}
+
+// ── System detail ─────────────────────────────────────────
+const _sysDetCache = {}; // system_id → {data, ts}
+
+function _kv2(label, val, col){
+  if(!val && val!==0) return '';
+  return `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+    <span style="color:var(--muted);">${label}</span>
+    <span style="font-weight:600;${col?`color:${col}`:''}">${val}</span></div>`;
+}
+function _dangerBadge(lvl){
+  if(!lvl) return '<span style="color:#22c55e;font-size:10px;font-weight:700;">Safe</span>';
+  const cols=['#22c55e','#84cc16','#fbbf24','#f97316','#ef4444','#a855f7'];
+  const labels=['Safe','Low','Moderate','High','Dangerous','Death'];
+  return `<span style="color:${cols[lvl]||'#ef4444'};font-size:10px;font-weight:700;">${'⚠️'.repeat(Math.min(lvl,3))} ${labels[lvl]||'Extreme'}</span>`;
+}
+
+async function showSysDet(s){
+  const sid = s.system_id;
+  const isWH = /^J\d{6}$/.test(s.system_name||'');
+  const np = (_data.pilots[sid]||[]);
+  const el = document.getElementById('sysDetail');
+
+  // Nebula — computed immediately from s.region_name (no fetch needed)
+  const _nebF0 = regionNebulaFile(s.region_name||'', isWH);
+  const _nebPos = _nebF0==='kador' ? '30% 25%' : 'center';
+  const _nebSz  = _nebF0==='kador' ? '250% auto' : 'cover';
+
+  // Apply nebula to the entire sysDetail pane as a full-height backdrop.
+  // Uses % stops so the gradient scales with panel height.
+  // attachment: scroll (default) keeps the nebula stationary as content scrolls.
+  const _nebBg = document.getElementById('panelNebulaBg');
+  function _applyNebulaToPanelEl(nebF){
+    if(!nebF || !_nebBg) return;
+    const pos = nebF==='kador' ? '30% 20%' : 'center top';
+    _nebBg.style.backgroundImage    = `linear-gradient(rgba(4,6,16,.45),rgba(4,6,16,.65)),url('${STATIC}/nebulae/${nebF}.jpg')`;
+    _nebBg.style.backgroundSize     = `100% 100%,cover`;
+    _nebBg.style.backgroundPosition = `0 0,${pos}`;
+    _nebBg.style.backgroundRepeat   = `no-repeat,no-repeat`;
+    _nebBg.classList.add('active');
+  }
+  _applyNebulaToPanelEl(_nebF0);
+
+  el.innerHTML = `
+    <div id="sdHdr" style="padding:18px 12px 14px; border-bottom:1px solid rgba(50,182,255,.08); position:relative;">
+      <div style="font-size:18px;font-weight:800;text-shadow:0 1px 12px rgba(0,0,0,.95),0 0 32px rgba(0,0,0,.8);">${esc(s.temp_name||s.system_name)}</div>
+      ${s.temp_name?`<div style="font-size:10px;color:#c084fc;text-shadow:0 1px 6px rgba(0,0,0,.9);">📝 ${esc(s.system_name)}</div>`:''}
+      ${s.region_name?`<div style="font-size:10px;color:rgba(180,205,240,.9);margin-top:3px;text-shadow:0 1px 6px rgba(0,0,0,.9);">${esc(s.region_name)}</div>`:''}
+    </div>
+    <div id="sdBody" style="padding:8px 12px 12px;display:flex;flex-direction:column;gap:2px;">
+      <div style="color:var(--muted);font-size:10px;padding:8px 0;">Loading details…</div>
+    </div>
+    <div style="padding:0 12px 12px;display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="btn" style="font-size:10px;padding:3px 10px;" onclick="editTempName(${sid},'${(s.temp_name||'').replace(/'/g,"\\'")}')">✏️ Rename</button>
+      <button class="btn" style="font-size:10px;padding:3px 10px;" onclick="toggleLock(${sid},${s.locked?0:1})">${s.locked?'🔓 Unlock':'🔒 Lock'}</button>
+      <a href="https://evemaps.dotlan.net/system/${esc(s.system_name)}" target="_blank"
+        class="btn" style="font-size:10px;padding:3px 10px;text-decoration:none;">DOTLAN ↗</a>
+      ${isWH?`<a href="https://anoik.is/systems/${esc(s.system_name)}" target="_blank"
+        class="btn" style="font-size:10px;padding:3px 10px;text-decoration:none;">Anoikis ↗</a>`:''}
+      <button class="btn" style="font-size:10px;padding:3px 10px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#f87171;" onclick="deleteSys(${sid})">🗑 Remove</button>
+    </div>`;
+
+  // Fetch rich detail (cache 3 minutes)
+  let d = {};
+  const cached = _sysDetCache[sid];
+  if(cached && (Date.now() - cached.ts) < 180000){
+    d = cached.data;
+  } else {
+    try {
+      const r = await fetch(`${API}/nav/system_detail/${sid}`, {credentials:'include'});
+      d = await r.json();
+      _sysDetCache[sid] = {data: d, ts: Date.now()};
+    } catch(e) {}
+  }
+
+  // Fallback: if region wasn't in s, try the API response
+  if(!_nebF0 && d.region_name){
+    const _nebF2 = regionNebulaFile(d.region_name, isWH);
+    _applyNebulaToPanelEl(_nebF2);
+  }
+
+  // Security & class
+  const secClass = d.security_class || (isWH?'Wormhole':'—');
+  const secNum   = d.security_status ?? s.sec_status;
+  const secColor = secNum!=null ? secCol(secNum) : 'var(--muted)';
+  const pilots   = np.length ? np.join(', ') : null;
+  const constel  = d.constellation?.name || '—';
+  const planetsN = d.planets_count ?? '—';
+  const stargatesN = d.stargates_count ?? '—';
+  const activity = d.activity || {};
+  const jinfo    = d.jspace;
+  const zkill    = d.zkill;
+  const sov      = d.sovereignty;
+  const fw       = d.fw_status;
+  const hubD     = d.hub_distances || {};
+  const neighbors= d.neighbors || [];
+  const stations = d.npc_stations || [];
+  const visitors = d.recent_visitors || [];
+
+  let rows = '';
+
+  // Core stats
+  if(pilots) rows += _kv2('Pilots', pilots, 'var(--accent)');
+  if(secNum!=null) rows += _kv2('Security', `${Number(secNum).toFixed(1)} · ${secClass}`, secColor);
+  rows += _kv2('Constellation', constel);
+  if(planetsN!=='—') rows += _kv2('Planets / Gates', `${planetsN} / ${stargatesN}`);
+
+  // WH-specific
+  if(jinfo){
+    if(jinfo.class) rows += _kv2('Class', jinfo.class, '#a855f7');
+    if(jinfo.effect) rows += _kv2('Effect', jinfo.effect, '#fbbf24');
+    if(jinfo.shattered) rows += _kv2('', '<span style="color:#f97316;font-weight:700;">⚡ Shattered</span>');
+    if(jinfo.statics && jinfo.statics.length){
+      const stats = jinfo.statics.map(st=>{
+        const whi=WHT[st]||{};
+        return `<span style="background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);border-radius:3px;padding:1px 5px;font-size:10px;color:#c084fc;">${esc(st)}${whi.d?' → '+esc(whi.d):''}</span>`;
+      }).join(' ');
+      rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="color:var(--muted);">Statics</span><span style="display:flex;gap:3px;flex-wrap:wrap;">${stats}</span></div>`;
+    }
+  }
+
+  // Sovereignty / faction
+  if(sov){
+    if(sov.faction_name) rows += _kv2('Faction', sov.faction_name);
+    if(sov.alliance_name) rows += _kv2('Alliance', sov.alliance_name);
+  }
+  if(fw && fw.occupier_faction_id) rows += _kv2('FW Occupier', fw.occupier_faction_id);
+
+  // Activity
+  if(activity.jumps||activity.ship_kills||activity.npc_kills){
+    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;display:flex;justify-content:space-between;">
+      <span style="color:var(--muted);">Activity (1h)</span>
+      <span style="display:flex;gap:8px;">
+        ${activity.jumps?`<span title="Jumps">🚀 ${activity.jumps}</span>`:''}
+        ${activity.ship_kills?`<span title="Ship kills" style="color:#ef4444;">💀 ${activity.ship_kills}</span>`:''}
+        ${activity.npc_kills?`<span title="NPC kills" style="color:var(--muted);">🤖 ${activity.npc_kills}</span>`:''}
+      </span></div>`;
+  }
+
+  // zKill danger
+  if(zkill){
+    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="color:var(--muted);">Danger (24h)</span>
+      <span>${_dangerBadge(zkill.danger_level)} <span style="color:var(--muted);font-size:10px;">${zkill.kills_24h} kill${zkill.kills_24h!==1?'s':''}</span></span></div>`;
+  }
+
+  // Hub distances
+  const hubs = Object.entries(hubD).filter(([,v])=>v!=null).slice(0,3);
+  if(hubs.length){
+    const hubTxt = hubs.map(([n,v])=>`${n}: ${v}j`).join(' · ');
+    rows += _kv2('To hubs', hubTxt);
+  }
+
+  // NPC stations
+  if(stations.length){
+    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+      <div style="color:var(--muted);margin-bottom:3px;">Stations (${stations.length})</div>
+      ${stations.slice(0,4).map(st=>`<div style="font-size:10px;color:var(--text);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(st.name||st.station_name||'Station')}</div>`).join('')}
+    </div>`;
+  }
+
+  // Recent visitors
+  if(visitors.length){
+    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+      <div style="color:var(--muted);margin-bottom:3px;">Recent visitors</div>
+      ${visitors.slice(0,5).map(v=>`<div style="font-size:10px;color:var(--accent);padding:1px 0;">${esc(v.name||'?')}</div>`).join('')}
+    </div>`;
+  }
+
+  // Neighbors (gates to)
+  if(neighbors.length){
+    const nList = neighbors.slice(0,5).map(n=>esc(n.name||n.system_name||'?')).join(', ');
+    rows += _kv2('Gates to', nList);
+  }
+
+  const bodyEl = document.getElementById('sdBody');
+  if(bodyEl) bodyEl.innerHTML = rows || '<div style="color:var(--muted);font-size:10px;padding:4px 0;">No additional data</div>';
+}
+
+function showConnDet(c){
+  const whi=WHT[c.wh_type]||{};
+  const mpct=whi.m&&c.mass_kg_passed?Math.round(c.mass_kg_passed/whi.m*100):0;
+  const mc={stable:'#22c55e',destab:'#fbbf24',crit:'#ef4444',eol:'#a855f7'};
+  const ml={stable:'🟢 Stable',destab:'🟡 Destab',crit:'🔴 Critical',eol:'💀 EOL'};
+  const eolRem=c.eol_ts?Math.max(0,Math.round((c.eol_ts-Date.now()/1000)/60))+'m':'—';
+  // Clear any nebula background leftover from previous system selection
+  const _nb2=document.getElementById('panelNebulaBg');
+  if(_nb2){_nb2.style.backgroundImage='';_nb2.classList.remove('active');}
+  _detEl.innerHTML=`
+    <div style="padding:12px;">
+      <div style="font-size:15px;font-weight:700;margin-bottom:8px;">${c.wh_type||'Connection'} #${c.id}</div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        ${whi.d?`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+          <span style="color:var(--muted);">Leads to</span><span style="font-weight:600;">${esc(whi.d)}</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+          <span style="color:var(--muted);">Mass status</span>
+          <span style="color:${mc[c.mass_status]||'#6b7280'};font-weight:600;">${ml[c.mass_status]||c.mass_status}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+          <span style="color:var(--muted);">Time status</span>
+          <span style="font-weight:600;">${ {fresh:'🕐 Fresh',reduced:'⏳ Reduced',eol:'💀 EOL'}[c.time_status]||c.time_status}</span></div>
+        ${c.eol_ts?`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+          <span style="color:var(--muted);">EOL in</span><span style="color:#a855f7;font-weight:600;">${eolRem}</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+          <span style="color:var(--muted);">Mass limit</span><span style="font-family:monospace;">${fmtMass(whi.m||null)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+          <span style="color:var(--muted);">Mass passed</span>
+          <span style="font-family:monospace;">${fmtMass(c.mass_kg_passed)} <span style="color:#6b7280;">(${mpct}%)</span></span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
+          <span style="color:var(--muted);">Ships passed</span><span style="font-family:monospace;">${c.ship_count||0}</span></div>
+        ${c.save_mass?`<div style="padding:4px 0;font-size:11px;color:#f97316;font-weight:600;">⚠️ Save Mass!</div>`:''}
+      </div>
+      <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn" style="font-size:10px;padding:3px 10px;" onclick="logMass(${c.id})">⚖️ Log Mass</button>
+        <button class="btn" style="font-size:10px;padding:3px 10px;" onclick="setConnType(${c.id})">✏️ WH Type</button>
+        <button class="btn" style="font-size:10px;padding:3px 10px;background:rgba(239,68,68,.1);
+          border-color:rgba(239,68,68,.25);color:#f87171;" onclick="delConn(${c.id})">🗑 Remove</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Context menus ─────────────────────────────────────────
+function showCtx(x,y,items){
+  const m=document.getElementById('ctxMenu');
+  m.innerHTML=items.map(it=>{
+    if(it.sep)return'<div class="ctx-sep"></div>';
+    if(it.head)return`<div class="ctx-head">${esc(it.head)}</div>`;
+    return`<div class="ctx-item${it.d?' danger':''}" onclick="(${it.fn})();hideCtx();">${esc(it.l)}</div>`;
+  }).join('');
+  m.style.cssText=`display:block;left:${x}px;top:${y}px;`;
+  requestAnimationFrame(()=>{
+    const r=m.getBoundingClientRect();
+    if(r.right>window.innerWidth)m.style.left=(x-r.width)+'px';
+    if(r.bottom>window.innerHeight)m.style.top=(y-r.height)+'px';
+  });
+}
+function hideCtx(){document.getElementById('ctxMenu').style.display='none';}
+window.addEventListener('click',hideCtx);
+
+function showSysCtx(x,y,s){
+  const sid=s.system_id;
+  showCtx(x,y,[
+    {head:s.system_name},
+    {l:'✏️ Rename',fn:`()=>editTempName(${sid},'${(s.temp_name||'').replace(/'/g,'')}') `},
+    {l:s.locked?'🔓 Unlock':'🔒 Lock',fn:`()=>toggleLock(${sid},${s.locked?0:1})`},
+    {sep:true},
+    {l:'📋 Paste Sigs',fn:`()=>{_sel=${sid};openPaste('sigs');}`},
+    {l:'📡 D-Scan Structs',fn:`()=>{_sel=${sid};openPaste('structs');}`},
+    {sep:true},
+    {l:'🗑 Remove System',fn:`()=>deleteSys(${sid})`,d:true},
+  ]);
+}
+
+function showConnCtx(x,y,c){
+  showCtx(x,y,[
+    {head:c.wh_type?`${c.wh_type} #${c.id}`:`Connection #${c.id}`},
+    {l:'🟢 Stable',fn:`()=>updConn(${c.id},{mass_status:'stable'})`},
+    {l:'🟡 Destab', fn:`()=>updConn(${c.id},{mass_status:'destab'})`},
+    {l:'🔴 Critical',fn:`()=>updConn(${c.id},{mass_status:'crit'})`},
+    {sep:true},
+    {l:'🕐 Fresh',   fn:`()=>updConn(${c.id},{time_status:'fresh'})`},
+    {l:'⏳ Reduced', fn:`()=>updConn(${c.id},{time_status:'reduced'})`},
+    {l:'💀 Set EOL', fn:`()=>updConn(${c.id},{time_status:'eol'})`},
+    {sep:true},
+    {l:c.save_mass?'✅ Save Mass ON':'⚠️ Toggle Save Mass',fn:`()=>updConn(${c.id},{save_mass:${c.save_mass?0:1}})`},
+    {l:'✏️ Set WH Type',fn:`()=>setConnType(${c.id})`},
+    {l:'⚖️ Log Mass Passage',fn:`()=>logMass(${c.id})`},
+    {sep:true},
+    {l:'🗑 Delete',fn:`()=>delConn(${c.id})`,d:true},
+  ]);
+}
+
+// ── Tooltip ───────────────────────────────────────────────
+function showTip(html){
+  const t=document.getElementById('mapTip');t.innerHTML=html;t.style.display='block';
+  window.addEventListener('mousemove',moveTip);
+}
+function moveTip(e){const t=document.getElementById('mapTip');t.style.left=(e.clientX+14)+'px';t.style.top=(e.clientY-8)+'px';}
+function hideTip(){const t=document.getElementById('mapTip');t.style.display='none';window.removeEventListener('mousemove',moveTip);}
+
+// ── Fit / centre ──────────────────────────────────────────
+function fitAll(){
+  if(!_data.systems.length){_cx=0;_cy=0;_cz=1;applyT();return;}
+  const r=svg.getBoundingClientRect();
+  const xs=_data.systems.map(s=>s.x_pos),ys=_data.systems.map(s=>s.y_pos);
+  const xn=Math.min(...xs),xx=Math.max(...xs)+NW,yn=Math.min(...ys),yx=Math.max(...ys)+NH;
+  const pad=60,sx=(r.width-pad*2)/(xx-xn||1),sy=(r.height-pad*2)/(yx-yn||1);
+  _cz=Math.min(sx,sy,2.5);_cx=pad-xn*_cz;_cy=pad-yn*_cz;applyT();
+}
+function centerOnMe(){
+  const pil=Object.entries(_data.pilots||{});
+  if(!pil.length){fitAll();return;}
+  const sid=parseInt(pil[0][0]);
+  const s=_data.systems.find(x=>x.system_id===sid);
+  if(!s){fitAll();return;}
+  const r=svg.getBoundingClientRect();
+  _cx=r.width/2-(s.x_pos+NW/2)*_cz;_cy=r.height/2-(s.y_pos+NH/2)*_cz;applyT();
+}
+
+// ── System management ─────────────────────────────────────
+function showAddSys(){
+  document.getElementById('addSysModal').classList.add('open');
+  const inp=document.getElementById('addSysInp');inp.value='';
+  document.getElementById('addSysRes').innerHTML='';inp.focus();
+}
+async function doSysSearch(){
+  const q=document.getElementById('addSysInp').value.trim();if(q.length<2)return;
+  try{
+    const r=await fetch(`https://esi.evetech.net/latest/search/?categories=solar_system&search=${encodeURIComponent(q)}&strict=false`);
+    const d=await r.json();const ids=(d.solar_system||[]).slice(0,10);
+    if(!ids.length){document.getElementById('addSysRes').innerHTML='<div style="padding:10px;color:var(--muted);font-size:11px;">No results</div>';return;}
+    const nr=await fetch('https://esi.evetech.net/latest/universe/names/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ids)});
+    const names=await nr.json();
+    document.getElementById('addSysRes').innerHTML=names.map(n=>`
+      <div style="padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid rgba(50,182,255,.06);"
+        onclick="confirmAddSys(${n.id},'${n.name.replace(/'/g,"")}')"
+        onmouseover="this.style.background='rgba(50,182,255,.1)'"
+        onmouseout="this.style.background=''">
+        ${esc(n.name)}
+      </div>`).join('');
+  }catch(e){console.error(e);}
+}
+async function confirmAddSys(sid,name){
+  document.getElementById('addSysModal').classList.remove('open');
+  const x=_addXY?_addXY.x:200+Math.random()*300,y=_addXY?_addXY.y:200+Math.random()*200;
+  _addXY=null;
+  await fetch(`${API}/map/system`,{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({system_id:sid,system_name:name,x,y,map_id:_map})});
+  loadMap();
+}
+async function deleteSys(sid){
+  if(!confirm('Remove this system from the map?'))return;
+  await fetch(`${API}/map/system/${sid}?map_id=${_map}`,{method:'DELETE',credentials:'include'});
+  if(_sel===sid){_sel=null;clearSysDetail();}
+  _data.systems=_data.systems.filter(s=>s.system_id!==sid);
+  _data.connections=_data.connections.filter(c=>c.from_sys_id!==sid&&c.to_sys_id!==sid);
+  render();
+}
+async function editTempName(sid,cur){
+  const v=prompt('Custom label (blank to clear):',cur||'');if(v===null)return;
+  await fetch(`${API}/map/system/${sid}`,{method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({map_id:_map,temp_name:v.trim()||null})});
+  loadMap();
+}
+async function toggleLock(sid,val){
+  await fetch(`${API}/map/system/${sid}`,{method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({map_id:_map,locked:val})});
+  loadMap();
+}
+
+// ── Connection management ─────────────────────────────────
+async function promptAddConn(from,to){
+  const wt=prompt('WH type (e.g. B274, K162 — blank for unknown):','');
+  await fetch(`${API}/map/connection`,{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({from_sys_id:from,to_sys_id:to,wh_type:wt||null,map_id:_map})});
+  loadMap();
+}
+async function updConn(cid,u){
+  if(u.time_status==='eol'&&!u.eol_ts)u.eol_ts=Date.now()/1000+15300;
+  await fetch(`${API}/map/connection/${cid}`,{method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({map_id:_map,...u})});
+  const c=_data.connections.find(x=>x.id===cid);if(c)Object.assign(c,u);
+  render();if(_selConn===cid){const c2=_data.connections.find(x=>x.id===cid);if(c2)showConnDet(c2);}
+}
+async function setConnType(cid){const wt=prompt('WH type:','');if(!wt)return;updConn(cid,{wh_type:wt.toUpperCase().trim()});}
+async function logMass(cid){
+  const c=_data.connections.find(x=>x.id===cid);
+  const v=prompt('Ship mass in kg (e.g. 15000000 for T3C):','');
+  if(!v||isNaN(parseFloat(v)))return;
+  const add=parseFloat(v),nm=(c?.mass_kg_passed||0)+add,ns=(c?.ship_count||0)+1;
+  const whi=WHT[c?.wh_type]||{};
+  let nms=c?.mass_status||'stable';
+  if(whi.m){const pct=nm/whi.m;if(pct>=.95)nms='crit';else if(pct>=.5)nms='destab';}
+  updConn(cid,{mass_kg_passed:nm,ship_count:ns,mass_status:nms});
+}
+async function delConn(cid){
+  await fetch(`${API}/map/connection/${cid}`,{method:'DELETE',credentials:'include'});
+  if(_selConn===cid)_selConn=null;
+  _data.connections=_data.connections.filter(c=>c.id!==cid);
+  render();
+}
+
+// ── Signatures ────────────────────────────────────────────
+async function loadSigs(sid){
+  if(!sid)return;
+  try{
+    const r=await fetch(`${API}/nav/sigs/${sid}`,{credentials:'include'});
+    const d=await r.json();
+    renderSigs(d.signatures||[],sid);
+  }catch(e){}
+}
+const SIG_COLS={Wormhole:{bg:'rgba(168,85,247,.2)',c:'#c084fc'},Combat:{bg:'rgba(239,68,68,.15)',c:'#f87171'},
+  Data:{bg:'rgba(59,130,246,.15)',c:'#60a5fa'},Relic:{bg:'rgba(251,191,36,.15)',c:'#fbbf24'},
+  Gas:{bg:'rgba(34,197,94,.15)',c:'#4ade80'},Ore:{bg:'rgba(251,146,60,.15)',c:'#fb923c'},
+  Unknown:{bg:'rgba(107,114,128,.15)',c:'#9ca3af'}};
+function renderSigs(sigs,sid){
+  const s=_data.systems.find(x=>x.system_id===sid);
+  document.getElementById('sigSysLbl').textContent=s?s.system_name:`System ${sid}`;
+  const now=Date.now()/1000,STALE=4*3600;
+  const el=document.getElementById('sigList');
+  if(!sigs.length){el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No signatures. Paste to add.</div>';return;}
+  el.innerHTML=sigs.map(sig=>{
+    const g=sig.sig_group||'Unknown',tc=SIG_COLS[g]||SIG_COLS.Unknown;
+    const stale=now-sig.updated_ts>STALE;
+    return`<div class="sig-row${stale?' sig-stale':''}">
+      <span class="sig-id">${esc(sig.sig_id)}</span>
+      <span class="sig-badge" style="background:${tc.bg};color:${tc.c};">${esc(g)}</span>
+      <span class="sig-name">${esc(sig.sig_info||'')} ${esc(sig.description||'')}</span>
+      <span class="sig-age">${fmtAge(sig.updated_ts)}${stale?' ⚠️':''}</span>
+      <button onclick="delSig(${sig.id},${sid})" style="background:none;border:none;
+        color:rgba(239,68,68,.5);cursor:pointer;font-size:10px;padding:0 2px;">✕</button>
+    </div>`;
+  }).join('');
+  _data.sig_counts[sid]=sigs.length;
+}
+async function delSig(id,sid){
+  await fetch(`${API}/nav/sig/${id}`,{method:'DELETE',credentials:'include'});
+  loadSigs(sid);loadMap();
+}
+async function clearSigs(){
+  if(!_sel)return;if(!confirm('Clear all sigs?'))return;
+  await fetch(`${API}/nav/sigs/${_sel}`,{method:'DELETE',credentials:'include'});
+  loadSigs(_sel);loadMap();
+}
+
+// ── Structures ────────────────────────────────────────────
+async function loadStructs(sid){
+  if(!sid)return;
+  try{
+    const r=await fetch(`${API}/map/structures/${sid}?map_id=${_map}`,{credentials:'include'});
+    const d=await r.json();renderStructs(d.structures||[],sid);
+  }catch(e){}
+}
+function renderStructs(structs,sid){
+  const s=_data.systems.find(x=>x.system_id===sid);
+  document.getElementById('structSysLbl').textContent=s?s.system_name:`System ${sid}`;
+  const el=document.getElementById('structList');
+  if(!structs.length){el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No structures. Paste D-Scan to add.</div>';return;}
+  el.innerHTML=structs.map(st=>`
+    <div style="padding:6px 10px;border-bottom:1px solid rgba(50,182,255,.05);font-size:11px;display:flex;gap:8px;align-items:center;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(st.name)}</div>
+        <div style="font-size:9px;color:var(--muted);">${esc(st.struct_type||'')}${st.owner?' · '+esc(st.owner):''}</div>
+      </div>
+      <button onclick="delStruct(${st.id},${sid})" style="background:none;border:none;
+        color:rgba(239,68,68,.5);cursor:pointer;font-size:10px;">✕</button>
+    </div>`).join('');
+}
+async function delStruct(id,sid){
+  await fetch(`${API}/map/structure/${id}`,{method:'DELETE',credentials:'include'});
+  loadStructs(sid);
+}
+
+// ── Paste modal ───────────────────────────────────────────
+function openPaste(mode){
+  if(!_sel){alert('Select a system first');return;}
+  _pasteMode=mode;
+  const m=document.getElementById('pasteModal');
+  document.getElementById('pasteTitle').textContent=mode==='sigs'?'📋 Paste Signatures':'📡 Paste D-Scan (Structures)';
+  const ta=document.getElementById('pasteTA');
+  ta.placeholder=mode==='sigs'?'Copy all signatures in-game (Ctrl+A → Ctrl+C in probe scanner) then paste here…':'Paste D-Scan results here…';
+  ta.value='';document.getElementById('pastePrev').innerHTML='';
+  m.classList.add('open');setTimeout(()=>ta.focus(),50);
+  ta.oninput=()=>{
+    const lines=ta.value.trim().split('\n').filter(l=>l.trim());
+    document.getElementById('pastePrev').textContent=
+      mode==='sigs'?`${lines.length} line(s) to import`:
+      `${lines.filter(l=>/astrahus|fortizar|keepstar|raitaru|azbel|sotiyo|athanor|tatara|ansiblex|pharolux|tenebrex/i.test(l)).length} Upwell structure(s) found`;
+  };
+}
+function closePaste(){document.getElementById('pasteModal').classList.remove('open');}
+async function applyPaste(){
+  if(!_sel)return;
+  const text=document.getElementById('pasteTA').value.trim();
+  if(!text){closePaste();return;}
+  const s=_data.systems.find(x=>x.system_id===_sel)||{};
+  if(_pasteMode==='sigs'){
+    await fetch(`${API}/nav/sigs`,{method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system_id:_sel,system_name:s.system_name||'',raw_text:text})});
+    loadSigs(_sel);
+  }else{
+    await fetch(`${API}/map/structures`,{method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({system_id:_sel,system_name:s.system_name||'',raw_text:text,map_id:_map})});
+    loadStructs(_sel);
+  }
+  closePaste();loadMap();
+}
+
+// ── Routes ────────────────────────────────────────────────
+async function renderRoutes(){
+  try{
+    const r=await fetch(`${API}/map/routes?map_id=${_map}`,{credentials:'include'});
+    const d=await r.json();const routes=d.routes||[];
+    const el=document.getElementById('routeList');
+    if(!routes.length){el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No saved destinations</div>';return;}
+    el.innerHTML=routes.map(rt=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid rgba(50,182,255,.05);font-size:11px;">
+        <span style="flex:1;font-weight:600;">${esc(rt.name||rt.system_name)}</span>
+        <span style="font-size:10px;color:var(--muted);">${rt.name!==rt.system_name?esc(rt.system_name):''}</span>
+        <button onclick="delRoute(${rt.id})" style="background:none;border:none;
+          color:rgba(239,68,68,.5);cursor:pointer;font-size:10px;">✕</button>
+      </div>`).join('');
+  }catch(e){}
+}
+async function addRoute(){
+  const inp=document.getElementById('routeInp'),name=inp.value.trim();if(!name)return;
+  await fetch(`${API}/map/routes`,{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({name,system_name:name,map_id:_map})});
+  inp.value='';renderRoutes();
+}
+async function delRoute(id){
+  await fetch(`${API}/map/routes/${id}`,{method:'DELETE',credentials:'include'});renderRoutes();
+}
+
+// ── Pilots ────────────────────────────────────────────────
+function renderPilots(){
+  const el=document.getElementById('pilotList');
+  const entries=Object.entries(_data.pilots||{});
+  if(!entries.length){el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No pilots tracked</div>';return;}
+  const byId={};for(const s of _data.systems)byId[s.system_id]=s;
+  el.innerHTML=entries.flatMap(([sid,pilots])=>{
+    const s=byId[parseInt(sid)];const sname=s?s.system_name:`Sys ${sid}`;
+    return pilots.map(p=>`<div style="padding:6px 10px;border-bottom:1px solid rgba(50,182,255,.05);font-size:11px;display:flex;gap:8px;align-items:center;">
+      <span style="width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;display:inline-block;"></span>
+      <span style="flex:1;font-weight:600;">${esc(p)}</span>
+      <span style="font-size:9px;color:var(--muted);">${esc(sname)}</span>
+    </div>`);
+  }).join('');
+}
+
+// ── Tabs ──────────────────────────────────────────────────
+function showTab(name,btn){
+  document.querySelectorAll('.side-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.side-tab').forEach(t=>t.classList.remove('active'));
+  const p=document.getElementById('pane-'+name);if(p)p.classList.add('active');
+  if(btn)btn.classList.add('active');
+  else{const tabs=document.querySelectorAll('.side-tab');
+    const idx={system:0,sigs:1,structs:2,routes:3,pilots:4}[name]||0;
+    if(tabs[idx])tabs[idx].classList.add('active');}
+}
+
+// ── Map switching ─────────────────────────────────────────
+function switchMap(id,btn){
+  _map=id;document.querySelectorAll('.map-tab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');
+  _sel=null;_selConn=null;clearSysDetail();
+  loadMap();
+}
+
+// ── Init ──────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  applyT();
+  loadMap().then(()=>setTimeout(fitAll,150));
+  _refreshTimer=setInterval(loadMap,30000);
+});
+window.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){hideCtx();closePaste();
+    document.getElementById('addSysModal').classList.remove('open');}
+  if((e.ctrlKey||e.metaKey)&&e.key==='f'){e.preventDefault();fitAll();}
+  if(e.key==='Delete'){
+    if(_sel)deleteSys(_sel);
+    else if(_selConn)delConn(_selConn);
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// Corp Sharing — real-time SSE sync
+// ══════════════════════════════════════════════════════════════
+
+let _syncEs = null;           // EventSource
+let _syncActive = false;      // true when WS on server side is live
+let _syncCorpName = '';
+
+// ── Badge helpers ─────────────────────────────────────────────
+function _syncBadgeShow(connected, label){
+  const badge = document.getElementById('syncStatusBadge');
+  const dot   = document.getElementById('syncBadgeDot');
+  const lbl   = document.getElementById('syncBadgeLabel');
+  if(_map !== 'corp'){ badge.style.display = 'none'; return; }
+  badge.style.display = 'flex';
+  dot.style.background = connected ? '#22c55e' : '#f59e0b';
+  lbl.textContent = label || (_syncCorpName ? _syncCorpName : 'Sync');
+  badge.title = connected ? 'Corp Sharing — live' : 'Corp Sharing — reconnecting…';
+}
+function _syncBadgeHide(){
+  document.getElementById('syncStatusBadge').style.display = 'none';
+}
+
+// ── Apply an inbound map_op to local state without full reload ─
+function _applyRemoteOp(op){
+  if(!op || !op.op) return;
+  switch(op.op){
+    case 'add_system': {
+      if(!_data.systems.find(s=>s.system_id===op.system_id)){
+        _data.systems.push({
+          system_id: op.system_id, system_name: op.system_name||'?',
+          x_pos: op.x||200, y_pos: op.y||200,
+          sec_status: op.sec_status||0, region_name: op.region_name||'',
+          is_wh: op.is_wh||false, map_id: 'corp',
+        });
+      }
+      break;
+    }
+    case 'delete_system': {
+      _data.systems = _data.systems.filter(s=>s.system_id!==op.system_id);
+      _data.connections = _data.connections.filter(
+        c=>c.from_sys_id!==op.system_id && c.to_sys_id!==op.system_id
+      );
+      if(_sel===op.system_id){ _sel=null; clearSysDetail(); }
+      break;
+    }
+    case 'update_system': {
+      const s = _data.systems.find(s=>s.system_id===op.system_id);
+      if(s) Object.assign(s, op.updates||{});
+      break;
+    }
+    case 'add_connection': {
+      if(!_data.connections.find(c=>c.id===op.conn_id)){
+        _data.connections.push({
+          id: op.conn_id, from_sys_id: op.from_sys_id, to_sys_id: op.to_sys_id,
+          wh_type: op.wh_type||null, mass_status:'stable', time_status:'fresh', map_id:'corp',
+        });
+      }
+      break;
+    }
+    case 'delete_connection': {
+      _data.connections = _data.connections.filter(c=>c.id!==op.conn_id);
+      if(_selConn===op.conn_id) _selConn=null;
+      break;
+    }
+    case 'update_connection': {
+      const c = _data.connections.find(c=>c.id===op.conn_id);
+      if(c) Object.assign(c, op.updates||{});
+      break;
+    }
+    case 'expire_connection': {
+      // conn_key is "from_sys_id:to_sys_id" — find matching connection
+      if(op.conn_key){
+        const [sA, sB] = op.conn_key.split(':').map(Number);
+        const conn = _data.connections.find(c=>
+          (c.from_sys_id===sA&&c.to_sys_id===sB)||(c.from_sys_id===sB&&c.to_sys_id===sA));
+        if(conn) conn.expired = true;
+      }
+      break;
+    }
+    case 'traverse_connection': {
+      // Reset expire flag — someone just traversed this connection
+      if(op.conn_key){
+        const [sA, sB] = op.conn_key.split(':').map(Number);
+        const conn = _data.connections.find(c=>
+          (c.from_sys_id===sA&&c.to_sys_id===sB)||(c.from_sys_id===sB&&c.to_sys_id===sA));
+        if(conn){ conn.expired = false; conn.created_ts = op.ts||Date.now()/1000; }
+      }
+      break;
+    }
+  }
+  render();
+}
+
+// ── Apply inbound pilot locations ─────────────────────────────
+function _applyRemotePilots(payload){
+  // payload.pilots = { system_id: [char_name, …] }
+  if(!payload || !payload.pilots) return;
+  // Merge remote pilots over local _data.pilots (remote wins for remote chars)
+  const merged = Object.assign({}, _data.pilots||{});
+  for(const [sid, names] of Object.entries(payload.pilots)){
+    merged[parseInt(sid)] = names;
+  }
+  _data.pilots = merged;
+  renderPilots();
+}
+
+// ── Start/stop SSE connection ─────────────────────────────────
+function _syncStart(){
+  if(_syncEs){ _syncEs.close(); _syncEs=null; }
+  _syncEs = new EventSource(`${API}/sync/events`);
+
+  _syncEs.onmessage = (evt)=>{
+    let msg;
+    try{ msg=JSON.parse(evt.data); }catch(e){ return; }
+
+    switch(msg.type){
+      case 'status':
+        _syncActive = msg.data.connected;
+        _syncCorpName = msg.data.corp_name || '';
+        _syncBadgeShow(msg.data.connected);
+        break;
+
+      case 'map_state':
+        // Full state push from sync server — replace corp map data entirely
+        if(_map==='corp' && msg.data){
+          const d = msg.data;
+          if(d.systems)   _data.systems     = d.systems;
+          if(d.connections) _data.connections = d.connections;
+          if(d.pilots)    _data.pilots      = d.pilots;
+          render(); renderPilots();
+        }
+        break;
+
+      case 'map_op':
+        if(_map==='corp') _applyRemoteOp(msg.data);
+        break;
+
+      case 'pilot_location':
+        if(_map==='corp') _applyRemotePilots(msg.data);
+        break;
+
+      case 'disconnected':
+        _syncActive = false;
+        _syncBadgeHide();
+        break;
+    }
+  };
+
+  _syncEs.onerror = ()=>{
+    _syncActive = false;
+    _syncBadgeShow(false, 'Sync');
+  };
+}
+
+function _syncStop(){
+  if(_syncEs){ _syncEs.close(); _syncEs=null; }
+  _syncActive = false;
+  _syncBadgeHide();
+}
+
+// ── Notify sync server of local corp map mutations ─────────────
+async function _syncPush(op){
+  if(!_syncActive || _map!=='corp') return;
+  try{
+    await fetch(`${API}/sync/map_op`, {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(op),
+    });
+  }catch(e){ /* sync is optional — never block local ops */ }
+}
+
+// ── Patch map mutation functions to also push to sync ─────────
+// We wrap the existing functions rather than modifying them inline.
+const _orig_confirmAddSys = confirmAddSys;
+confirmAddSys = async function(sid, name){
+  await _orig_confirmAddSys(sid, name);
+  const s = _data.systems.find(s=>s.system_id===sid||s.system_id===parseInt(sid));
+  _syncPush({op:'add_system', system_id:parseInt(sid||0), system_name:name,
+    x: s?.x_pos, y: s?.y_pos, sec_status:s?.sec_status,
+    region_name: s?.region_name, is_wh: s?.is_wh||false});
+};
+
+const _orig_deleteSys = deleteSys;
+deleteSys = async function(sid){
+  await _orig_deleteSys(sid);
+  _syncPush({op:'delete_system', system_id: parseInt(sid||0)});
+};
+
+const _orig_promptAddConn = promptAddConn;
+promptAddConn = async function(from, to){
+  await _orig_promptAddConn(from, to);
+  const c = _data.connections.find(c=>c.from_sys_id===from&&c.to_sys_id===to
+    || c.from_sys_id===to&&c.to_sys_id===from);
+  _syncPush({op:'add_connection', conn_id:c?.id,
+    from_sys_id:parseInt(from||0), to_sys_id:parseInt(to||0), wh_type:c?.wh_type||null});
+};
+
+const _orig_delConn = delConn;
+delConn = async function(cid){
+  _syncPush({op:'delete_connection', conn_id:parseInt(cid||0)});
+  await _orig_delConn(cid);
+};
+
+const _orig_updConn = updConn;
+updConn = async function(cid, u){
+  await _orig_updConn(cid, u);
+  _syncPush({op:'update_connection', conn_id:parseInt(cid||0), updates:u});
+};
+
+// ── Re-check sync status whenever the map tab switches ─────────
+const _orig_switchMap = switchMap;
+switchMap = function(id, btn){
+  _orig_switchMap(id, btn);
+  if(id==='corp' && _syncEs){
+    _syncBadgeShow(_syncActive);
+  } else {
+    _syncBadgeHide();
+  }
+};
+
+// ── Bootstrap sync on page load ────────────────────────────────
+(async ()=>{
+  try{
+    const r = await fetch(`${API}/sync/status`);
+    const d = await r.json();
+    if(d.configured){
+      _syncStart();
+    }
+  }catch(e){}
+})();
+</script>
+{% endblock %}

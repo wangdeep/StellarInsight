@@ -1,0 +1,751 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title if title else "Stellar Insight" }}</title>
+    <link rel="stylesheet" href="{{ request.url_for('static', path='styles.css') }}" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg: {{ (theme.BRAND_BG if theme is defined else "#0b0f14") }};
+        --panel: {{ (theme.BRAND_PANEL if theme is defined else "#101827") }};
+        --text: {{ (theme.BRAND_TEXT if theme is defined else "#e8eefc") }};
+        --muted: {{ (theme.BRAND_MUTED if theme is defined else "#9db1d1") }};
+        --accent: {{ (theme.BRAND_ACCENT if theme is defined else "#32b6ff") }};
+        --accent2: {{ (theme.BRAND_ACCENT_2 if theme is defined else "#a855f7") }};
+        --pop: {{ (theme.BRAND_POP if theme is defined else "#ff8a3d") }};
+        --danger: {{ (theme.BRAND_DANGER if theme is defined else "#ff4d6d") }};
+        --sidebar-w: 162px;
+      }
+
+      /* ── Sidebar ─────────────────────────────────────────── */
+      #xylon-sidebar {
+        position: fixed;
+        top: calc(var(--ticker-h) + var(--topbar-h));
+        left: 0;
+        bottom: 0;
+        width: var(--sidebar-w);
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-right: 1px solid rgba(50,182,255,.15);
+        z-index: 3500;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        padding: 10px 8px 16px;
+        gap: 2px;
+        overflow: hidden;
+        transition: transform .22s cubic-bezier(.4,0,.2,1);
+      }
+      #xylon-sidebar.hidden {
+        transform: translateX(calc(-1 * var(--sidebar-w)));
+      }
+
+      /* Sidebar nav items — icon + text side by side */
+      .snav-item {
+        position: relative;
+        width: 100%;
+        height: 38px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding: 0 10px;
+        gap: 10px;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        transition: background .15s, color .15s;
+        flex-shrink: 0;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .snav-item:hover {
+        background: rgba(50,182,255,.12);
+        color: var(--accent);
+      }
+      .snav-item.active {
+        background: rgba(50,182,255,.16);
+        color: var(--accent);
+        box-shadow: 0 0 8px rgba(50,182,255,.25);
+      }
+      .snav-item.active svg {
+        filter: drop-shadow(0 0 4px rgba(50,182,255,.65));
+      }
+      .snav-item svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        display: block;
+        flex-shrink: 0;
+      }
+
+      /* Label — always visible, not a tooltip */
+      .snav-item .snav-tip {
+        position: static;
+        left: auto;
+        top: auto;
+        transform: none;
+        background: none;
+        border: none;
+        border-radius: 0;
+        padding: 0;
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+        color: inherit;
+        pointer-events: none;
+        opacity: 1;
+        transition: none;
+        z-index: auto;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* ── Premium nav item — always green ─────────────────── */
+      .snav-item.snav-premium                { color: #22c55e; }
+      .snav-item.snav-premium svg            { filter: drop-shadow(0 0 5px rgba(34,197,94,.70)); }
+      .snav-item.snav-premium:hover          { background: rgba(34,197,94,.12); color: #4ade80; }
+      .snav-item.snav-premium.active         { background: rgba(34,197,94,.18); color: #4ade80;
+                                               box-shadow: 0 0 8px rgba(34,197,94,.28); }
+      .snav-item.snav-premium.active svg     { filter: drop-shadow(0 0 7px rgba(34,197,94,.90)); }
+
+      /* Divider in sidebar */
+      .snav-div {
+        width: 100%;
+        height: 1px;
+        background: rgba(50,182,255,.1);
+        margin: 4px 0;
+        flex-shrink: 0;
+      }
+
+      /* ── Hamburger button in topbar ──────────────────────── */
+      #sidebar-toggle {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        border: 1px solid rgba(50,182,255,.18);
+        background: rgba(50,182,255,.06);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background .15s, border-color .15s;
+        padding: 0;
+      }
+      #sidebar-toggle:hover {
+        background: rgba(50,182,255,.14);
+        border-color: rgba(50,182,255,.4);
+      }
+      /* SVG icons inside sidebar toggle — color via currentColor */
+      #sidebar-toggle svg {
+        color: var(--accent);
+        transition: opacity .15s;
+      }
+      #sidebar-toggle:hover svg {
+        opacity: 0.8;
+      }
+
+      /* ── Brand title ─────────────────────────────────────── */
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-family: 'Cinzel', Georgia, serif;
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        color: var(--text);
+        text-shadow: 0 0 18px rgba(50,182,255,.45), 0 1px 4px rgba(0,0,0,.6);
+        user-select: none;
+        margin-left: 10px;
+      }
+      .brand .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 8px rgba(50,182,255,.9);
+        flex-shrink: 0;
+      }
+
+      /* ── Splash screen overlay ───────────────────────────── */
+      #splash-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 1.1s cubic-bezier(.4,0,.2,1);
+        pointer-events: all;
+        overflow: hidden;
+      }
+      #splash-overlay.fading {
+        opacity: 0;
+        pointer-events: none;
+      }
+      /* Deep space CSS fallback background */
+      #splash-bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 80% 60% at 70% 30%, rgba(180,60,0,.35) 0%, transparent 60%),
+          radial-gradient(ellipse 50% 80% at 20% 60%, rgba(20,10,60,.8) 0%, transparent 70%),
+          radial-gradient(ellipse 100% 100% at 50% 50%, #0a0510 30%, #000 100%);
+      }
+      /* Image layer — fades in once loaded */
+      #splash-img {
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        background-position: center;
+        opacity: 0;
+        transition: opacity .5s ease;
+      }
+      /* Branding shown over CSS fallback; hidden when real image loads */
+      #splash-brand {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        transition: opacity .4s;
+      }
+      #splash-logo {
+        font-size: 42px;
+        color: #e8820c;
+        text-shadow: 0 0 30px rgba(232,130,12,.7), 0 0 60px rgba(232,130,12,.3);
+        line-height: 1;
+        margin-bottom: 4px;
+      }
+      #splash-title {
+        font-family: 'Cinzel', Georgia, serif;
+        font-size: 38px;
+        font-weight: 700;
+        letter-spacing: .18em;
+        color: #e8e0cc;
+        text-shadow: 0 0 40px rgba(232,130,12,.5), 0 2px 8px rgba(0,0,0,.9);
+      }
+      #splash-sub {
+        font-family: 'Cinzel', Georgia, serif;
+        font-size: 11px;
+        letter-spacing: .28em;
+        color: rgba(232,130,12,.75);
+        text-shadow: 0 0 12px rgba(232,130,12,.4);
+        margin-top: 2px;
+      }
+
+      /* ── Shift main content when sidebar open ────────────── */
+      body.sidebar-open main.wrap {
+        padding-left: calc(var(--sidebar-w) + 14px);
+      }
+      main.wrap {
+        transition: padding-left .22s cubic-bezier(.4,0,.2,1);
+      }
+
+      /* ── Parallax scene ──────────────────────────────────── */
+      .space-scene {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        background: #000;
+        isolation: isolate;
+        z-index: 0;
+      }
+      /* All three canvases are 1920×1080 — same size, just stacked.
+         No scaling logic needed; they simply fill the viewport together. */
+      .space-scene > img {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        user-select: none;
+        will-change: transform;
+      }
+      .scene-base { z-index: 1; transform: translate3d(var(--bg-x,  0px), var(--bg-y,  0px), 0); }
+      .scene-mid  { z-index: 3; transform: translate3d(var(--mid-x, 0px), var(--mid-y, 0px), 0); }
+      .scene-fg   { z-index: 4; transform: translate3d(var(--fg-x,  0px), var(--fg-y,  0px), 0); }
+      /* Left-side UI vignette */
+      .ui-vignette {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        pointer-events: none;
+        background: linear-gradient(
+          90deg,
+          rgba(0,0,0,0.55) 0%,
+          rgba(0,0,0,0.38) 24%,
+          rgba(0,0,0,0.12) 44%,
+          rgba(0,0,0,0.00) 64%
+        );
+      }
+      /* App UI sits above all scene layers and is the page scroll container.
+         position:absolute + inset:0 fills the fixed scene, overflow-y:auto
+         lets content scroll while the parallax bg layers remain stationary. */
+      .space-scene .app-ui {
+        position: absolute;
+        inset: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        z-index: 10;
+      }
+
+      /* ── Character switcher ─────────────────────────────────────────────── */
+      .char-sw-btn {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        background: rgba(255,255,255,0.05);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 6px;
+        padding: 4px 10px 4px 5px;
+        color: #e8eaf0;
+        cursor: pointer;
+        font-size: 13px;
+        font-family: inherit;
+        line-height: 1;
+        transition: background 0.15s;
+      }
+      .char-sw-btn:hover { background: rgba(255,255,255,0.10); }
+      .char-sw-img {
+        width: 28px; height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 1px solid rgba(255,255,255,0.15);
+        flex-shrink: 0;
+      }
+      .char-sw-caret { opacity: 0.45; flex-shrink: 0; }
+      .char-sw-name  { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .char-sw-drop {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 6px);
+        background: #0c1220;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 9px;
+        min-width: 210px;
+        z-index: 2000;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+        overflow: hidden;
+      }
+      .char-sw-item {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 9px 14px;
+        cursor: pointer;
+        color: #c8cad8;
+        font-size: 13px;
+        transition: background 0.1s;
+      }
+      .char-sw-item:hover { background: rgba(255,255,255,0.06); }
+      .char-sw-item.active { color: #a78bfa; }
+      .char-sw-item img {
+        width: 32px; height: 32px;
+        border-radius: 50%;
+        border: 1px solid rgba(255,255,255,0.10);
+        flex-shrink: 0;
+      }
+      .char-sw-item .sw-check { margin-left: auto; font-size: 11px; }
+      .char-sw-add {
+        display: block;
+        padding: 8px 14px;
+        font-size: 12px;
+        color: #7c84a8;
+        border-top: 1px solid rgba(255,255,255,0.07);
+        text-decoration: none;
+        transition: color 0.12s;
+      }
+      .char-sw-add:hover { color: #a78bfa; }
+    </style>
+  </head>
+  <body>
+  <div class="space-scene">
+    <!-- ── Parallax layers — img tags share a common fitted canvas ── -->
+    <img class="scene-base" src="/app/static/bg/bg_canvas.png?v=3"  alt="" aria-hidden="true">
+    <img class="scene-mid"  src="/app/static/bg/mid_canvas.png?v=3" alt="" aria-hidden="true">
+    <img class="scene-fg"   src="/app/static/bg/fg_canvas.png?v=3"  alt="" aria-hidden="true">
+    <div class="ui-vignette" aria-hidden="true"></div>
+
+    <div class="app-ui">
+
+    <!-- ── Splash screen — dismissed by pages calling window.__splashReady() ── -->
+    <div id="splash-overlay">
+      <!-- CSS fallback: always looks great; image layered on top if file exists -->
+      <div id="splash-bg"></div>
+      <div id="splash-img" style="position:absolute;inset:0;background-image:url('/app/static/splash.png');background-size:cover;background-position:center;opacity:0;transition:opacity .4s;"></div>
+      <div id="splash-brand" style="opacity:0;">
+        <div id="splash-logo">✦</div>
+        <div id="splash-title">STELLAR INSIGHT</div>
+        <div id="splash-sub">INTEL &nbsp;·&nbsp; PLANNING &nbsp;·&nbsp; ANALYTICS</div>
+      </div>
+    </div>
+    <script>
+    (function(){
+      var sp  = document.getElementById('splash-overlay');
+      var img = document.getElementById('splash-img');
+      var brd = document.getElementById('splash-brand');
+      if(!sp) return;
+
+      // Only show the splash once per session — skip it on every page change after the first.
+      if(sessionStorage.getItem('splashShown')){
+        sp.parentNode.removeChild(sp);
+        window.__splashReady = function(){};
+        return;
+      }
+      sessionStorage.setItem('splashShown', '1');
+
+      // Try to load the splash image — fade it in if it works, keep CSS fallback if not
+      if(img){
+        var probe = new Image();
+        probe.onload = function(){
+          img.style.opacity = '1';               // real image fades in
+        };
+        probe.onerror = function(){
+          if(brd) brd.style.opacity = '1';       // only show branding if image missing
+        };
+        probe.src = '/app/static/splash.png';
+      }
+
+      var _minDone = false, _appReady = false, _dismissed = false;
+      function _dismiss(){
+        if(_dismissed) return;
+        if(!_minDone || !_appReady) return;
+        _dismissed = true;
+        sp.classList.add('fading');
+        setTimeout(function(){ if(sp.parentNode) sp.parentNode.removeChild(sp); }, 1200);
+      }
+
+      // Minimum on-screen time: 2.8 s
+      setTimeout(function(){ _minDone = true; _dismiss(); }, 2800);
+      // Hard fallback: always dismiss after 8 s
+      setTimeout(function(){ _appReady = true; _minDone = true; _dismiss(); }, 8000);
+      // Pages call this when their data has loaded
+      window.__splashReady = function(){ _appReady = true; _dismiss(); };
+    })();
+    </script>
+
+    <div class="ticker" role="status" aria-live="polite">
+      <div class="ticker-track" id="corp-ops-ticker">
+        <span id="corp-ticker-text">Corp ops: loading…</span>
+      </div>
+    </div>
+
+    <header class="topbar">
+      <div class="topbar-inner" style="padding:0 18px; justify-content:flex-start; width:100%; box-sizing:border-box;">
+        <button id="sidebar-toggle" aria-label="Toggle navigation" onclick="xylonSidebarToggle()">
+          <!-- Hamburger / close icon via SVG -->
+          <svg id="si-hamburger" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <line x1="2" y1="5" x2="18" y2="5"/>
+            <line x1="2" y1="10" x2="18" y2="10"/>
+            <line x1="2" y1="15" x2="18" y2="15"/>
+          </svg>
+          <svg id="si-close" viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" style="display:none;">
+            <line x1="3" y1="3" x2="17" y2="17"/>
+            <line x1="17" y1="3" x2="3" y2="17"/>
+          </svg>
+        </button>
+        <div class="brand">
+          <span class="dot"></span>
+          <span>Stellar Insight</span>
+        </div>
+        <div class="user" style="margin-left:auto; position:relative;">
+          <!-- Shown when no characters are linked yet -->
+          <a id="no-char-btn" href="/eve/login?scope_mode=max_corp" style="display:none; padding:6px 14px; background:#7c3aed; color:#fff; border-radius:6px; text-decoration:none; font-size:13px; font-weight:700; white-space:nowrap;">+ Add Character</a>
+          <!-- Character switcher — shown once at least one char is linked -->
+          <div id="char-switcher" style="display:none; position:relative;">
+            <button id="char-switcher-btn" class="char-sw-btn" onclick="charSwitcherToggle(event)" aria-haspopup="listbox" aria-expanded="false">
+              <img id="char-sw-portrait" class="char-sw-img" src="" alt="">
+              <span id="char-sw-name" class="char-sw-name">…</span>
+              <svg class="char-sw-caret" viewBox="0 0 10 6" width="10" height="6" fill="currentColor"><path d="M0 0l5 6 5-6z"/></svg>
+            </button>
+            <div id="char-switcher-dropdown" class="char-sw-drop" style="display:none;" role="listbox">
+              <div id="char-sw-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    {% set p = request.url.path %}
+
+    <!-- Icon Sidebar -->
+    <nav id="xylon-sidebar" class="hidden" aria-label="Main navigation">
+
+      <a href="/app/eve_online" class="snav-item {{ 'active' if p.startswith('/app/eve_online') or p.startswith('/app/eve') else '' }}" title="EVE Overview">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="12" ry="4"/></svg>
+        <span class="snav-tip">EVE Overview</span>
+      </a>
+
+      <a href="/app/navigator" class="snav-item {{ 'active' if p.startswith('/app/navigator') else '' }}" title="Navigator">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polygon points="12,3 14.5,12 12,10 9.5,12"/><polygon points="12,21 9.5,12 12,14 14.5,12" style="opacity:.35"/></svg>
+        <span class="snav-tip">Navigator</span>
+      </a>
+
+      <a href="/app/structures" class="snav-item {{ 'active' if p.startswith('/app/structures') else '' }}" title="Structures">
+        <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="1"/><path d="M4 10l8-7 8 7"/><rect x="9" y="14" width="6" height="7"/></svg>
+        <span class="snav-tip">Structures</span>
+      </a>
+
+      <a href="/app/skills" class="snav-item {{ 'active' if p.startswith('/app/skills') else '' }}" title="Skills">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+        <span class="snav-tip">Skills</span>
+      </a>
+
+      <div class="snav-div"></div>
+
+      <a href="/app/industry" class="snav-item {{ 'active' if p.startswith('/app/industry') else '' }}" title="Industry">
+        <svg viewBox="0 0 24 24"><path d="M2 20h20M4 20V10l6-4v4l6-4v4l4-2v12"/></svg>
+        <span class="snav-tip">Industry</span>
+      </a>
+
+      <a href="/app/fitting" class="snav-item {{ 'active' if p.startswith('/app/fitting') else '' }}" title="Fitting">
+        <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-2-2a1 1 0 010-1.4l8-8a1 1 0 011.4 0l2 2z"/><path d="M20 7l-3-3 1.5-2L21 4l-1 3z"/></svg>
+        <span class="snav-tip">Fitting</span>
+      </a>
+
+      <a href="/app/market" class="snav-item {{ 'active' if p.startswith('/app/market') else '' }}" title="Market">
+        <svg viewBox="0 0 24 24"><line x1="6" y1="4" x2="6" y2="20"/><rect x="4" y="7" width="4" height="8" rx="1"/><line x1="18" y1="4" x2="18" y2="20"/><rect x="16" y="9" width="4" height="6" rx="1"/><line x1="12" y1="3" x2="12" y2="21"/><rect x="10" y="6" width="4" height="10" rx="1"/></svg>
+        <span class="snav-tip">Market</span>
+      </a>
+
+      <div class="snav-div"></div>
+
+      <a href="/app/settings" class="snav-item snav-premium {{ 'active' if p.startswith('/app/settings') else '' }}" title="Premium">
+        <svg viewBox="0 0 24 24" style="fill:currentColor;stroke:none;overflow:visible;">
+          <text x="12" y="18" text-anchor="middle" font-size="18" font-weight="900"
+            font-family="system-ui,Arial,sans-serif">$</text>
+        </svg>
+        <span class="snav-tip">Premium</span>
+      </a>
+
+    </nav>
+
+    <!-- r191: Mobile sidebar backdrop — closes sidebar on tap outside -->
+    <div id="sidebar-backdrop" onclick="xylonSidebarToggle()"></div>
+
+    <main class="wrap">
+      {% block content %}{% endblock %}
+    </main>
+
+    </div><!-- /.app-ui -->
+  </div><!-- /.space-scene -->
+
+  <script>
+    // ── Corp ops ticker ───────────────────────────────────────
+    (function(){
+      const el = document.getElementById("corp-ticker-text");
+      const track = document.getElementById("corp-ops-ticker");
+      if(!el || !track) return;
+      async function refresh(){
+        try{
+          const r = await fetch("/app/api/corp_ops_ticker", {cache:"no-store"});
+          if(!r.ok) throw new Error("bad");
+          const j = await r.json();
+          const txt = (j && j.text) ? String(j.text) : "Corp ops: no data yet";
+          el.textContent = txt;
+          const dur = Math.max(15, Math.round(txt.length / 4));
+          track.style.animationDuration = dur + "s";
+        }catch(e){
+          el.textContent = "Corp ops: no data yet";
+        }
+      }
+      refresh();
+      setInterval(refresh, 300_000);
+    })();
+
+    // ── Sidebar toggle ────────────────────────────────────────
+    (function(){
+      const STORAGE_KEY = "xylon_sidebar_open";
+      const sidebar = document.getElementById("xylon-sidebar");
+      const body = document.body;
+      const isMobile = () => window.innerWidth < 768;
+
+      const hamburger = document.getElementById("si-hamburger");
+      const closeIcon = document.getElementById("si-close");
+
+      function applyState(open){
+        if(open){
+          sidebar.classList.remove("hidden");
+          body.classList.add("sidebar-open");
+        } else {
+          sidebar.classList.add("hidden");
+          body.classList.remove("sidebar-open");
+        }
+        // Swap hamburger ↔ close icon
+        if(hamburger) hamburger.style.display = open ? "none" : "block";
+        if(closeIcon) closeIcon.style.display = open ? "block" : "none";
+      }
+
+      // r204: Always force closed on mobile at page load — check at init time
+      // isMobile() uses innerWidth which may be unreliable before layout; use screen.width too
+      const onMobile = window.innerWidth < 768 || window.screen.width < 768;
+      const saved = localStorage.getItem(STORAGE_KEY);
+      // Default: open on desktop (wider sidebar with text labels), closed on mobile
+      applyState(onMobile ? false : (saved === null ? true : saved === "1"));
+
+      window.xylonSidebarToggle = function(){
+        const open = sidebar.classList.contains("hidden");
+        applyState(open);
+        if(!isMobile()) localStorage.setItem(STORAGE_KEY, open ? "1" : "0");
+      };
+
+      // r201: Close sidebar on nav link click (mobile only)
+      // Use setTimeout so the <a> href navigation fires before DOM mutation closes the drawer
+      sidebar.querySelectorAll('.snav-item').forEach(a => {
+        a.addEventListener('click', () => {
+          if(isMobile()) setTimeout(() => applyState(false), 50);
+        });
+      });
+    })();
+
+    // ── Parallax scene layout + engine ───────────────────────────────────
+    (function(){
+      const scene = document.querySelector('.space-scene');
+      if (!scene) return;
+
+      // ── Parallax animation ───────────────────────────────────────────
+      const strength = { bg: 10, mid: 25, fg: 45 };
+
+      let targetX = 0, targetY = 0;
+      let currentX = 0, currentY = 0;
+      let idleTime = 0;
+
+      window.addEventListener('mousemove', function(e) {
+        targetX = (e.clientX / window.innerWidth  - 0.5) * 2;
+        targetY = (e.clientY / window.innerHeight - 0.5) * 2 * 0.25;
+      }, { passive: true });
+
+      function animate() {
+        idleTime += 0.002;
+        const idleX = Math.sin(idleTime) * 0.2;
+        const idleY = Math.cos(idleTime) * 0.1;
+
+        currentX += ((targetX + idleX) - currentX) * 0.05;
+        currentY += ((targetY + idleY) - currentY) * 0.05;
+
+        scene.style.setProperty('--bg-x',  currentX * strength.bg  + 'px');
+        scene.style.setProperty('--bg-y',  currentY * strength.bg  + 'px');
+        scene.style.setProperty('--mid-x', currentX * strength.mid + 'px');
+        scene.style.setProperty('--mid-y', currentY * strength.mid + 'px');
+        scene.style.setProperty('--fg-x',  currentX * strength.fg  + 'px');
+        scene.style.setProperty('--fg-y',  currentY * strength.fg  + 'px');
+
+        requestAnimationFrame(animate);
+      }
+      animate();
+    })();
+
+    // ── Character switcher ────────────────────────────────────────────────
+    (function(){
+      const switcher  = document.getElementById('char-switcher');
+      const noCharBtn = document.getElementById('no-char-btn');
+      const dropdown  = document.getElementById('char-switcher-dropdown');
+      const portrait  = document.getElementById('char-sw-portrait');
+      const nameEl    = document.getElementById('char-sw-name');
+      const listEl    = document.getElementById('char-sw-list');
+      const btnEl     = document.getElementById('char-switcher-btn');
+      if (!switcher) return;
+
+      let _chars = [];
+
+      function _portraitUrl(cid, size) {
+        return 'https://images.evetech.net/characters/' + cid + '/portrait?size=' + (size||32);
+      }
+
+      function renderList() {
+        listEl.innerHTML = '';
+        _chars.forEach(function(c) {
+          const item = document.createElement('div');
+          item.className = 'char-sw-item' + (c.is_default ? ' active' : '');
+          item.setAttribute('role', 'option');
+          item.setAttribute('aria-selected', c.is_default ? 'true' : 'false');
+          const img = document.createElement('img');
+          img.src = _portraitUrl(c.character_id, 32);
+          img.alt = '';
+          const label = document.createElement('span');
+          label.textContent = c.alias || c.character_name;
+          item.appendChild(img);
+          item.appendChild(label);
+          if (c.is_default) {
+            const check = document.createElement('span');
+            check.className = 'sw-check';
+            check.textContent = '✓';
+            item.appendChild(check);
+          }
+          if (!c.is_default) {
+            item.addEventListener('click', function() { switchTo(c.character_id); });
+          }
+          listEl.appendChild(item);
+        });
+      }
+
+      async function load() {
+        try {
+          const r = await fetch('/app/api/eve/chars', {credentials:'include'});
+          const d = await r.json();
+          _chars = d.chars || [];
+          const active = _chars.find(function(c){ return c.is_default; }) || _chars[0];
+          if (active) {
+            portrait.src = _portraitUrl(active.character_id, 32);
+            portrait.alt = active.alias || active.character_name;
+            nameEl.textContent = active.alias || active.character_name;
+            switcher.style.display = '';
+            if (noCharBtn) noCharBtn.style.display = 'none';
+          } else {
+            // No characters linked — show the plain Add Character button
+            if (noCharBtn) noCharBtn.style.display = '';
+          }
+          renderList();
+        } catch(e) { /* silent — don't break page load */ }
+      }
+
+      async function switchTo(charId) {
+        dropdown.style.display = 'none';
+        if (btnEl) btnEl.setAttribute('aria-expanded', 'false');
+        try {
+          await fetch('/app/api/eve/default', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({character_id: charId}),
+            credentials: 'include'
+          });
+        } catch(e) { /* still reload — server will sort it out */ }
+        location.reload();
+      }
+
+      window.charSwitcherToggle = function(e) {
+        if (e) e.stopPropagation();
+        const open = dropdown.style.display === 'none';
+        dropdown.style.display = open ? 'block' : 'none';
+        if (btnEl) btnEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+      };
+
+      // Close on any click outside the switcher
+      document.addEventListener('click', function(e) {
+        if (!switcher.contains(e.target)) {
+          dropdown.style.display = 'none';
+          if (btnEl) btnEl.setAttribute('aria-expanded', 'false');
+        }
+      });
+
+      load();
+    })();
+  </script>
+  </body>
+</html>

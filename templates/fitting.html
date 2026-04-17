@@ -1,0 +1,1305 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  /* Force wide layout for fitting page */
+  main.wrap{max-width:100% !important;padding-right:8px !important;}
+  body:not(.sidebar-open) main.wrap{padding-left:8px !important;}
+
+  .fit-outer{display:grid;grid-template-columns:240px 1fr 260px;gap:0;height:calc(100vh - var(--topbar-h) - var(--ticker-h) - 40px);min-height:600px;border:1px solid rgba(60,80,110,0.28);background: rgba(0,0,0,0.6);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);position:relative;z-index:5;isolation:isolate;}
+  @media(max-width:1100px){.fit-outer{grid-template-columns:200px 1fr 220px;}}
+  @media(max-width:900px){.fit-outer{grid-template-columns:1fr;height:auto;}}
+
+  /* Left: Ship browser */
+  .fit-left{border-right:1px solid rgba(60,80,110,0.22);display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);}
+  .ship-scroll{flex:1;overflow-y:auto;}
+  .sg-hdr{padding:4px 7px;font-size:11px;font-weight:700;text-transform:uppercase;color:#8b939e;background: rgba(0,0,0,0.8);border-bottom:1px solid rgba(60,80,110,0.22);cursor:pointer;user-select:none;position:sticky;top:0;z-index:2;}
+  .sg-hdr:hover{background:rgba(50,182,255,0.08);color:#c5cdd8;}
+  .sg-body{display:none;}.sg-body.open{display:block;}
+  .sf-hdr{padding:3px 7px 3px 16px;font-size:10px;font-weight:600;color:#555d6a;cursor:pointer;user-select:none;}
+  .sf-hdr:hover{color:#c5cdd8;}
+  .sf-body{display:none;}.sf-body.open{display:block;}
+  .ship-item{padding:3px 7px 3px 22px;border-bottom:1px solid rgba(46,51,59,0.3);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:11px;transition:background 0.08s;}
+  .ship-item:hover{background:rgba(50,160,220,0.06);}
+  .ship-item.selected{background:rgba(50,160,220,0.14);}
+  .ship-item img{width:26px;height:26px;border:1px solid rgba(60,80,110,0.28);background: rgba(0,0,0,0.6);}
+  .in-hangar{color:#2fef2f;font-size:7px;font-weight:700;margin-left:auto;}
+
+  /* Center: Fitting ring + stats */
+  .fit-center{display:flex;flex-direction:column;overflow:hidden;position:relative;background: rgba(0,0,0,0.4);z-index:3;}
+
+  /* Ring container */
+  .ring-area{flex:1;display:flex;align-items:center;justify-content:center;position:relative;min-height:400px;overflow:hidden;isolation:isolate;z-index:3;}
+  .ring-container{position:relative;width:460px;height:460px;}
+  .ship-render{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:210px;height:210px;border-radius:50%;border:2px solid rgba(80,110,160,0.45);overflow:hidden;background: rgba(0,0,0,0.6);box-shadow:0 0 50px rgba(0,0,0,0.7),0 0 20px rgba(50,182,255,0.08),inset 0 0 24px rgba(0,0,0,0.5);}
+  .ship-render img{width:100%;height:100%;object-fit:cover;}
+  .ring-circle{position:absolute;top:50%;left:50%;width:390px;height:390px;transform:translate(-50%,-50%);border:1px solid rgba(50,182,255,0.08);border-radius:50%;pointer-events:none;box-shadow:0 0 30px rgba(50,182,255,0.04) inset;}
+
+  /* Slot nodes on ring */
+  .ring-slot{position:absolute;width:42px;height:42px;border-radius:8px;border:1px solid rgba(80,110,160,0.45);background:linear-gradient(135deg,rgba(20,28,42,0.90) 0%,rgba(8,12,20,0.80) 100%);cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;z-index:3;box-shadow:0 2px 8px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.04);}
+  .ring-slot:hover{border-color:rgba(50,182,255,0.7);box-shadow:0 0 12px rgba(50,182,255,0.35),inset 0 1px 0 rgba(255,255,255,0.06);transform:scale(1.08);}
+  .ring-slot.filled{border-color:rgba(74,138,181,0.7);background:linear-gradient(135deg,rgba(20,35,55,0.95) 0%,rgba(10,18,30,0.90) 100%);}
+  .ring-slot.active{border-color:#ef8f2f;box-shadow:0 0 14px rgba(239,143,47,0.5),inset 0 0 6px rgba(239,143,47,0.1);transform:scale(1.08);}
+  .ring-slot img{width:36px;height:36px;border-radius:5px;}
+  .ring-slot .slot-empty{font-size:8px;font-weight:700;color:rgba(120,140,170,0.5);text-align:center;line-height:1.1;letter-spacing:0.02em;}
+  .ring-slot-high{border-top:2px solid #ef4040;box-shadow:0 -2px 8px rgba(239,64,64,0.20),0 2px 8px rgba(0,0,0,0.5);}
+  .ring-slot-med{border-top:2px solid #40c8ef;box-shadow:0 -2px 8px rgba(64,200,239,0.20),0 2px 8px rgba(0,0,0,0.5);}
+  .ring-slot-low{border-top:2px solid #efef40;box-shadow:0 -2px 8px rgba(239,239,64,0.18),0 2px 8px rgba(0,0,0,0.5);}
+  .ring-slot-rig{border-top:2px solid #c080ff;box-shadow:0 -2px 8px rgba(192,128,255,0.20),0 2px 8px rgba(0,0,0,0.5);}
+
+  /* Slot type labels around ring */
+  .ring-label{position:absolute;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#4a5060;pointer-events:none;z-index:2;white-space:nowrap;}
+
+  /* Bottom stat bars */
+  .fit-bottom{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid rgba(60,80,110,0.22);background: rgba(0,0,0,0.4);}
+  .fit-resource{padding:4px 8px;border-right:1px solid rgba(60,80,110,0.22);text-align:center;}
+  .fit-resource:last-child{border-right:none;}
+  .fit-res-label{font-size:7px;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;}
+  .fit-res-val{font-size:12px;font-weight:700;font-family:'Consolas','Monaco',monospace;margin-top:1px;}
+  .fit-res-bar{height:4px;background: rgba(0,0,0,0.6);border:1px solid rgba(60,80,110,0.28);margin-top:2px;overflow:hidden;}
+  .fit-res-fill{height:100%;transition:width 0.3s;}
+
+  /* Right: Stats + Module browser */
+  .fit-right{border-left:1px solid rgba(60,80,110,0.22);display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);}
+  .stat-section{padding:6px 8px;border-bottom:1px solid rgba(60,80,110,0.22);}
+  .stat-title{font-size:8px;font-weight:700;text-transform:uppercase;color:#8b939e;letter-spacing:0.04em;margin-bottom:4px;}
+  .stat-row{display:flex;justify-content:space-between;font-size:11px;padding:1px 0;}
+  .stat-val{font-family:'Consolas','Monaco',monospace;font-weight:600;}
+  .hp-bar{display:flex;gap:2px;margin-top:2px;}
+  .hp-seg{height:6px;flex:1;border-radius:1px;}
+
+  .mod-scroll{flex:1;overflow-y:auto;}
+  .mod-filter-bar{display:flex;gap:2px;padding:3px;flex-wrap:wrap;border-bottom:1px solid rgba(60,80,110,0.22);}
+  .mod-filter-btn{padding:1px 5px;font-size:7px;font-weight:700;text-transform:uppercase;cursor:pointer;border:1px solid rgba(60,80,110,0.28);background: rgba(0,0,0,0.8);color:#6b7280;}
+  .mod-filter-btn:hover{color:#c5cdd8;}
+  .mod-filter-btn.active{color:#e8ecf2;background:rgba(50,182,255,0.10);border-color:#4a8ab5;}
+  .mod-item{display:flex;align-items:center;gap:4px;padding:3px 5px;border-bottom:1px solid rgba(46,51,59,0.3);cursor:grab;font-size:11px;}
+  .mod-item:active{cursor:grabbing;}
+  .mod-item:hover{background:rgba(50,160,220,0.06);}
+  .mod-item img{width:22px;height:22px;border:1px solid rgba(60,80,110,0.28);background: rgba(0,0,0,0.6);}
+
+  .skill-list{padding:3px;max-height:80px;overflow-y:auto;}
+  .skill-req{font-size:8px;padding:0 3px;display:inline-block;margin:1px;}
+  .skill-ok{color:#2fef2f;}.skill-miss{color:#ef2f2f;}
+
+  .eft-section{border-top:1px solid rgba(60,80,110,0.22);padding:3px;}
+  .eft-area{font-family:'Consolas','Monaco',monospace;font-size:8px;background: rgba(0,0,0,0.6);border:1px solid rgba(60,80,110,0.28);color:#c5cdd8;width:100%;height:40px;resize:vertical;padding:3px;}
+
+  .char-bar{display:flex;align-items:center;gap:6px;padding:3px 6px;border-bottom:1px solid rgba(60,80,110,0.22);background: rgba(0,0,0,0.8);flex-wrap:wrap;}
+  .char-bar label{font-size:8px;color:#8b939e;text-transform:uppercase;}
+  .fitted-list{max-height:120px;overflow-y:auto;border-bottom:1px solid rgba(60,80,110,0.22);}
+  .fitted-item{display:flex;align-items:center;gap:4px;padding:2px 6px;font-size:9px;border-bottom:1px solid rgba(46,51,59,0.3);}
+  .fitted-item img{width:20px;height:20px;border:1px solid rgba(60,80,110,0.28);background: rgba(0,0,0,0.6);}
+  .resist-grid{display:grid;grid-template-columns:1fr repeat(4,28px);gap:1px 4px;font-size:8px;margin-top:3px;}
+  .resist-grid .rg-hdr{font-size:7px;font-weight:700;text-transform:uppercase;color:#555d6a;text-align:center;}
+  .resist-grid .rg-lbl{color:#8b939e;font-size:9px;display:flex;align-items:center;gap:3px;}
+  .resist-grid .rg-val{text-align:center;font-family:monospace;font-size:9px;}
+  .resist-bar{height:3px;background: rgba(0,0,0,0.6);margin-top:1px;overflow:hidden;border-radius:1px;}
+  .resist-bar-fill{height:100%;border-radius:1px;}
+  .stat-mini{display:flex;justify-content:space-between;font-size:10px;padding:1px 0;}
+  .stat-mini .sv{font-family:monospace;font-weight:600;color:#e8ecf2;}
+  .stat-mini .sl{color:#8b939e;}
+  .cap-stable{color:#2fef2f;font-weight:700;}
+  .cap-unstable{color:#ef8f2f;font-weight:700;}
+
+  /* Module tooltip */
+  #fitTooltip{position:fixed;z-index:9999;pointer-events:none;display:none;
+    background: rgba(0,0,0,0.8);border:1px solid rgba(50,182,255,0.28);
+    border-radius:6px;padding:7px 9px;min-width:150px;max-width:220px;
+    box-shadow:0 4px 20px rgba(0,0,0,0.7),0 0 12px rgba(50,182,255,0.08);
+    font-size:9px;color:#c5cdd8;line-height:1.5;backdrop-filter:blur(8px);}
+  #fitTooltip .tt-name{font-weight:700;font-size:10px;color:#e8ecf2;margin-bottom:4px;
+    padding-bottom:3px;border-bottom:1px solid rgba(60,80,110,0.35);}
+  #fitTooltip .tt-row{display:flex;justify-content:space-between;gap:6px;}
+  #fitTooltip .tt-lbl{color:#8b939e;}
+  #fitTooltip .tt-val{font-family:monospace;color:#e8ecf2;font-weight:600;}
+  #fitTooltip .tt-warn{color:#ef8f2f;font-size:8px;margin-top:3px;}
+
+  /* Ring slot active dot (positioned absolutely inside slot) */
+  .ring-slot{overflow:visible;}
+</style>
+
+<div class="eve-window-title" style="border:1px solid rgba(60,80,110,0.28);border-bottom:none;background: rgba(0,0,0,0.8);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
+  <span>FITTING</span>
+  <span style="flex:1;"></span>
+  <span style="font-size:9px;color:#6b7280;font-weight:400;text-transform:none;" id="fitShipName">Select a ship</span>
+</div>
+{% if not chars or chars|length == 0 %}
+<div class="fit-outer" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;">
+  <div style="color:#6b7280;">No EVE characters linked.</div>
+  <a href="/eve/login?scope_mode=max_corp" style="padding:8px 22px;background:#7c3aed;color:#fff;border-radius:7px;text-decoration:none;font-weight:700;font-size:13px;">+ Add EVE Character</a>
+</div>
+{% else %}
+<div class="char-bar" style="border:1px solid rgba(60,80,110,0.28);border-bottom:none;border-top:none;background: rgba(0,0,0,0.6);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);">
+  <label>Character</label>
+  <select id="charSelect" class="eve-select" onchange="loadCharData()">
+    {% for c in chars %}<option value="{{ c.alias or c.character_name }}">{{ c.character_name }}{% if c.is_default %} [default]{% endif %}</option>{% endfor %}
+  </select>
+  <span id="skillStatus" style="font-size:9px;color:#6b7280;"></span>
+</div>
+<div class="fit-outer">
+  <!-- LEFT: Ship Browser -->
+  <div class="fit-left">
+    <div class="eve-panel-hdr"><span>SHIPS</span></div>
+    <div style="padding:3px;"><input id="shipSearch" class="eve-input" placeholder="Filter…" style="width:100%;font-size:10px;" oninput="filterShips()"/></div>
+    <div id="shipList" class="ship-scroll eve-scroll"><div style="padding:8px;color:#6b7280;font-size:10px;">Loading…</div></div>
+  </div>
+
+  <!-- CENTER: Fitting Ring + Resources -->
+  <div class="fit-center">
+    <div class="ring-area" id="ringArea">
+      <div class="ring-container" id="ringContainer">
+        <div class="ring-circle"></div>
+        <div class="ship-render" id="shipRender">
+          <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#3a3f48;font-size:10px;">No ship</div>
+        </div>
+        <!-- Slot nodes will be injected here -->
+      </div>
+    </div>
+    <!-- Fitted module list -->
+    <div class="eve-panel-hdr" style="border-top:1px solid rgba(60,80,110,0.22);"><span>FITTED MODULES</span></div>
+    <div id="fittedList" class="fitted-list eve-scroll"></div>
+    <!-- Resource bars -->
+    <div class="fit-bottom">
+      <div class="fit-resource">
+        <div class="fit-res-label">CPU</div>
+        <div class="fit-res-val" id="statCPU">0 / 0 tf</div>
+        <div class="fit-res-bar"><div class="fit-res-fill" id="barCPU" style="width:0;background:#40c8ef;"></div></div>
+      </div>
+      <div class="fit-resource">
+        <div class="fit-res-label">Powergrid</div>
+        <div class="fit-res-val" id="statPG">0 / 0 MW</div>
+        <div class="fit-res-bar"><div class="fit-res-fill" id="barPG" style="width:0;background:#efef40;"></div></div>
+      </div>
+      <div class="fit-resource">
+        <div class="fit-res-label">Calibration</div>
+        <div class="fit-res-val" id="statCal">0 / 400</div>
+        <div class="fit-res-bar"><div class="fit-res-fill" id="barCal" style="width:0;background:#c080ff;"></div></div>
+      </div>
+    </div>
+    <!-- EFT -->
+    <div class="eft-section">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:2px;">
+        <span style="font-size:7px;font-weight:700;text-transform:uppercase;color:#6b7280;">EFT</span>
+        <button class="eve-btn" style="font-size:7px;padding:1px 6px;" onclick="importEFT()">IMPORT</button>
+        <button class="eve-btn" style="font-size:7px;padding:1px 6px;" onclick="exportEFT()">EXPORT</button>
+      </div>
+      <textarea id="eftText" class="eft-area" placeholder="Paste EFT format…"></textarea>
+    </div>
+
+    <!-- DRONE BAY -->
+    <div class="eft-section" id="droneBaySection" style="display:none;">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+        <span style="font-size:7px;font-weight:700;text-transform:uppercase;color:#6b7280;">DRONES</span>
+        <span id="droneBayUsed" style="font-size:8px;color:#8b939e;"></span>
+        <span style="flex:1;"></span>
+        <input id="droneSearch" class="eve-input" placeholder="Search drones…" style="width:90px;font-size:9px;padding:1px 4px;" oninput="loadDrones()"/>
+      </div>
+      <div id="droneList" style="max-height:90px;overflow-y:auto;" class="eve-scroll"></div>
+      <div id="droneSlots" style="margin-top:4px;"></div>
+    </div>
+
+    <!-- r100: SAVE / BROWSE FITTINGS -->
+    <div class="eft-section" style="margin-top:4px;">
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;">
+        <span style="font-size:7px;font-weight:700;text-transform:uppercase;color:#6b7280;">SAVED FITS</span>
+        <button class="eve-btn" style="font-size:7px;padding:1px 6px;background:rgba(50,182,255,0.15);border-color:rgba(50,182,255,0.35);color:#32b6ff;" onclick="openSaveFitDialog()">&#128190; SAVE</button>
+        <button class="eve-btn" style="font-size:7px;padding:1px 6px;" onclick="toggleSavedFits()">&#128065; BROWSE</button>
+      </div>
+      <!-- Save dialog (hidden by default) -->
+      <div id="saveFitDialog" style="display:none;background: rgba(0,0,0,0.6);border:1px solid rgba(50,182,255,0.25);border-radius:4px;padding:6px;margin-bottom:4px;">
+        <div style="font-size:9px;color:#8b939e;margin-bottom:3px;">Name this fitting:</div>
+        <div style="display:flex;gap:4px;">
+          <input id="saveFitName" class="eve-input" style="flex:1;font-size:10px;" placeholder="e.g. PvP Caracal v2" />
+          <button class="eve-btn" style="font-size:8px;padding:2px 8px;background: rgba(0,0,0,0.4);border-color:rgba(47,180,80,0.40);color:#2fb850;" onclick="saveFit()">SAVE</button>
+          <button class="eve-btn" style="font-size:8px;padding:2px 6px;" onclick="document.getElementById('saveFitDialog').style.display='none'">✕</button>
+        </div>
+        <div id="saveFitMsg" style="font-size:9px;margin-top:3px;min-height:12px;"></div>
+      </div>
+      <!-- Browse panel (hidden by default) -->
+      <div id="savedFitsList" style="display:none;max-height:180px;overflow-y:auto;">
+        <div id="savedFitsInner"><span style="font-size:9px;color:#6b7280;">Loading…</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Stats + Module Search -->
+  <div class="fit-right">
+    <!-- Stats scrollable area — fixed height, scrolls independently of module browser -->
+    <div style="flex:0 0 auto;max-height:52%;overflow-y:auto;" class="eve-scroll">
+      <!-- Capacitor -->
+      <div class="stat-section" id="statsCapacitor">
+        <div class="stat-title">⚡ Capacitor</div>
+        <div id="capStats"><div class="stat-row"><span style="color:#6b7280;font-size:9px;">Select a ship</span></div></div>
+      </div>
+      <!-- Offense -->
+      <div class="stat-section" id="statsOffense">
+        <div class="stat-title">⚔ Offense</div>
+        <div id="offenseStats"><div class="stat-row"><span style="color:#6b7280;font-size:9px;">Fit weapons to see DPS</span></div></div>
+      </div>
+      <!-- Defence -->
+      <div class="stat-section" id="statsDefence">
+        <div class="stat-title">🛡 Defence</div>
+        <div id="defenceStats"><div class="stat-row"><span style="color:#6b7280;font-size:9px;">Select a ship</span></div></div>
+      </div>
+      <!-- Targeting -->
+      <div class="stat-section" id="statsTargeting">
+        <div class="stat-title">🎯 Targeting</div>
+        <div id="targetingStats"><div class="stat-row"><span style="color:#6b7280;font-size:9px;">Select a ship</span></div></div>
+      </div>
+      <!-- Navigation -->
+      <div class="stat-section" id="statsNav">
+        <div class="stat-title">🚀 Navigation</div>
+        <div id="navStats"><div class="stat-row"><span style="color:#6b7280;font-size:9px;">Select a ship</span></div></div>
+      </div>
+    </div>
+    <div class="eve-panel-hdr"><span>MODULES</span></div>
+    <div style="padding:3px;"><input id="modSearch" class="eve-input" placeholder="Search modules…" style="width:100%;font-size:9px;" oninput="loadModules()"/></div>
+    <div class="mod-filter-bar" id="modFilterBar">
+      <div class="mod-filter-btn active" onclick="setMF('all',this)">All</div>
+      <div class="mod-filter-btn" onclick="setMF('high',this)">High</div>
+      <div class="mod-filter-btn" onclick="setMF('med',this)">Med</div>
+      <div class="mod-filter-btn" onclick="setMF('low',this)">Low</div>
+      <div class="mod-filter-btn" onclick="setMF('rig',this)">Rig</div>
+      <div class="mod-filter-btn" onclick="setMF('assets',this)">Assets</div>
+    </div>
+    <div id="modList" class="mod-scroll eve-scroll"><div style="padding:4px;color:#4a5060;font-size:8px;">Click a slot or search</div></div>
+    <div class="eve-panel-hdr"><span>SKILL REQUIREMENTS</span></div>
+    <div id="skillReqs" class="skill-list eve-scroll"><span style="font-size:8px;color:#4a5060;">Fit modules to check</span></div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Floating module tooltip -->
+<div id="fitTooltip"></div>
+
+<script>
+const API='/app/api',FW=API+'/sde',EI='https://images.evetech.net/types';
+function eI(t,v,s){return `${EI}/${t}/${v||'icon'}?size=${s||64}`;}
+function iE(i,t,v){if(v==='icon'){i.src=eI(t,'render',64);i.onerror=function(){i.style.opacity='0.15';i.onerror=null;};}else if(v==='render'){i.src=eI(t,'icon',64);i.onerror=function(){i.style.opacity='0.15';i.onerror=null;};}else{i.style.opacity='0.15';i.onerror=null;}}
+function tI(t,s){return `<img src="${eI(t,'icon',s||64)}" onerror="iE(this,${t},'icon')" loading="lazy"/>`;}
+function sI(t,s){return `<img src="${eI(t,'render',s||256)}" onerror="iE(this,${t},'render')" loading="lazy" style="width:100%;height:100%;object-fit:cover;"/>`;}
+function _e(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+
+let cS={},cA={},allShips=[],sD=null;
+let fit={high:[],med:[],low:[],rig:[],sub:[]};
+let aST=null,aSI=null,_mf='all';
+// Drone bay state: array of {typeID, name, qty, dmgMult, rof, emDmg, thDmg, kiDmg, exDmg, bandwidth}
+let drones=[];
+
+function setMF(f,el){_mf=f;document.querySelectorAll('#modFilterBar .mod-filter-btn').forEach(b=>b.classList.remove('active'));el.classList.add('active');loadModules();}
+function toggleModGrp(bodyId,hdrEl){const b=document.getElementById(bodyId);if(!b)return;const open=b.style.display!=='none';b.style.display=open?'none':'block';const arr=hdrEl.querySelector('.mg-arr');if(arr)arr.textContent=open?'▸':'▾';}
+
+// ─── Circular Ring Layout ────────────────────────────────────────────────
+function positionSlots(){
+  const container=document.getElementById('ringContainer');
+  if(!container||!sD)return;
+  // Remove old slot nodes
+  container.querySelectorAll('.ring-slot,.ring-label').forEach(e=>e.remove());
+
+  const cx=230,cy=230,radius=178;
+  const slots=[];
+  // Highs: top arc (centered at top)
+  for(let i=0;i<sD.hiSlots;i++) slots.push({key:'high',idx:i,cls:'ring-slot-high'});
+  // Meds: right arc
+  for(let i=0;i<sD.medSlots;i++) slots.push({key:'med',idx:i,cls:'ring-slot-med'});
+  // Lows: bottom arc
+  for(let i=0;i<sD.lowSlots;i++) slots.push({key:'low',idx:i,cls:'ring-slot-low'});
+  // Rigs: bottom-left arc
+  for(let i=0;i<sD.rigSlots;i++) slots.push({key:'rig',idx:i,cls:'ring-slot-rig'});
+
+  const total=slots.length;
+  if(!total)return;
+
+  // Distribute slots around the circle — start from top (-90deg), go clockwise
+  // Group boundaries for labels
+  let idx=0;
+  const groups=[
+    {key:'high',label:'HIGH',count:sD.hiSlots,color:'#ef4040'},
+    {key:'med',label:'MED',count:sD.medSlots,color:'#40c8ef'},
+    {key:'low',label:'LOW',count:sD.lowSlots,color:'#efef40'},
+    {key:'rig',label:'RIG',count:sD.rigSlots,color:'#c080ff'},
+  ];
+
+  const gap=4; // degrees gap between groups
+  const totalSlots=groups.reduce((s,g)=>s+g.count,0);
+  const usableArc=360-(groups.filter(g=>g.count>0).length*gap);
+  const degPerSlot=usableArc/Math.max(totalSlots,1);
+
+  let angle=-90; // start at top
+  groups.forEach(grp=>{
+    if(!grp.count)return;
+    const startAngle=angle;
+    for(let i=0;i<grp.count;i++){
+      const a=angle+(degPerSlot*0.5);
+      const rad=a*Math.PI/180;
+      const x=cx+radius*Math.cos(rad)-21;
+      const y=cy+radius*Math.sin(rad)-21;
+      const slotEl=document.createElement('div');
+      slotEl.className=`ring-slot ${grp.key==='high'?'ring-slot-high':grp.key==='med'?'ring-slot-med':grp.key==='low'?'ring-slot-low':'ring-slot-rig'}`;
+      slotEl.style.left=x+'px';slotEl.style.top=y+'px';
+      slotEl.dataset.key=grp.key;slotEl.dataset.idx=i;
+      slotEl.onclick=function(){openSlot(grp.key,i);highlightActive(grp.key,i);};
+      const m=fit[grp.key][i];
+      if(m){
+        slotEl.classList.add('filled');
+        const inactive = m.isActive === false;
+        if(inactive) slotEl.style.opacity='0.45';
+        const toggleBtn = `<div onclick="event.stopPropagation();toggleActive('${grp.key}',${i})" title="${inactive?'Activate':'Deactivate'}" style="position:absolute;top:-4px;right:-4px;width:10px;height:10px;border-radius:50%;background:${inactive?'#4a5060':'#2fef2f'};border:1px solid rgba(0,0,0,0.5);cursor:pointer;z-index:5;font-size:6px;line-height:10px;text-align:center;"></div>`;
+        slotEl.style.position='absolute';
+        slotEl.innerHTML=`<img src="${eI(m.typeID,'icon',32)}" onerror="iE(this,${m.typeID},'icon')" title="${_e(m.name)}" style="${inactive?'filter:grayscale(0.7)':''}"/>${toggleBtn}`;
+      }else{
+        slotEl.innerHTML=`<div class="slot-empty">${grp.key[0].toUpperCase()}${i+1}</div>`;
+      }
+      container.appendChild(slotEl);
+      angle+=degPerSlot;
+    }
+    // Label at midpoint of arc
+    const midAngle=startAngle+(grp.count*degPerSlot/2);
+    const labelRad=midAngle*Math.PI/180;
+    const lx=cx+(radius+24)*Math.cos(labelRad);
+    const ly=cy+(radius+24)*Math.sin(labelRad);
+    const lbl=document.createElement('div');
+    lbl.className='ring-label';
+    lbl.style.left=lx+'px';lbl.style.top=ly+'px';
+    lbl.style.transform='translate(-50%,-50%)';
+    lbl.style.color=grp.color;
+    lbl.textContent=grp.label;
+    container.appendChild(lbl);
+    angle+=gap;
+  });
+}
+
+function highlightActive(key,idx){
+  document.querySelectorAll('.ring-slot').forEach(s=>s.classList.remove('active'));
+  const slot=document.querySelector(`.ring-slot[data-key="${key}"][data-idx="${idx}"]`);
+  if(slot)slot.classList.add('active');
+}
+
+function updateFittedList(){
+  const el=document.getElementById('fittedList');
+  const all=[];
+  ['high','med','low','rig'].forEach(k=>{fit[k].forEach((m,i)=>{if(m)all.push({...m,key:k,idx:i});});});
+  if(!all.length){el.innerHTML='<div style="padding:4px;color:#4a5060;font-size:8px;">No modules fitted</div>';return;}
+  el.innerHTML=all.map(m=>{
+    const inactive = m.isActive === false;
+    const toggleColor = inactive ? '#6b7280' : '#2fef2f';
+    const toggleTitle = inactive ? 'Inactive (click to activate)' : 'Active (click to deactivate)';
+    const toggleSymbol = inactive ? '○' : '●';
+    return `<div class="fitted-item" style="opacity:${inactive?0.55:1}">` +
+      `<img src="${eI(m.typeID,'icon',32)}" onerror="iE(this,${m.typeID},'icon')" style="${inactive?'filter:grayscale(1)':''}"/>` +
+      `<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${inactive?'color:#6b7280':''}">${_e(m.name)}</span>` +
+      `<span onclick="toggleActive('${m.key}',${m.idx})" title="${toggleTitle}" style="color:${toggleColor};cursor:pointer;font-size:11px;padding:0 3px;line-height:1;">${toggleSymbol}</span>` +
+      `<span onclick="clearSlot('${m.key}',${m.idx})" style="color:#ef2f2f;cursor:pointer;font-size:9px;padding:0 3px;">✕</span>` +
+      `</div>`;
+  }).join('');
+}
+
+// ─── Ship / Character Loading ────────────────────────────────────────────
+async function loadCharData(){
+  const alias=document.getElementById('charSelect').value;document.getElementById('skillStatus').textContent='Loading…';
+  // Kick off ships in parallel — don't wait for char data first
+  const shipsPromise=loadShips();
+  try{
+    const sr=await fetch(API+'/eve/character/skills?alias='+encodeURIComponent(alias),{credentials:'include'});const sd=await sr.json();cS={};
+    const raw=sd.skills;const arr=Array.isArray(raw)?raw:(raw&&Array.isArray(raw.skills)?raw.skills:[]);
+    arr.forEach(s=>{cS[s.skill_id]={level:s.trained_skill_level||s.active_skill_level||0,name:''};});
+    const ids=Object.keys(cS);
+    if(ids.length){try{const nr=await fetch(FW+'/type_names?type_ids='+ids.slice(0,400).join(','),{credentials:'include'});const nd=await nr.json();Object.entries(nd).forEach(([k,v])=>{if(cS[k])cS[k].name=v.typeName||v;});}catch(e){}}
+    document.getElementById('skillStatus').textContent=arr.length+' skills';
+    const ar=await fetch(API+'/eve/character/assets?alias='+encodeURIComponent(alias),{credentials:'include'});const ad=await ar.json();cA={};
+    (ad.assets||[]).forEach(a=>{const t=a.type_id;if(!cA[t])cA[t]=0;cA[t]+=(a.quantity||1);});
+  }catch(e){document.getElementById('skillStatus').textContent='Error';}
+  // Wait for ships then re-render so hangar indicators reflect the now-loaded assets
+  await shipsPromise;
+  renderShips(allShips);
+}
+
+async function loadShips(){
+  const el=document.getElementById('shipList');el.innerHTML='<div style="padding:8px;color:#6b7280;font-size:9px;">Loading ships…</div>';
+  try{const r=await fetch(FW+'/ships',{credentials:'include'});allShips=await r.json();if(!Array.isArray(allShips))allShips=[];renderShips(allShips);}catch(e){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;">${e.message}</div>`;}
+}
+
+function filterShips(){const q=document.getElementById('shipSearch').value.toLowerCase();renderShips(q?allShips.filter(s=>s.name.toLowerCase().includes(q)||s.group.toLowerCase().includes(q)||s.faction.toLowerCase().includes(q)):allShips);}
+
+function renderShips(ships){
+  const el=document.getElementById('shipList');if(!ships.length){el.innerHTML='<div style="padding:6px;color:#6b7280;">No ships.</div>';return;}
+  const groups={};ships.forEach(s=>{if(!groups[s.group])groups[s.group]={};if(!groups[s.group][s.faction])groups[s.group][s.faction]=[];groups[s.group][s.faction].push(s);});
+  let h='';Object.keys(groups).sort().forEach((grp,gi)=>{
+    h+=`<div class="sg-hdr" onclick="var b=this.nextElementSibling;b.classList.toggle('open');this.querySelector('.sg-arr').textContent=b.classList.contains('open')?'▾':'▸'"><span class='sg-arr'>${gi===0?'▾':'▸'}</span> ${_e(grp)} <span style='opacity:0.5;font-size:8px;'>(${ships.filter(s=>s.group===grp).length})</span></div><div class="sg-body${gi===0?' open':''}">`;
+    Object.keys(groups[grp]).sort().forEach(fac=>{const fs=groups[grp][fac];h+=`<div class="sf-hdr" onclick="var b=this.nextElementSibling;b.classList.toggle('open');this.querySelector('.sf-arr').textContent=b.classList.contains('open')?'›':'›'"><span class='sf-arr'>›</span> ${_e(fac)} <span style='opacity:0.4;font-size:7px;'>(${fs.length})</span></div><div class="sf-body open">`;fs.sort((a,b)=>a.name.localeCompare(b.name)).forEach(s=>{const owned=cA[s.typeID]?'<span class="in-hangar">IN HANGAR</span>':'';h+=`<div class="ship-item" onclick="selectShip(${s.typeID})" data-tid="${s.typeID}"><img src="${eI(s.typeID,'render',32)}" onerror="iE(this,${s.typeID},'render')"/><span>${_e(s.name)}</span>${owned}</div>`;});h+=`</div>`;});h+=`</div>`;});
+  el.innerHTML=h;
+}
+
+async function selectShip(typeID){
+  document.querySelectorAll('.ship-item').forEach(e=>e.classList.remove('selected'));
+  const s=document.querySelector(`.ship-item[data-tid="${typeID}"]`);if(s)s.classList.add('selected');
+  fit={high:[],med:[],low:[],rig:[],sub:[]};aST=null;aSI=null;
+  try{
+    const r=await fetch(FW+'/type_dogma/'+typeID,{credentials:'include'});const data=await r.json();
+    const dogma=data.dogmaAttributes||[];const am={};dogma.forEach(a=>{am[a.attributeID]=a.value;});
+    sD={typeID,name:data.typeName||allShips.find(x=>x.typeID===typeID)?.name||`Ship #${typeID}`,
+      // Resources
+      cpuMax:am[48]||0, pgMax:am[11]||0, capMax:am[482]||0, calMax:am[1132]||400, capRecharge:am[55]||0,
+      // Slots
+      hiSlots:Math.floor(am[14]||0), medSlots:Math.floor(am[13]||0), lowSlots:Math.floor(am[12]||0), rigSlots:Math.floor(am[1137]||0),
+      // Hardpoints (attr 101=turretHardpoints, attr 102=launcherHardpoints)
+      turretHardpoints:Math.floor(am[101]||0), launcherHardpoints:Math.floor(am[102]||0),
+      // HP
+      shieldHP:am[263]||0, armorHP:am[265]||0, hullHP:am[9]||0,
+      // RESONANCE values (EVE: 1.0=no resist, 0.0=immune). Use ||1 default (no resist).
+      shieldEMRes:am[271]!=null?am[271]:1, shieldTHRes:am[274]!=null?am[274]:1,
+      shieldKIRes:am[273]!=null?am[273]:1, shieldEXRes:am[272]!=null?am[272]:1,
+      armorEMRes:am[267]!=null?am[267]:1,  armorTHRes:am[270]!=null?am[270]:1,
+      armorKIRes:am[269]!=null?am[269]:1,  armorEXRes:am[268]!=null?am[268]:1,
+      // Hull has fixed 33% resist to all damage types (resonance 0.667)
+      hullEMRes:0.667, hullTHRes:0.667, hullKIRes:0.667, hullEXRes:0.667,
+      // Navigation
+      maxVelocity:am[37]||0, inertia:am[70]||0, mass:am[4]||0,
+      // Targeting
+      scanRes:am[564]||0, targetRange:am[76]||0, maxTargets:Math.floor(am[192]||0),
+      sensorStr:Math.max(am[208]||0, am[209]||0, am[210]||0, am[211]||0),
+      // Ship damage bonuses (applied to fitted weapons)
+      turretDmgMult:am[64]||1, missileDmgMult:am[212]||1,
+      // Drone bay: attr 283=droneCapacity(m3), attr 1272=droneBandwidth(Mbit/s)
+      droneBay:am[283]||0, droneBandwidth:am[1272]||0,
+      skillReqs:extractSkillReqs(am)};
+    document.getElementById('fitShipName').textContent=sD.name;
+    console.log('[SHIP BASE]', sD.name, 'shHP:', sD.shieldHP, 'arHP:', sD.armorHP, 'huHP:', sD.hullHP,
+      'shRes:', sD.shieldEMRes, sD.shieldTHRes, sD.shieldKIRes, sD.shieldEXRes,
+      'arRes:', sD.armorEMRes, sD.armorTHRes, sD.armorKIRes, sD.armorEXRes);
+    // Ship render
+    document.getElementById('shipRender').innerHTML=sI(typeID,256);
+    // Reset drones on ship change
+    drones=[];
+    // Show/hide drone bay based on ship having drone bay
+    const droneSec=document.getElementById('droneBaySection');
+    if(sD.droneBay>0){
+      droneSec.style.display='block';
+      renderDroneSlots();loadDrones();
+    } else {
+      droneSec.style.display='none';
+    }
+    positionSlots();updateStats();updateFittedList();
+  }catch(e){console.error(e);}
+}
+
+function extractSkillReqs(am){const reqs=[];[[182,277],[183,278],[184,279],[1285,1286],[1289,1287],[1290,1288]].forEach(([idA,lvA])=>{const sid=am[idA],slvl=am[lvA];if(sid&&slvl){const sk=cS[Math.floor(sid)];reqs.push({skillID:Math.floor(sid),level:Math.floor(slvl),skillName:sk?.name||`Skill #${Math.floor(sid)}`});}});return reqs;}
+
+function clearSlot(k,i){fit[k][i]=null;positionSlots();updateStats();updateFittedList();}
+function toggleActive(k,i){if(!fit[k][i])return;fit[k][i].isActive=fit[k][i].isActive===false?true:false;positionSlots();updateStats();updateFittedList();}
+function openSlot(type,idx){aST=type;aSI=idx;_mf=type==='rig'?'rig':type;document.querySelectorAll('#modFilterBar .mod-filter-btn').forEach(b=>b.classList.remove('active'));loadModules();}
+
+// ── EVE Resist Model ────────────────────────────────────────────────────────
+// EVE stores RESONANCE, not resistance. resonance=1.0 → 0% resist, resonance=0.0 → immune.
+// Hardener modules also store their resonance multiplier (e.g. 0.625 on EM hardener).
+// Final resonance = ship_resonance * prod(mod_resonance * stackPenalty_i)
+// Resist % shown = (1 - finalResonance) * 100
+
+function calcResist(shipRes, mods, attrFn) {
+  const modRes = mods.map(attrFn).filter(v => v !== null && v < 1.0).sort((a,b) => a-b);
+  const STACK = [1.0, 0.869, 0.571, 0.283, 0.100, 0.034, 0.011];
+  let finalRes = shipRes;
+  modRes.forEach((r, i) => {
+    const pen = STACK[i] || 0.011;
+    const effR = 1 - (1 - r) * pen;
+    finalRes *= effR;
+  });
+  finalRes = Math.max(0, Math.min(1, finalRes));
+  return finalRes;
+}
+
+// Debug helper: log module resist attrs to console (remove after confirming values)
+function debugModResists(mods){
+  mods.forEach(m=>{
+    const hasAny = m.shEMRes!==null||m.shTHRes!==null||m.shKIRes!==null||m.shEXRes!==null||
+                   m.arEMRes!==null||m.arTHRes!==null||m.arKIRes!==null||m.arEXRes!==null;
+    if(hasAny){
+      console.log(`[RESIST] ${m.name}: sh=${m.shEMRes?.toFixed(3)}/${m.shTHRes?.toFixed(3)}/${m.shKIRes?.toFixed(3)}/${m.shEXRes?.toFixed(3)} ar=${m.arEMRes?.toFixed(3)}/${m.arTHRes?.toFixed(3)}/${m.arKIRes?.toFixed(3)}/${m.arEXRes?.toFixed(3)}`);
+    }
+  });
+}
+
+function resistPct(resonance){ return ((1 - resonance) * 100).toFixed(1); }
+function resistColor(resonance){ // lower resonance = more resist = greener
+  const r = 1 - resonance;
+  if(r>=0.75)return'#2fef2f';
+  if(r>=0.50)return'#efef2f';
+  if(r>=0.25)return'#ef8f2f';
+  return'#ef4040';
+}
+
+function resistRow(label, color, em, th, ki, ex) {
+  function cell(v){ return `<div class="rg-val" style="color:${resistColor(v)}">${resistPct(v)}</div>`; }
+  return `<div class="rg-lbl"><span style="color:${color}">${label}</span></div>${cell(em)}${cell(th)}${cell(ki)}${cell(ex)}`;
+}
+
+function updateStats(){
+  if(!sD)return;
+  const allMods=[...fit.high,...fit.med,...fit.low,...fit.rig,...fit.sub].filter(Boolean);
+
+  // ── CPU / PG / Cal ──────────────────────────────────────────────────────
+  let cu=0,pu=0,calu=0;
+  allMods.forEach(m=>{cu+=(m.cpu||0);pu+=(m.pg||0);calu+=(m.cal||0);});
+  const cm=sD.cpuMax,pm=sD.pgMax,clm=sD.calMax;
+  document.getElementById('statCPU').textContent=`${cu.toFixed(1)} / ${cm.toFixed(1)} tf`;
+  document.getElementById('statPG').textContent=`${pu.toFixed(1)} / ${pm.toFixed(1)} MW`;
+  document.getElementById('statCal').textContent=`${calu.toFixed(0)} / ${clm.toFixed(0)}`;
+  setBar('barCPU',cm>0?cu/cm*100:0,'#40c8ef');
+  setBar('barPG',pm>0?pu/pm*100:0,'#efef40');
+  setBar('barCal',clm>0?calu/clm*100:0,'#c080ff');
+
+  // ── Capacitor ───────────────────────────────────────────────────────────
+  // Start from ship base, apply module bonuses
+  let capMax = sD.capMax;
+  let capRechargeMs = sD.capRecharge; // in ms
+
+  allMods.forEach(m => {
+    // Flat cap additions (batteries: attr 67)
+    if(m.capAdd) capMax += m.capAdd;
+    // Capacitor capacity multipliers (Power Diagnostic: attr 147 = 1.04)
+    if(m.capCapacityBonus && m.capCapacityBonus > 0) capMax *= m.capCapacityBonus;
+    // Recharge time multipliers (Cap Recharger: attr 144 = 0.85, Power Diagnostic: 0.925)
+    if(m.capRechargeBonus && m.capRechargeBonus > 0 && m.capRechargeBonus < 1.0)
+      capRechargeMs *= m.capRechargeBonus;
+    // Cap rig: attr 314 = negative % e.g. -15 means reduce recharge time by 15%
+    if(m.capRigBonus && m.capRigBonus < 0)
+      capRechargeMs *= (1 + m.capRigBonus / 100);
+    // Shield HP multiplier from Power Diagnostic (attr 146) — applied in defence section
+    // PG bonus (attr 145) — would need to apply to pgMax but skip for now
+  });
+
+  const rechargeTime = capRechargeMs / 1000; // ms → s
+  // EVE cap regen peak ≈ 2.5 * capMax / rechargeTime (at ~25% cap)
+  const peakRegen = rechargeTime > 0 ? 2.5 * capMax / rechargeTime : 0;
+
+  // Cap drain: sum ACTIVE module usage per cycle, convert to per-second
+  // Only modules with isActive===true (not toggled off) contribute to drain
+  let totalDrainPerSec = 0;
+  allMods.forEach(m => {
+    if(m.isActive !== false && m.capUse > 0) totalDrainPerSec += m.capUse / 10; // assume 10s cycle
+  });
+
+  const netRegen = peakRegen - totalDrainPerSec;
+  const isStable = netRegen >= 0;
+  const capEl = document.getElementById('capStats');
+  const stableLabel = isStable
+    ? `<span class="cap-stable">STABLE</span>`
+    : `<span class="cap-unstable">${(capMax / Math.abs(netRegen) / 60).toFixed(1)} min to empty</span>`;
+  capEl.innerHTML = `
+    <div class="stat-mini"><span class="sl">Capacity</span><span class="sv">${capMax.toFixed(0)} GJ</span></div>
+    <div class="stat-mini"><span class="sl">Recharge</span><span class="sv">${rechargeTime.toFixed(0)}s</span></div>
+    <div class="stat-mini"><span class="sl">Peak Regen</span><span class="sv">${peakRegen.toFixed(1)} GJ/s</span></div>
+    <div class="stat-mini"><span class="sl">Stability</span>${stableLabel}</div>`;
+
+  // ── Offense ─────────────────────────────────────────────────────────────
+  const shipTurretMult = sD.turretDmgMult || 1.0;
+  const shipMissileMult = sD.missileDmgMult || 1.0;
+  let totalDPS = 0, totalVolley = 0;
+  const weaponLines = [];
+  // Hardpoint tracking
+  const turretsFitted = fit.high.filter(m => m && m.isTurret).length;
+  const launchersFitted = fit.high.filter(m => m && m.isLauncher).length;
+  const tHP = sD.turretHardpoints, lHP = sD.launcherHardpoints;
+  const tOver = turretsFitted > tHP, lOver = launchersFitted > lHP;
+  const hpLines = [];
+  if(tHP > 0 || turretsFitted > 0) hpLines.push(`<div class="stat-mini"><span class="sl">Turret Hardpoints</span><span class="sv" style="color:${tOver?'#ef4040':'#e8ecf2'}">${turretsFitted}/${tHP}</span></div>`);
+  if(lHP > 0 || launchersFitted > 0) hpLines.push(`<div class="stat-mini"><span class="sl">Launcher Hardpoints</span><span class="sv" style="color:${lOver?'#ef4040':'#e8ecf2'}">${launchersFitted}/${lHP}</span></div>`);
+
+  allMods.forEach(m => {
+    const chargeDmg = (m.emDmg||0)+(m.thDmg||0)+(m.kiDmg||0)+(m.exDmg||0);
+    if(m.isTurret && m.dmgMult > 0 && m.rof > 0) {
+      // Turret: ship bonus × gun dmgMult × charge damage / ROF
+      const perShot = chargeDmg > 0
+        ? chargeDmg * (m.dmgMult||1) * shipTurretMult
+        : (m.dmgMult||1) * shipTurretMult * 50; // fallback: 50 base if no charge loaded
+      const rofSec = m.rof / 1000;
+      const dps = perShot / rofSec;
+      totalDPS += dps; totalVolley += perShot;
+      const label = chargeDmg > 0
+        ? `${dps.toFixed(1)} dps${m.chargeName?' ('+m.chargeName+')':''}`
+        : `${dps.toFixed(1)} dps (est.)`;
+      weaponLines.push(`<div class="stat-mini"><span class="sl" style="font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${_e(m.name)}</span><span class="sv">${label}</span></div>`);
+    } else if(m.isLauncher && m.missileRof > 0) {
+      // Launcher: ship missile bonus × charge damage / ROF
+      const perShot = chargeDmg > 0
+        ? chargeDmg * shipMissileMult
+        : shipMissileMult * 80; // fallback
+      const rofSec = m.missileRof / 1000;
+      const dps = perShot / rofSec;
+      totalDPS += dps; totalVolley += perShot;
+      const label = chargeDmg > 0
+        ? `${dps.toFixed(1)} dps${m.chargeName?' ('+m.chargeName+')':''}`
+        : `${dps.toFixed(1)} dps (est.)`;
+      weaponLines.push(`<div class="stat-mini"><span class="sl" style="font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">${_e(m.name)}</span><span class="sv">${label}</span></div>`);
+    }
+  });
+
+  const offEl = document.getElementById('offenseStats');
+  if(weaponLines.length) {
+    offEl.innerHTML = `
+      <div class="stat-mini" style="border-bottom:1px solid rgba(60,80,110,0.22);margin-bottom:3px;padding-bottom:2px;">
+        <span class="sl" style="font-weight:700;">Total DPS</span><span class="sv" style="color:#ef4040;">${totalDPS.toFixed(1)}</span>
+      </div>
+      <div class="stat-mini"><span class="sl">Volley</span><span class="sv">${totalVolley.toFixed(0)} hp</span></div>
+      ${weaponLines.join('')}
+      ${hpLines.length?'<div style="border-top:1px solid rgba(60,80,110,0.18);margin-top:3px;padding-top:2px;">'+hpLines.join('')+'</div>':''}`;
+  } else if(hpLines.length) {
+    offEl.innerHTML = `<div style="padding-bottom:1px;">${hpLines.join('')}</div><div class="stat-mini"><span style="color:#4a5060;font-size:9px;">No weapons fitted</span></div>`;
+  }
+
+  // Drone DPS contribution
+  let droneDPS = 0;
+  drones.forEach(d => {
+    if(d.rof > 0) droneDPS += ((d.emDmg+d.thDmg+d.kiDmg+d.exDmg) * d.dmgMult / (d.rof/1000)) * d.qty;
+  });
+  if(droneDPS > 0) {
+    const droneHtml = `<div class="stat-mini" style="border-top:1px solid rgba(60,80,110,0.15);margin-top:2px;padding-top:2px;"><span class="sl">Drones</span><span class="sv" style="color:#c0a0ff;">${droneDPS.toFixed(1)} dps</span></div>`;
+    if(weaponLines.length) {
+      offEl.innerHTML = offEl.innerHTML.replace('</div>',droneHtml+'</div>');
+      // update total
+      const newTotal = totalDPS + droneDPS;
+      offEl.innerHTML = offEl.innerHTML.replace(/Total DPS<\/span><span class="sv" style="color:#ef4040;">[0-9.]+<\/span>/,
+        `Total DPS</span><span class="sv" style="color:#ef4040;">${newTotal.toFixed(1)}</span>`);
+    } else {
+      offEl.innerHTML = `<div class="stat-mini" style="border-bottom:1px solid rgba(60,80,110,0.22);margin-bottom:3px;padding-bottom:2px;"><span class="sl" style="font-weight:700;">Total DPS</span><span class="sv" style="color:#ef4040;">${droneDPS.toFixed(1)}</span></div>
+        <div class="stat-mini"><span class="sl">Drones</span><span class="sv" style="color:#c0a0ff;">${droneDPS.toFixed(1)} dps</span></div>`;
+    }
+  } else if(!weaponLines.length) {
+    offEl.innerHTML = '<div class="stat-mini"><span style="color:#4a5060;font-size:9px;">No weapons or drones</span></div>';
+  }
+
+  // ── Defence ─────────────────────────────────────────────────────────────
+  debugModResists(allMods); // remove after confirming hardener values
+  // calcResist returns final RESONANCE. EHP uses resonance directly.
+  // Shield resonance: ship base * stacked module multipliers
+  const shEMr = calcResist(sD.shieldEMRes, allMods, m => m.shEMRes);
+  const shTHr = calcResist(sD.shieldTHRes, allMods, m => m.shTHRes);
+  const shKIr = calcResist(sD.shieldKIRes, allMods, m => m.shKIRes);
+  const shEXr = calcResist(sD.shieldEXRes, allMods, m => m.shEXRes);
+  const arEMr = calcResist(sD.armorEMRes,  allMods, m => m.arEMRes);
+  const arTHr = calcResist(sD.armorTHRes,  allMods, m => m.arTHRes);
+  const arKIr = calcResist(sD.armorKIRes,  allMods, m => m.arKIRes);
+  const arEXr = calcResist(sD.armorEXRes,  allMods, m => m.arEXRes);
+  // Hull: fixed resonance 0.667 (33% resist) to all types
+  const huEMr=sD.hullEMRes, huTHr=sD.hullTHRes, huKIr=sD.hullKIRes, huEXr=sD.hullEXRes;
+
+  // HP with module additions and multipliers
+  let shHP = sD.shieldHP, arHP = sD.armorHP, huHP = sD.hullHP;
+  allMods.forEach(m => {
+    if(m.shieldHPAdd)   shHP += m.shieldHPAdd;
+    if(m.armorHPAdd)    arHP += m.armorHPAdd;
+    if(m.shieldHPBonus && m.shieldHPBonus > 1.0) shHP *= m.shieldHPBonus; // Power Diag
+  });
+
+  // EHP per layer = HP / avgResonance (lower resonance = more effective HP)
+  // Use uniform incoming damage profile (equal EM/TH/KI/EX weight)
+  const shEHP = shHP / Math.max(0.001, (shEMr+shTHr+shKIr+shEXr)/4);
+  const arEHP = arHP / Math.max(0.001, (arEMr+arTHr+arKIr+arEXr)/4);
+  const huEHP = huHP / Math.max(0.001, (huEMr+huTHr+huKIr+huEXr)/4);
+  const totalEHP = shEHP + arEHP + huEHP;
+
+  const ds = document.getElementById('defenceStats');
+  ds.innerHTML = `
+    <div class="resist-grid">
+      <div class="rg-hdr"></div>
+      <div class="rg-hdr" style="color:#a040ff">EM</div>
+      <div class="rg-hdr" style="color:#ef8f2f">TH</div>
+      <div class="rg-hdr" style="color:#60a0ff">KI</div>
+      <div class="rg-hdr" style="color:#40ef40">EX</div>
+      ${resistRow('Shield','#4aa8e8',shEMr,shTHr,shKIr,shEXr)}
+      ${resistRow('Armor','#efef40',arEMr,arTHr,arKIr,arEXr)}
+      ${resistRow('Hull','#c5cdd8',huEMr,huTHr,huKIr,huEXr)}
+    </div>
+    <div style="margin-top:5px;border-top:1px solid rgba(60,80,110,0.22);padding-top:4px;">
+      <div class="stat-mini"><span class="sl" style="color:#4aa8e8;">Shield</span><span class="sv">${shHP.toFixed(0)} hp <span style="color:#6b7280;font-size:8px;">(${shEHP.toFixed(0)} ehp)</span></span></div>
+      <div class="hp-bar"><div class="hp-seg" style="background:#2080c0;flex:${Math.max(1,shHP)};"></div></div>
+      <div class="stat-mini"><span class="sl" style="color:#efef40;">Armor</span><span class="sv">${arHP.toFixed(0)} hp <span style="color:#6b7280;font-size:8px;">(${arEHP.toFixed(0)} ehp)</span></span></div>
+      <div class="hp-bar"><div class="hp-seg" style="background:#c0a020;flex:${Math.max(1,arHP)};"></div></div>
+      <div class="stat-mini"><span class="sl" style="color:#c5cdd8;">Hull</span><span class="sv">${huHP.toFixed(0)} hp</span></div>
+      <div class="stat-mini" style="margin-top:4px;border-top:1px solid rgba(60,80,110,0.22);padding-top:3px;">
+        <span style="font-weight:700;color:#e8ecf2;">Total EHP</span>
+        <span class="sv" style="color:#2fef2f;">${totalEHP.toFixed(0)}</span>
+      </div>
+    </div>`;
+
+  // ── Targeting ───────────────────────────────────────────────────────────
+  const tEl = document.getElementById('targetingStats');
+  if(sD.scanRes) {
+    tEl.innerHTML = `
+      <div class="stat-mini"><span class="sl">Scan Res</span><span class="sv">${sD.scanRes.toFixed(0)} mm</span></div>
+      <div class="stat-mini"><span class="sl">Lock Range</span><span class="sv">${(sD.targetRange/1000).toFixed(0)} km</span></div>
+      <div class="stat-mini"><span class="sl">Max Targets</span><span class="sv">${sD.maxTargets}</span></div>
+      <div class="stat-mini"><span class="sl">Sensor Str</span><span class="sv">${(sD.sensorStr||0).toFixed(1)} pts</span></div>`;
+  } else {
+    tEl.innerHTML = '<div class="stat-mini"><span style="color:#4a5060;font-size:9px;">Select a ship</span></div>';
+  }
+
+  // ── Navigation ──────────────────────────────────────────────────────────
+  const nEl = document.getElementById('navStats');
+  if(sD.maxVelocity) {
+    // Apply velocity, inertia, and mass bonuses from mods
+    let vel = sD.maxVelocity;
+    let inertia = sD.inertia;
+    let totalMass = (sD.mass||0);
+    allMods.forEach(m => {
+      if(m.velocityMult && m.velocityMult !== 0) vel *= m.velocityMult;
+      if(m.inertiaMult && m.inertiaMult !== 0) inertia *= m.inertiaMult;
+      if(m.massAdd) totalMass += m.massAdd;
+    });
+    // Align time = ln(2) * mass(kg) * inertiaModifier / 1,000,000
+    const alignTime = totalMass > 0 ? Math.log(2) * totalMass * inertia / 1e6 : 0;
+    nEl.innerHTML = `
+      <div class="stat-mini"><span class="sl">Max Velocity</span><span class="sv">${vel.toFixed(0)} m/s</span></div>
+      <div class="stat-mini"><span class="sl">Inertia</span><span class="sv">${inertia.toFixed(3)}</span></div>
+      <div class="stat-mini"><span class="sl">Align Time</span><span class="sv">${alignTime.toFixed(1)} s</span></div>
+      <div class="stat-mini"><span class="sl">Mass</span><span class="sv">${((sD.mass||0)/1e6).toFixed(2)} M kg</span></div>`;
+  } else {
+    nEl.innerHTML = '<div class="stat-mini"><span style="color:#4a5060;font-size:9px;">Select a ship</span></div>';
+  }
+
+  updateSkillReqs(allMods);
+}
+
+function setBar(id,pct,color){const el=document.getElementById(id);el.style.width=Math.min(100,pct)+'%';el.style.background=pct>100?'#ef2f2f':color;}
+
+function updateSkillReqs(mods){
+  const el=document.getElementById('skillReqs');const reqs=new Map();[...(sD?[sD]:[]),...mods].forEach(it=>{(it.skillReqs||[]).forEach(sr=>{const ex=reqs.get(sr.skillID);if(!ex||sr.level>ex.level)reqs.set(sr.skillID,sr);});});
+  if(!reqs.size){el.innerHTML='<span style="font-size:8px;color:#4a5060;">No requirements</span>';return;}
+  el.innerHTML=[...reqs.values()].sort((a,b)=>(a.skillName||'').localeCompare(b.skillName||'')).map(sr=>{const have=cS[sr.skillID]?.level||0;const ok=have>=sr.level;return `<span class="skill-req ${ok?'skill-ok':'skill-miss'}">${_e(sr.skillName)} ${sr.level} ${ok?'✓':'✗('+have+')'}</span>`;}).join(' ');
+}
+
+async function loadModules(){
+  const el=document.getElementById('modList'),q=document.getElementById('modSearch').value.trim();
+  const slotNames={high:'High Slot',med:'Medium Slot',low:'Low Slot',rig:'Rig Slot'};
+  // Determine active slot filter
+  const slotFilter=(['high','med','low','rig'].includes(_mf))?_mf:'';
+
+  el.innerHTML='<div style="padding:4px;color:#6b7280;font-size:8px;">Loading…</div>';
+  try{let items=[];
+    if(_mf==='assets'){
+      // Show only equippable modules from character assets, filtered to active slot if set
+      const tids=Object.keys(cA).map(Number);
+      if(tids.length){
+        // Batch-fetch slot types to filter to equippable items only
+        const chunks=[];for(let i=0;i<tids.length;i+=200)chunks.push(tids.slice(i,i+200));
+        let slotMap={};
+        for(const chunk of chunks){
+          const sr=await fetch(FW+'/slot_types?type_ids='+chunk.join(','),{credentials:'include'});
+          Object.assign(slotMap,await sr.json());
+        }
+        // Only keep items that have a slot, and match active slot filter if set
+        const equippable=tids.filter(tid=>{
+          const slot=slotMap[tid]||slotMap[String(tid)];
+          if(!slot)return false;
+          if(slotFilter&&slot!==slotFilter)return false;
+          return true;
+        });
+        if(equippable.length){
+          const nr=await fetch(FW+'/type_names?type_ids='+equippable.slice(0,200).join(','),{credentials:'include'});
+          const nd=await nr.json();
+          items=equippable.slice(0,200).map(tid=>({
+            typeID:tid,
+            typeName:(nd[tid]||nd[String(tid)])?.typeName||`#${tid}`,
+            slotType:slotMap[tid]||slotMap[String(tid)]
+          })).filter(i=>!q||i.typeName.toLowerCase().includes(q.toLowerCase()));
+        }
+      }
+    } else {
+      // Use module_search endpoint with slot filter
+      const params=new URLSearchParams();
+      if(q)params.set('q',q);
+      if(slotFilter)params.set('slot',slotFilter);
+      // Need either a query or a slot filter to search
+      if(!q&&!slotFilter){
+        el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:9px;">Type to search or select a slot type</div>';
+        return;
+      }
+      const r=await fetch(FW+'/module_search?'+params.toString(),{credentials:'include'});
+      items=await r.json();if(!Array.isArray(items))items=[];
+    }
+    if(!items.length){el.innerHTML=`<div style="padding:4px;color:#6b7280;font-size:8px;">No ${slotFilter?slotNames[slotFilter]+' ':''} modules found${q?' for "'+_e(q)+'"':''}.</div>`;return;}
+    // Group by groupName for tree browsing
+    const groups={};items.forEach(m=>{const g=m.groupName||'Other';if(!groups[g])groups[g]=[];groups[g].push(m);});
+    const sortedGroups=Object.keys(groups).sort();
+    // Collapse groups when browsing without search (tree mode); expand all when searching
+    const treeMode=!q;
+    let html='';
+    sortedGroups.forEach((g,gi)=>{
+      const open=!treeMode||(sortedGroups.length===1);
+      const bodyId=`mgb_${gi}`;
+      html+=`<div class="mod-grp-hdr" onclick="toggleModGrp('${bodyId}',this)" style="padding:3px 5px;font-size:7px;font-weight:700;text-transform:uppercase;color:#8b939e;background: rgba(0,0,0,0.8);border-bottom:1px solid rgba(60,80,110,0.22);position:sticky;top:0;z-index:2;cursor:pointer;user-select:none;display:flex;align-items:center;gap:3px;">` +
+        `<span class="mg-arr" style="font-size:8px;color:#4a5060;">${open?'▾':'▸'}</span>` +
+        `<span style="flex:1;">${_e(g)}</span>` +
+        `<span style="color:#4a5060;">${groups[g].length}</span>` +
+        `</div>`;
+      html+=`<div id="${bodyId}" style="display:${open?'block':'none'};">`;
+      groups[g].forEach(m=>{
+        const owned=cA[m.typeID];
+        const esc=_e(m.typeName||'').replace(/'/g,"\\'");
+        html+=`<div class="mod-item" draggable="true" ` +
+          `ondragstart="onModDragStart(event,${m.typeID},'${esc}')" ` +
+          `onclick="fitModule(${m.typeID},'${esc}')" ` +
+          `onmouseenter="showModTooltip(this,${m.typeID},'${esc}')" ` +
+          `onmouseleave="hideModTooltip()">` +
+          `<img src="${eI(m.typeID,'icon',32)}" onerror="iE(this,${m.typeID},'icon')"/>` +
+          `<span style="flex:1;">${_e(m.typeName||'?')}</span>` +
+          `${owned?`<span class="in-hangar">×${owned}</span>`:''}` +
+          `</div>`;
+      });
+      html+=`</div>`;
+    });
+    el.innerHTML=html;
+  }catch(e){el.innerHTML=`<div style="padding:4px;color:#ef2f2f;font-size:8px;">${e.message}</div>`;}
+}
+
+// Map slot type to the effectID that identifies it
+const SLOT_EFFECTS={high:12,med:13,low:11,rig:2663};
+
+async function fitModule(typeID,name){
+  if(!aST||aSI===null||!sD)return;
+  try{
+    const r=await fetch(FW+'/type_dogma/'+typeID,{credentials:'include'});
+    const data=await r.json();
+    const dogma=data.dogmaAttributes||[];const am={};
+    dogma.forEach(a=>{am[a.attributeID]=a.value;});
+    const effects=data.dogmaEffects||[];
+    // Validate slot type using effects returned from dogma endpoint
+    const slotEffects={12:'high',13:'med',11:'low',2663:'rig'};
+    const modSlot=effects.map(e=>slotEffects[e]).find(Boolean);
+    if(!modSlot){
+      showFitError(`${data.typeName||name} cannot be fitted to any slot (not a module).`);return;
+    }
+    if(modSlot!==aST){
+      const slotNames={high:'High',med:'Medium',low:'Low',rig:'Rig'};
+      showFitError(`${data.typeName||name} is a ${slotNames[modSlot]} slot module — cannot fit in ${slotNames[aST]} slot.`);return;
+    }
+    const modObj=buildModObj(typeID,data.typeName||name,am,effects,data.groupName||'');
+    // For turrets and launchers, fetch default charge damage
+    if(modObj.isTurret || modObj.isLauncher){
+      const cgAttr=modObj.isTurret ? (am[507]||am[509]||am[510]||0) : (am[507]||am[509]||0);
+      if(cgAttr>0){
+        try{
+          const cr=await fetch(FW+'/default_charge/'+cgAttr,{credentials:'include'});
+          const cd=await cr.json();
+          if(cd&&(cd.emDamage||cd.thermalDamage||cd.kineticDamage||cd.explosiveDamage)){
+            modObj.emDmg=cd.emDamage||0;modObj.thDmg=cd.thermalDamage||0;
+            modObj.kiDmg=cd.kineticDamage||0;modObj.exDmg=cd.explosiveDamage||0;
+            modObj.chargeName=cd.typeName||'';
+          }
+        }catch(e){}
+      }
+    }
+    fit[aST][aSI]=modObj;
+    positionSlots();updateStats();updateFittedList();highlightActive(aST,aSI);
+  }catch(e){console.error(e);}
+}
+
+function showFitError(msg){
+  // Show a brief non-blocking error near the module list
+  const el=document.getElementById('modList');
+  const err=document.createElement('div');
+  err.style.cssText='position:sticky;top:0;z-index:10;padding:4px 6px;background:rgba(239,47,47,0.18);border:1px solid rgba(239,47,47,0.4);color:#ef6060;font-size:9px;';
+  err.textContent=msg;
+  el.prepend(err);
+  setTimeout(()=>err.remove(),3000);
+}
+
+// EVE effectIDs that identify weapon types
+const EFF_TURRET    = new Set([34,35,36,37,38,39,40,41,42,43]);// projectileFired + energy/hybrid variants
+const EFF_MISSILE   = new Set([10,12,104,259,11]);// useMissiles and related
+const EFF_NEUT      = new Set([48]);
+// Weapon group name keywords for fallback detection
+function isWeaponGroup(g){return /cannon|gun|laser|blaster|railgun|artillery|autocannon|launcher|torpedo|missile|beam|pulse/i.test(g||'');}
+
+function buildModObj(typeID,name,am,effects,groupName){
+  effects = effects || [];
+  const fx = new Set(effects);
+
+  // Detect turret: has damageMultiplier(64) AND speed/rof(51) AND (effectID matches OR group name matches)
+  // Turrets fire projectiles/lasers - they have dmgMult. Launchers do NOT have attr 64.
+  const isTurret = (am[64] > 0) && (am[51] > 0);
+  // Detect launcher: has speed(51) AND chargeGroup1(507) but NO dmgMult(64)
+  // Launchers always have a chargeGroup attr
+  const isLauncher = !isTurret && (am[51] > 0) && (am[507] > 0 || am[509] > 0);
+
+  // Resist resonance helper — hardeners store the RESULTING resonance value
+  // e.g. a shield EM hardener has attr 271 = 0.625 (meaning 37.5% EM resist)
+  // We want this value if it's < 1.0 (actually changes the resonance)
+  // Some modules have these attrs set to 1.0 (no effect) — return null for those
+  const res = id => (am[id] != null && am[id] < 1.0) ? am[id] : null;
+  const bonusRes = id => (am[id] != null && am[id] < 0) ? (1 + am[id]/100) : null;
+
+  // Determine which resist layers this module can affect based on slot:
+  // - Mid slot (effectID 13): shield layer only (shield hardeners, coatings)
+  // - Low slot (effectID 11): armor layer, BUT Damage Control also has shield attrs
+  // - Damage Control detected by having BOTH shield AND armor resonance attrs (267-274)
+  const isMidSlot  = effects.includes(13);
+  const isLowSlot  = effects.includes(11);
+  const hasDCAttrs = (am[267] != null && am[267] < 1.0) && (am[271] != null && am[271] < 1.0);
+  // Shield resist applies if: mid slot, OR low slot with DC-style attrs (affects both layers)
+  const affectsShield = isMidSlot || hasDCAttrs;
+  // Armor resist applies if: low slot, OR DC-style attrs
+  const affectsArmor  = isLowSlot || hasDCAttrs;
+
+  return {
+    typeID, name, groupName: groupName||'',
+    isTurret, isLauncher,
+    isActive: true,  // toggleable — inactive modules excluded from cap drain
+    // Resources — note: attr 1132 = ship upgradeCapacity, attr 1153 = rig upgradeCost
+    cpu:am[50]||0, pg:am[30]||0, cal:am[1153]||0,
+    // Capacitor usage per cycle (GJ, attr 6 = capacitorNeed)
+    capUse:am[6]||0,              // cap drained per activation (GJ)
+    capAdd:am[67]||0,             // flat cap capacity bonus (batteries: +120 GJ)
+    capRechargeBonus:am[144]||0,  // recharge time multiplier (<1 = faster, e.g. 0.85)
+    capRigBonus:am[314]||0,       // cap rig recharge bonus (negative %, e.g. -15 = 15% faster)
+    capCapacityBonus:am[147]||0,  // cap capacity multiplier (>1 = more cap, e.g. 1.04)
+    shieldHPBonus:am[146]||0,     // shield HP multiplier (Power Diagnostic: 1.04)
+    pgBonus:am[145]||0,           // powergrid multiplier (Power Diagnostic: 1.05)
+    // TWO resist storage formats in EVE SDE:
+    // Format A (Damage Control, passive mods): resonance multiplier attrs 267-274
+    //   value < 1.0: multiply ship resonance by this value e.g. 0.85
+    // Format B (ALL active hardeners — shield AND armor): attrs 984-987
+    //   984=EM, 985=EX, 986=KI, 987=TH — negative % e.g. -50 = add 50% resist
+    //   Both shield hardeners (med slot) and armor hardeners (low slot) use same 4 attrs
+    //   Conversion: resonanceMultiplier = 1 + (value/100), e.g. -50 → 0.5
+    //
+    // Store final resonance MULTIPLIER for both formats (null = no effect on that type):
+    // Shield resist: only if mid slot OR Damage Control (which affects both)
+    shEMRes: affectsShield ? (res(271) ?? bonusRes(984)) : null,
+    shTHRes: affectsShield ? (res(274) ?? bonusRes(987)) : null,
+    shKIRes: affectsShield ? (res(273) ?? bonusRes(986)) : null,
+    shEXRes: affectsShield ? (res(272) ?? bonusRes(985)) : null,
+    // Armor resist: only if low slot OR Damage Control
+    arEMRes: affectsArmor ? (res(267) ?? bonusRes(984)) : null,
+    arTHRes: affectsArmor ? (res(270) ?? bonusRes(987)) : null,
+    arKIRes: affectsArmor ? (res(269) ?? bonusRes(986)) : null,
+    arEXRes: affectsArmor ? (res(268) ?? bonusRes(985)) : null,
+    // HP additions: shield extender=attr72, armor plate=attr1159, mass addition=attr796
+    shieldHPAdd: am[72]||0,
+    armorHPAdd:  am[1159]||0,
+    massAdd:     am[796]||0,
+    // Navigation
+    velocityMult:am[20]||0, inertiaMult:am[799]||0,
+    // Turret: damageMultiplier(64), speed/rof(51 in ms)
+    // NOTE: damage values (114/116/118/120) are on CHARGES, not the gun
+    // We store a weaponBaseDmg placeholder — actual DPS needs charge selection
+    dmgMult:  am[64]||0,
+    rof:      am[51]||0,
+    // Missile launcher: rof(51), chargeGroup(507)
+    // Missile damage is on the missile, not the launcher
+    missileRof: (isLauncher ? am[51]||0 : 0),
+    skillReqs:extractSkillReqs(am)
+  };
+}
+
+function exportEFT(){if(!sD)return;let l=[`[${sD.name}, XYLON Fit]`,''];fit.low.forEach(m=>{if(m)l.push(m.name);});l.push('');fit.med.forEach(m=>{if(m)l.push(m.name);});l.push('');fit.high.forEach(m=>{if(m)l.push(m.name);});l.push('');fit.rig.forEach(m=>{if(m)l.push(m.name);});document.getElementById('eftText').value=l.join('\n');}
+
+async function importEFT(){
+  const text=document.getElementById('eftText').value.trim();if(!text)return;const lines=text.split('\n').map(l=>l.trim());const hdr=lines[0].match(/^\[(.+?),\s*(.+?)\]$/);
+  if(!hdr){alert('Invalid EFT — first line: [Ship Name, Fit Name]');return;}
+  const ship=allShips.find(s=>s.name.toLowerCase()===hdr[1].trim().toLowerCase());if(!ship){alert(`Ship "${hdr[1]}" not found`);return;}
+  await selectShip(ship.typeID);document.getElementById('fitShipName').textContent=`${sD.name} — ${hdr[2]}`;
+  const sections=[];let cur=[];lines.slice(1).forEach(l=>{if(!l){if(cur.length){sections.push(cur);cur=[];}return;}cur.push(l);});if(cur.length)sections.push(cur);
+  const slotKeys=['low','med','high','rig'];
+  for(let si=0;si<Math.min(sections.length,slotKeys.length);si++){const key=slotKeys[si];for(let mi=0;mi<sections[si].length;mi++){const modName=sections[si][mi];try{const r=await fetch(FW+'/type_search?q='+encodeURIComponent(modName)+'&category=Module',{credentials:'include'});let items=await r.json();if(!Array.isArray(items))items=[];const exact=items.find(i=>(i.typeName||'').toLowerCase()===modName.toLowerCase())||items[0];if(exact){const dr=await fetch(FW+'/type_dogma/'+exact.typeID,{credentials:'include'});const dd=await dr.json();const dogma=dd.dogmaAttributes||[];const am={};dogma.forEach(a=>{am[a.attributeID]=a.value;});const efx=(dd.dogmaEffects||[]);fit[key][mi]=buildModObj(exact.typeID,exact.typeName||modName,am,efx,'');}}catch(e){}}}
+  positionSlots();updateStats();updateFittedList();
+}
+
+// ── Drone Bay ────────────────────────────────────────────────────────────
+async function loadDrones(){
+  if(!sD||!sD.droneBay)return;
+  const q=document.getElementById('droneSearch').value.trim();
+  const el=document.getElementById('droneList');
+  el.innerHTML='<div style="padding:3px;color:#6b7280;font-size:8px;">Loading…</div>';
+  try{
+    const r=await fetch(FW+'/drone_search?q='+encodeURIComponent(q),{credentials:'include'});
+    let items=await r.json();if(!Array.isArray(items))items=[];
+    if(!items.length){el.innerHTML='<div style="padding:3px;color:#6b7280;font-size:8px;">No drones found.</div>';return;}
+    const groups={};items.forEach(d=>{const g=d.groupName||'Other';if(!groups[g])groups[g]=[];groups[g].push(d);});
+    let h='';
+    Object.keys(groups).sort().forEach(g=>{
+      h+=`<div style="padding:1px 3px;font-size:7px;font-weight:700;text-transform:uppercase;color:#555d6a;background: rgba(0,0,0,0.8);">${_e(g)}</div>`;
+      groups[g].forEach(d=>{
+        h+=`<div class="mod-item" onclick="addDrone(${d.typeID},'${_e(d.typeName||'').replace(/'/g,"\\'")}')"><img src="${eI(d.typeID,'icon',32)}" onerror="iE(this,${d.typeID},'icon')"/><span style="flex:1;font-size:9px;">${_e(d.typeName||'?')}</span><span style="font-size:8px;color:#4aa8e8;">+</span></div>`;
+      });
+    });
+    el.innerHTML=h;
+  }catch(e){el.innerHTML=`<div style="padding:3px;color:#ef4040;font-size:8px;">${e.message}</div>`;}
+}
+
+async function addDrone(typeID,name){
+  if(!sD||!sD.droneBay)return;
+  // Fetch drone dogma attrs
+  try{
+    const r=await fetch(FW+'/type_dogma/'+typeID,{credentials:'include'});
+    const data=await r.json();const dogma=data.dogmaAttributes||[];const am={};
+    dogma.forEach(a=>{am[a.attributeID]=a.value;});
+    // Drone bandwidth (attr 1271), volume (attr 469)
+    const bw=am[1271]||0, vol=am[469]||5;
+    // Check bandwidth and bay capacity
+    const usedBW=drones.reduce((s,d)=>s+d.bw*d.qty,0);
+    const usedVol=drones.reduce((s,d)=>s+d.vol*d.qty,0);
+    if(usedBW+bw>sD.droneBandwidth&&sD.droneBandwidth>0){alert(`Not enough drone bandwidth (${bw} Mbit needed, ${(sD.droneBandwidth-usedBW).toFixed(0)} free)`);return;}
+    if(usedVol+vol>sD.droneBay&&sD.droneBay>0){alert(`Drone bay full (${vol}m³ needed, ${(sD.droneBay-usedVol).toFixed(0)}m³ free)`);return;}
+    // Check if already have this drone type
+    const existing=drones.find(d=>d.typeID===typeID);
+    if(existing){existing.qty++;} else {
+      drones.push({typeID,name:data.typeName||name,qty:1,
+        dmgMult:am[64]||1, rof:am[51]||3000,
+        emDmg:am[114]||0, thDmg:am[116]||0, kiDmg:am[118]||0, exDmg:am[120]||0,
+        bw, vol
+      });
+    }
+    renderDroneSlots();updateStats();
+  }catch(e){console.error(e);}
+}
+
+function removeDrone(typeID){
+  const idx=drones.findIndex(d=>d.typeID===typeID);
+  if(idx<0)return;
+  drones[idx].qty--;
+  if(drones[idx].qty<=0)drones.splice(idx,1);
+  renderDroneSlots();updateStats();
+}
+
+function renderDroneSlots(){
+  const el=document.getElementById('droneSlots');
+  if(!drones.length){el.innerHTML='<div style="font-size:8px;color:#4a5060;padding:2px;">No drones loaded</div>';updateDroneBayUsed();return;}
+  el.innerHTML=drones.map(d=>{
+    const dps=d.rof>0?((d.emDmg+d.thDmg+d.kiDmg+d.exDmg)*d.dmgMult/(d.rof/1000)*d.qty).toFixed(1):'—';
+    return `<div style="display:flex;align-items:center;gap:3px;padding:2px 3px;border-bottom:1px solid rgba(60,80,110,0.18);font-size:9px;">
+      <img src="${eI(d.typeID,'icon',24)}" onerror="iE(this,${d.typeID},'icon')" style="width:20px;height:20px;"/>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_e(d.name)}</span>
+      <span style="font-family:monospace;color:#6b7280;">${dps} dps</span>
+      <button onclick="removeDrone(${d.typeID})" style="background:none;border:none;color:#ef4040;cursor:pointer;font-size:10px;padding:0 2px;">✕</button>
+      <span style="font-family:monospace;min-width:16px;text-align:center;color:#4aa8e8;">×${d.qty}</span>
+    </div>`;
+  }).join('');
+  updateDroneBayUsed();
+}
+
+function updateDroneBayUsed(){
+  const el=document.getElementById('droneBayUsed');
+  if(!sD)return;
+  const usedVol=drones.reduce((s,d)=>s+d.vol*d.qty,0);
+  const usedBW=drones.reduce((s,d)=>s+d.bw*d.qty,0);
+  el.textContent=`${usedVol.toFixed(0)}/${sD.droneBay}m³ · ${usedBW.toFixed(0)}/${sD.droneBandwidth}Mbit`;
+}
+
+loadCharData();
+
+// ─── Drag and Drop ─────────────────────────────────────────────────────
+let _dragTypeID=null,_dragName=null;
+
+function onModDragStart(e,typeID,name){
+  _dragTypeID=typeID;_dragName=name;
+  e.dataTransfer.setData('text/plain',typeID);
+  e.dataTransfer.effectAllowed='copy';
+}
+
+function setupSlotDropHandlers(){
+  document.querySelectorAll('.ring-slot').forEach(slot=>{
+    slot.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';slot.style.boxShadow='0 0 12px rgba(74,138,181,0.6)';slot.style.borderColor='#4aa8e8';});
+    slot.addEventListener('dragleave',e=>{slot.style.boxShadow='';slot.style.borderColor='';});
+    slot.addEventListener('drop',async e=>{
+      e.preventDefault();slot.style.boxShadow='';slot.style.borderColor='';
+      if(!_dragTypeID||!sD)return;
+      const key=slot.dataset.key,idx=parseInt(slot.dataset.idx);
+      if(!key&&key!==0)return;
+      aST=key;aSI=idx;
+      await fitModule(_dragTypeID,_dragName||'');
+      _dragTypeID=null;_dragName=null;
+    });
+  });
+}
+
+// Hook into positionSlots to re-attach drop handlers after ring re-render
+const _origPositionSlots=positionSlots;
+positionSlots=function(){_origPositionSlots();setupSlotDropHandlers();};
+
+// ── r100: Save & Browse Fittings ────────────────────────────────────────────
+
+function openSaveFitDialog(){
+  if(!sD){alert('Select a ship first.');return;}
+  exportEFT(); // ensure EFT text is current
+  document.getElementById('saveFitDialog').style.display='block';
+  document.getElementById('saveFitMsg').textContent='';
+  const el=document.getElementById('saveFitName');
+  el.value=el.value||sD.name+' Fit';
+  el.focus();el.select();
+}
+
+async function saveFit(){
+  const name=document.getElementById('saveFitName').value.trim();
+  const msg=document.getElementById('saveFitMsg');
+  if(!name){msg.style.color='#ef4040';msg.textContent='Name required.';return;}
+  if(!sD){msg.style.color='#ef4040';msg.textContent='No ship selected.';return;}
+  msg.style.color='#8b939e';msg.textContent='Saving…';
+  const eftStr=document.getElementById('eftText').value||'';
+  const fitPayload={
+    name:name,
+    ship_type_id:sD.type_id||0,
+    ship_name:sD.name||'',
+    fit_data:JSON.stringify({ship_type_id:sD.type_id,ship_name:sD.name,slots:fit}),
+    eft_string:eftStr
+  };
+  try{
+    const r=await fetch('/app/api/fittings',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(fitPayload)});
+    const d=await r.json();
+    if(d.success){
+      msg.style.color='#2fb850';msg.textContent='✓ Saved as "'+name+'"';
+      setTimeout(()=>{document.getElementById('saveFitDialog').style.display='none';},1200);
+      // Refresh browse list if open
+      if(document.getElementById('savedFitsList').style.display!=='none') loadSavedFits();
+    }else{
+      msg.style.color='#ef4040';msg.textContent='Error: '+(d.error||'Unknown');
+    }
+  }catch(e){msg.style.color='#ef4040';msg.textContent='Network error.';}
+}
+
+let _savedFitsOpen=false;
+async function toggleSavedFits(){
+  const panel=document.getElementById('savedFitsList');
+  _savedFitsOpen=!_savedFitsOpen;
+  panel.style.display=_savedFitsOpen?'block':'none';
+  if(_savedFitsOpen) loadSavedFits();
+}
+
+async function loadSavedFits(){
+  const inner=document.getElementById('savedFitsInner');
+  inner.innerHTML='<span style="font-size:9px;color:#6b7280;">Loading…</span>';
+  try{
+    const r=await fetch('/app/api/fittings',{credentials:'include'});
+    const d=await r.json();
+    const fits=d.fittings||[];
+    if(!fits.length){inner.innerHTML='<span style="font-size:9px;color:#6b7280;">No saved fittings yet.</span>';return;}
+    inner.innerHTML=fits.map(f=>{
+      const ts=(f.saved_ts||'').slice(0,16).replace('T',' ');
+      return `<div style="display:flex;align-items:center;gap:4px;padding:3px 4px;border-bottom:1px solid rgba(60,80,110,0.18);font-size:9px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;color:#c5cdd8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${f.name}</div>
+          <div style="color:#6b7280;"><span style="color:#4aa8e8;">${f.ship_name||'?'}</span> · ${f.saved_by_name||'?'} · ${ts}</div>
+        </div>
+        <button class="eve-btn" style="font-size:7px;padding:1px 6px;flex-shrink:0;" onclick="loadFit(${f.id})">LOAD</button>
+        <button class="eve-btn" style="font-size:7px;padding:1px 5px;flex-shrink:0;color:#ef6060;border-color:rgba(239,96,96,0.3);" onclick="deleteFit(${f.id})">✕</button>
+      </div>`;
+    }).join('');
+  }catch(e){inner.innerHTML='<span style="font-size:9px;color:#ef4040;">Error loading fittings.</span>';}
+}
+
+async function loadFit(fitId){
+  try{
+    const r=await fetch('/app/api/fittings/'+fitId,{credentials:'include'});
+    const d=await r.json();
+    if(!d.success){alert('Could not load fitting.');return;}
+    const f=d.fitting;
+    // Load EFT string into textarea and run import
+    if(f.eft_string){
+      document.getElementById('eftText').value=f.eft_string;
+      await importEFT();
+    } else if(f.fit_data){
+      // Fallback: restore from raw fit_data JSON
+      try{
+        const fd=JSON.parse(f.fit_data);
+        if(fd.ship_type_id) await selectShip(fd.ship_type_id);
+        if(fd.slots) Object.assign(fit,fd.slots);
+        renderRing();updateStats();
+      }catch(e){}
+    }
+    // Close browse panel
+    document.getElementById('savedFitsList').style.display='none';
+    _savedFitsOpen=false;
+  }catch(e){alert('Network error loading fitting.');}
+}
+
+async function deleteFit(fitId){
+  if(!confirm('Delete this saved fitting?')) return;
+  try{
+    await fetch('/app/api/fittings/'+fitId,{method:'DELETE',credentials:'include'});
+    loadSavedFits();
+  }catch(e){alert('Delete failed.');}
+}
+
+// ── Module Tooltips ──────────────────────────────────────────────────────
+const _dogmaCache={};
+let _ttTimer=null;
+
+function showModTooltip(el,typeID,name){
+  const tt=document.getElementById('fitTooltip');
+  if(!tt)return;
+  clearTimeout(_ttTimer);
+  // Position immediately so it appears responsive
+  _positionTooltip(tt,el);
+  tt.innerHTML=`<div class="tt-name">${_e(name)}</div><div style="color:#6b7280;font-size:8px;">Loading…</div>`;
+  tt.style.display='block';
+  // If cached, render now
+  if(_dogmaCache[typeID]!==undefined){
+    if(_dogmaCache[typeID]) _renderTooltip(tt,_dogmaCache[typeID],name);
+    return;
+  }
+  // Otherwise fetch after short delay to avoid hammering on fast mouse moves
+  _ttTimer=setTimeout(async()=>{
+    if(!_dogmaCache[typeID] && _dogmaCache[typeID]!==null){
+      try{
+        const r=await fetch(FW+'/type_dogma/'+typeID,{credentials:'include'});
+        const data=await r.json();
+        const am={};(data.dogmaAttributes||[]).forEach(a=>{am[a.attributeID]=a.value;});
+        _dogmaCache[typeID]={data,am};
+      }catch(e){_dogmaCache[typeID]=null;}
+    }
+    if(tt.style.display!=='none'&&_dogmaCache[typeID]){
+      _renderTooltip(tt,_dogmaCache[typeID],name);
+      _positionTooltip(tt,el);
+    }
+  },280);
+}
+
+function _positionTooltip(tt,el){
+  const r=el.getBoundingClientRect();
+  const tw=230; // approx tooltip width
+  // Prefer left of element (module list is on the right side)
+  let left=r.left-tw-8;
+  if(left<4) left=r.right+8; // fallback right
+  let top=r.top+window.scrollY;
+  tt.style.left=left+'px';
+  tt.style.top=top+'px';
+}
+
+function _renderTooltip(tt,cached,name){
+  const{am}=cached;
+  const rows=[];
+  function row(lbl,val,extra){rows.push(`<div class="tt-row"><span class="tt-lbl">${lbl}</span><span class="tt-val">${val}${extra?' <span style="color:#6b7280;font-size:8px;">'+extra+'</span>':''}</span></div>`);}
+  // Slot type
+  const slotMap={12:'High Slot',13:'Medium Slot',11:'Low Slot',2663:'Rig'};
+  const effects=cached.data.dogmaEffects||[];
+  const slotName=effects.map(e=>slotMap[e]).find(Boolean)||'';
+  if(slotName) rows.push(`<div style="color:#4a8ab5;font-size:8px;margin-bottom:3px;">${slotName}</div>`);
+  // Resources
+  if(am[50]) row('CPU',am[50].toFixed(1),'tf');
+  if(am[30]) row('PG',am[30].toFixed(1),'MW');
+  if(am[1153]) row('Calibration',am[1153]);
+  if(am[6]>0) row('Cap Use',am[6].toFixed(1),'GJ/cycle');
+  // Offense
+  if(am[64]>0) row('Dmg Mult','×'+am[64].toFixed(2));
+  if(am[51]>0 && (am[64]>0||am[507]>0)) row('ROF',(am[51]/1000).toFixed(1),'s');
+  // Defence / HP
+  if(am[72]>0) row('Shield HP','+'+am[72].toFixed(0));
+  if(am[1159]>0) row('Armor HP','+'+am[1159].toFixed(0));
+  // Resist highlights (show non-trivial resists)
+  [[271,'Sh EM'],[274,'Sh TH'],[273,'Sh KI'],[272,'Sh EX'],[267,'Ar EM'],[270,'Ar TH'],[269,'Ar KI'],[268,'Ar EX']].forEach(([id,lbl])=>{
+    if(am[id]!=null&&am[id]<1.0) row(lbl,((1-am[id])*100).toFixed(1)+'%');
+  });
+  // Navigation
+  if(am[20]&&am[20]!==0) row('Velocity','×'+am[20].toFixed(2));
+  if(am[799]&&am[799]!==0) row('Inertia','×'+am[799].toFixed(3));
+  const html=`<div class="tt-name">${_e(name)}</div>${rows.join('')}`;
+  tt.innerHTML=html||`<div class="tt-name">${_e(name)}</div><div style="color:#6b7280;">No notable attributes</div>`;
+}
+
+function hideModTooltip(){
+  clearTimeout(_ttTimer);
+  const tt=document.getElementById('fitTooltip');
+  if(tt)tt.style.display='none';
+}
+</script>
+{% endblock %}

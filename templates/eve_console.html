@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="split">
+  <section class="card">
+    <div class="row" style="align-items:flex-start;">
+      <div>
+        <h2 style="margin:0;">EVE Overview</h2>
+        <div class="muted tiny" style="margin-top:6px;">
+          Select a linked character. The panel below auto-loads key info; tools still run on-demand and stream output to the console panel on the right.
+        </div>
+      </div>
+      <a class="btn-panel" href="/app/home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><polyline points="15 18 9 12 15 6"/></svg>Back</a>
+    </div>
+
+    {% if chars and chars|length > 0 %}
+      <div class="row left" style="gap:10px; flex-wrap:wrap; margin-top:14px;">
+        <label class="muted">Character</label>
+        <select id="charSelect" class="input">
+          {% for c in chars %}
+            {% set key = (c.alias if c.alias else c.character_name) %}
+            <option value="{{ key }}">{{ c.character_name }}{% if c.alias %} ({{ c.alias }}){% endif %}{% if c.is_default %} [default]{% endif %}</option>
+          {% endfor %}
+        </select>
+        <button class="btn" onclick="fetchTo('char_summary')">Overview</button>
+        <button class="btn btn-ghost" onclick="fetchTo('char_wallet')">Wallet</button>
+      
+      <div id="autoPanel" class="grid-2" style="margin-top:14px;">
+        <div class="card">
+          <div class="card-h">Overview</div>
+          <div class="kpi-grid">
+            <div class="kpi">
+              <div class="kpi-label">Wallet</div>
+              <div id="kpiWallet" class="kpi-value">—</div>
+              <div id="kpiWalletSub" class="kpi-sub muted tiny"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Skill Queue</div>
+              <div id="kpiSkills" class="kpi-value">—</div>
+              <div id="kpiSkillsSub" class="kpi-sub muted tiny"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Industry Jobs</div>
+              <div id="kpiIndustry" class="kpi-value">—</div>
+              <div id="kpiIndustrySub" class="kpi-sub muted tiny"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">PI Planets</div>
+              <div id="kpiPI" class="kpi-value">—</div>
+              <div id="kpiPISub" class="kpi-sub muted tiny"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">Identity</div>
+          <div class="kv">
+            <div class="kv-row"><div class="muted">Character</div><div id="idChar">—</div></div>
+            <div class="kv-row"><div class="muted">Corporation</div><div id="idCorp">—</div></div>
+            <div class="kv-row"><div class="muted">Security</div><div id="idSec">—</div></div>
+            <div class="kv-row"><div class="muted">Scopes</div><div id="idScopes" class="tiny muted" style="max-height:5.6em; overflow:auto;">—</div></div>
+          </div>
+          <div class="row left" style="margin-top:10px; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-ghost" onclick="refreshPanel()">Refresh panel</button>
+            <button class="btn btn-ghost" onclick="toggleRaw()">Toggle raw JSON</button>
+          </div>
+          <pre id="rawPanel" class="code" style="display:none; margin-top:10px; max-height:260px; overflow:auto;"></pre>
+        </div>
+      </div>
+
+</div>
+
+      <div class="grid grid-3" style="margin-top:14px;">
+        <div class="tile" style="cursor:pointer;" onclick="fetchTo('char_assets')">
+          <div class="tile-title"><span>Assets</span><span class="pill">character</span></div>
+          <div class="tile-desc">Inventory overview pulled from ESI for the selected character.</div>
+        </div>
+
+        <div class="tile" style="cursor:pointer;" onclick="fetchTo('char_industry')">
+          <div class="tile-title"><span>Industry Jobs</span><span class="pill">character</span></div>
+          <div class="tile-desc">Active industry jobs (optionally including completed, depending on route).</div>
+        </div>
+
+        <div class="tile" style="cursor:pointer;" onclick="fetchTo('char_pi')">
+          <div class="tile-title"><span>Planetary Interaction</span><span class="pill">character</span></div>
+          <div class="tile-desc">PI planets + routes where available for your scopes.</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="card-h">Corporation</div>
+        <div class="grid-2">
+          <div class="tile" style="cursor:pointer;" onclick="fetchTo('corp_summary')">
+            <div class="tile-title"><span>Corp Summary</span><span class="pill">corp</span></div>
+            <div class="tile-desc">Basic corporation details for the selected character.</div>
+          </div>
+          <div class="tile" style="cursor:pointer;" onclick="fetchTo('corp_wallets')">
+            <div class="tile-title"><span>Corp Wallets</span><span class="pill">corp</span></div>
+            <div class="tile-desc">Wallet divisions and balances (requires corp wallet scopes).</div>
+          </div>
+          <div class="tile" style="cursor:pointer;" onclick="fetchTo('corp_journal')">
+            <div class="tile-title"><span>Corp Journal</span><span class="pill">corp</span></div>
+            <div class="tile-desc">Division journal view (division 1 by default).</div>
+          </div>
+          <div class="tile" style="cursor:pointer;" onclick="fetchTo('corp_industry')">
+            <div class="tile-title"><span>Corp Industry</span><span class="pill">corp</span></div>
+            <div class="tile-desc">Corporation industry jobs.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        Tip: If a tool returns <span class="muted">403 / forbidden</span>, your token is valid but your scopes may be missing for that endpoint.
+      </div>
+    {% else %}
+      <div class="card" style="margin-top:14px; text-align:center; padding:40px 24px;">
+        <div style="font-size:2rem; margin-bottom:12px;">🚀</div>
+        <h3 style="margin-top:0;">No characters linked yet</h3>
+        <p class="muted" style="margin-bottom:20px;">Link your EVE character to get started. You'll be redirected to EVE SSO and back.</p>
+        <a href="/eve/login?scope_mode=max_corp" class="btn-primary" style="display:inline-block; padding:10px 28px; background:#7c3aed; color:#fff; border-radius:7px; text-decoration:none; font-weight:700; font-size:14px;">+ Add EVE Character</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="console-wrap">
+    <div class="console-head">
+      <div>
+        <div style="font-weight:800;">Output</div>
+        <div class="muted" id="status">Ready</div>
+      </div>
+      <div class="row" style="gap:8px;">
+        <button class="btn btn-ghost" onclick="clearOut()">Clear</button>
+      </div>
+    </div>
+    <div class="console-body" id="out">{}</div>
+  </section>
+</div>
+
+<script>
+function sel(){
+  const el = document.getElementById('charSelect');
+  return el ? el.value : '';
+}
+
+const endpoints = {
+  dashboard: (a)=> `/app/api/eve/dashboard?alias=${encodeURIComponent(a)}&include_corp=true`,
+  char_summary: (a)=> `/app/api/eve/character/summary?alias=${encodeURIComponent(a)}`,
+  char_wallet: (a)=> `/app/api/eve/character/wallet?alias=${encodeURIComponent(a)}`,
+  char_assets: (a)=> `/app/api/eve/character/assets?alias=${encodeURIComponent(a)}`,
+  char_industry: (a)=> `/app/api/eve/character/industry?alias=${encodeURIComponent(a)}&include_completed=false`,
+  char_pi: (a)=> `/app/api/eve/character/pi?alias=${encodeURIComponent(a)}`,
+
+  corp_summary: (a)=> `/app/api/eve/corp/summary?alias=${encodeURIComponent(a)}`,
+  corp_wallets: (a)=> `/app/api/eve/corp/wallets?alias=${encodeURIComponent(a)}`,
+  corp_journal: (a)=> `/app/api/eve/corp/journal?alias=${encodeURIComponent(a)}&division=1&page=1`,
+  corp_orders: (a)=> `/app/api/eve/corp/orders?alias=${encodeURIComponent(a)}`,
+  corp_assets: (a)=> `/app/api/eve/corp/assets?alias=${encodeURIComponent(a)}`,
+  corp_industry: (a)=> `/app/api/eve/corp/industry?alias=${encodeURIComponent(a)}&include_completed=false`,
+};
+
+
+function _fmtIso(iso){
+  if(!iso) return "";
+  try{
+    const d = new Date(iso);
+    if(isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString();
+  }catch(e){ return String(iso); }
+}
+
+function _set(elId, val){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.textContent = (val===undefined || val===null || val==="") ? "—" : String(val);
+}
+
+let _lastDashboard = null;
+
+async function refreshPanel(){
+  const a = sel();
+  const url = endpoints.dashboard?.(a);
+  if(!url) return;
+  _set('kpiWallet','…'); _set('kpiSkills','…'); _set('kpiIndustry','…'); _set('kpiPI','…');
+  _set('idChar','…'); _set('idCorp','…'); _set('idSec','…'); _set('idScopes','…');
+  try{
+    const r = await fetch(url, {credentials:'include'});
+    const j = await r.json();
+    if(!r.ok || !j.ok){
+      _set('kpiWallet','—'); _set('kpiSkills','—'); _set('kpiIndustry','—'); _set('kpiPI','—');
+      _set('idChar','—'); _set('idCorp','—'); _set('idSec','—'); _set('idScopes','—');
+      const raw = document.getElementById('rawPanel');
+      if(raw) raw.textContent = JSON.stringify(j, null, 2);
+      return;
+    }
+    _lastDashboard = j;
+    // KPIs
+    _set('kpiWallet', j.wallet?.balance_pretty || j.wallet?.balance);
+    _set('kpiWalletSub', j.wallet?.balance_pretty ? ('Raw: ' + j.wallet?.balance) : '');
+    _set('kpiSkills', j.skills?.queue_len);
+    _set('kpiSkillsSub', j.skills?.next_finish ? ('Next: ' + _fmtIso(j.skills?.next_finish)) : '');
+    _set('kpiIndustry', j.industry?.active_jobs);
+    _set('kpiIndustrySub', j.industry?.soonest_end ? ('Soonest: ' + _fmtIso(j.industry?.soonest_end)) : '');
+    _set('kpiPI', j.pi?.planets);
+    _set('kpiPISub', j.pi?.planets ? '' : '');
+
+    // Identity
+    _set('idChar', (j.character?.character_name || '') + (j.character?.alias ? (' ('+j.character.alias+')') : ''));
+    const corpName = j.corp?.corp?.name || '';
+    const corpTicker = j.corp?.corp?.ticker || '';
+    _set('idCorp', corpName ? (corpName + (corpTicker ? (' ['+corpTicker+']') : '')) : '—');
+    _set('idSec', (j.identity && j.identity.security_status!=null) ? j.identity.security_status : '—');
+    _set('idScopes', j.character?.scopes || j.scopes || j.character?.scope || '—');
+
+    const raw = document.getElementById('rawPanel');
+    if(raw) raw.textContent = JSON.stringify(j, null, 2);
+  }catch(e){
+    const raw = document.getElementById('rawPanel');
+    if(raw) raw.textContent = String(e);
+  }
+}
+
+function toggleRaw(){
+  const el = document.getElementById('rawPanel');
+  if(!el) return;
+  el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+}
+
+async function fetchTo(key){
+  const a = sel();
+  const url = endpoints[key]?.(a);
+  if(!url) return;
+
+  const status = document.getElementById('status');
+  const out = document.getElementById('out');
+  status.textContent = `Loading ${key}...`;
+  try{
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!res.ok){
+      status.textContent = `Error ${res.status}: ${data?.detail || 'request failed'}`;
+    } else {
+      status.textContent = `Loaded ${key}`;
+    }
+    out.textContent = JSON.stringify(data, null, 2);
+  }catch(e){
+    status.textContent = `Error: ${e}`;
+  }
+}
+
+function clearOut(){
+  const out = document.getElementById('out');
+  const status = document.getElementById('status');
+  out.textContent = '{}';
+  status.textContent = 'Ready';
+}
+
+// Auto-load panel on first paint
+window.addEventListener('load', ()=>{
+  const el = document.getElementById('charSelect');
+  if(el){ el.addEventListener('change', refreshPanel); }
+  refreshPanel();
+});
+</script>
+{% endblock %}

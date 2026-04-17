@@ -1,0 +1,765 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+/* ── Layout ── */
+.sk-wrap { max-width:1200px; margin:0 auto; padding:0 0 40px; }
+
+main.wrap{max-width:100% !important;padding-top:calc(var(--topbar-h,72px) + var(--ticker-h,32px) + 4px) !important;padding-right:8px !important;padding-bottom:0 !important;background: rgba(0,0,0,0.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+body:not(.sidebar-open) main.wrap{padding-left:8px !important;}
+
+/* ── Header row ── */
+.sk-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; flex-wrap:wrap; gap:10px; }
+.sk-title  { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+.sk-controls { display:flex; gap:8px; align-items:center; }
+
+/* ── Tabs ── */
+.sk-tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid rgba(50,182,255,.15); }
+.sk-tab  {
+  padding:9px 22px; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--muted); cursor:pointer; border:none; background:transparent;
+  border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s, border-color .15s;
+}
+.sk-tab:hover  { color:var(--text); }
+.sk-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+.sk-panel { display:none; }
+.sk-panel.active { display:block; }
+
+/* ── Queue Tab ── */
+.sq-hero {
+  position:relative; border-radius:12px; overflow:hidden;
+  border:1px solid rgba(50,182,255,.18); margin-bottom:18px;
+  min-height:100px; display:flex; align-items:center;
+}
+.sq-hero-bg {
+  position:absolute; inset:0;
+  background:linear-gradient(135deg, rgba(50,182,255,.05) 0%, rgba(4,8,18,.9) 100%);
+}
+.sq-hero-content {
+  position:relative; z-index:1; padding:20px 28px;
+  display:flex; align-items:center; gap:24px; flex-wrap:wrap; width:100%;
+}
+.sq-hero-icon {
+  width:52px; height:52px; border-radius:8px; object-fit:cover;
+  border:1px solid rgba(50,182,255,.25); background: rgba(0,0,0,0.4); flex-shrink:0;
+}
+.sq-hero-info { flex:1; min-width:0; }
+.sq-hero-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:3px; }
+.sq-hero-name  { font-size:20px; font-weight:800; color:var(--text); }
+.sq-hero-level { font-size:12px; color:var(--accent); margin-top:2px; }
+.sq-hero-time  { font-size:13px; font-weight:700; color:#22c55e; }
+.sq-hero-sub   { font-size:10px; color:var(--muted); margin-top:1px; }
+
+/* Progress bar inside hero */
+.sq-hero-bar-wrap { width:100%; max-width:360px; }
+.sq-hero-bar { height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; }
+.sq-hero-bar-fill { height:100%; border-radius:3px; background:var(--accent); transition:width .6s; }
+.sq-hero-pct { font-size:10px; color:var(--muted); margin-top:3px; }
+
+/* Queue list */
+.sq-list { display:flex; flex-direction:column; gap:4px; }
+.sq-item {
+  display:flex; align-items:center; gap:14px;
+  padding:10px 16px; border-radius:8px;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.06);
+  transition:background .15s;
+}
+.sq-item:hover { background:rgba(50,182,255,.05); }
+.sq-item.training { border-color:rgba(50,182,255,.3); background:rgba(50,182,255,.06); }
+.sq-item-pos  { font-size:10px; color:var(--muted); width:20px; text-align:right; flex-shrink:0; font-variant-numeric:tabular-nums; }
+.sq-item-icon { width:28px; height:28px; border-radius:4px; object-fit:cover; background: rgba(0,0,0,0.4); flex-shrink:0; }
+.sq-item-name { flex:1; font-size:13px; font-weight:600; color:var(--text); }
+.sq-item-lvl  { font-size:11px; color:var(--accent); flex-shrink:0; }
+.sq-item-end  { font-size:10px; color:var(--muted); flex-shrink:0; text-align:right; width:130px; font-variant-numeric:tabular-nums; }
+.sq-item-rem  { font-size:10px; color:#22c55e; flex-shrink:0; text-align:right; width:90px; font-variant-numeric:tabular-nums; }
+
+/* Level pips */
+.lvl-pips { display:flex; gap:2px; flex-shrink:0; }
+.lvl-pip  { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,.12); }
+.lvl-pip.trained { background:var(--accent); }
+.lvl-pip.training { background:#f97316; animation:pipPulse 1.2s ease-in-out infinite; }
+
+@keyframes pipPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* Countdown */
+.sq-countdown { font-variant-numeric:tabular-nums; }
+
+/* Total summary strip */
+.sq-summary {
+  display:flex; gap:20px; flex-wrap:wrap;
+  padding:12px 18px; background: rgba(0,0,0,0.6); border-radius:8px;
+  border:1px solid rgba(50,182,255,.12); margin-top:14px;
+}
+.sq-sum-item { display:flex; flex-direction:column; gap:2px; }
+.sq-sum-lbl  { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:700; }
+.sq-sum-val  { font-size:14px; font-weight:700; color:var(--text); }
+
+/* Empty */
+.sk-empty { text-align:center; padding:60px 20px; color:var(--muted); font-size:13px; }
+
+/* ══════════════════ PLANNER TAB ══════════════════ */
+.sp-layout { display:grid; grid-template-columns:280px 1fr; gap:16px; }
+@media (max-width:780px) { .sp-layout { grid-template-columns:1fr; } }
+
+/* Left panel — skill browser */
+.sp-browser {
+  background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.07);
+  border-radius:10px; overflow:hidden; display:flex; flex-direction:column; max-height:680px;
+}
+.sp-browser-head {
+  padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.07);
+  display:flex; flex-direction:column; gap:8px;
+}
+.sp-browser-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.sp-search { width:100%; }
+.sp-group-sel { width:100%; font-size:11px; }
+.sp-skill-list { flex:1; overflow-y:auto; padding:8px; }
+.sp-skill-item {
+  padding:7px 10px; border-radius:6px; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  transition:background .12s; font-size:12px; color:var(--text);
+}
+.sp-skill-item:hover { background:rgba(50,182,255,.08); }
+.sp-skill-item .sp-sk-name { flex:1; }
+.sp-skill-item .sp-sk-rank { font-size:10px; color:var(--muted); }
+.sp-skill-item .sp-sk-add  { font-size:14px; color:var(--accent); opacity:.6; transition:opacity .12s; }
+.sp-skill-item:hover .sp-sk-add { opacity:1; }
+
+/* Right panel — plan */
+.sp-plan-panel { display:flex; flex-direction:column; gap:14px; }
+
+/* Plan header bar */
+.sp-plan-top {
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+}
+.sp-plan-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.sp-plan-actions { display:flex; gap:8px; }
+
+/* Plan items */
+.sp-plan-list { display:flex; flex-direction:column; gap:4px; min-height:80px; }
+.sp-plan-empty { padding:40px; text-align:center; color:var(--muted); font-size:12px; border:1px dashed rgba(255,255,255,.1); border-radius:8px; }
+.sp-plan-item {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 14px; border-radius:8px;
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07);
+}
+.sp-plan-item:hover { background:rgba(50,182,255,.04); }
+.sp-plan-pos  { font-size:10px; color:var(--muted); width:18px; text-align:right; flex-shrink:0; }
+.sp-plan-icon { width:26px; height:26px; border-radius:4px; object-fit:cover; background: rgba(0,0,0,0.6); flex-shrink:0; }
+.sp-plan-name { flex:1; font-size:13px; font-weight:600; color:var(--text); }
+.sp-plan-lvlsel { font-size:11px; background: rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,.12); color:var(--text); border-radius:4px; padding:2px 6px; cursor:pointer; }
+.sp-plan-time  { font-size:11px; color:var(--muted); width:80px; text-align:right; font-variant-numeric:tabular-nums; flex-shrink:0; }
+.sp-plan-move  { display:flex; flex-direction:column; gap:2px; flex-shrink:0; }
+.sp-plan-mv-btn { font-size:10px; background:none; border:none; color:var(--muted); cursor:pointer; padding:0 4px; line-height:1.2; transition:color .1s; }
+.sp-plan-mv-btn:hover { color:var(--text); }
+.sp-plan-rm    { font-size:11px; color:rgba(239,68,68,.6); background:none; border:none; cursor:pointer; padding:0 4px; transition:color .1s; flex-shrink:0; }
+.sp-plan-rm:hover { color:#ef4444; }
+
+/* Total training estimate card */
+.sp-total-card {
+  padding:16px 20px; border-radius:10px;
+  background:rgba(50,182,255,.04); border:1px solid rgba(50,182,255,.15);
+  display:flex; gap:24px; flex-wrap:wrap; align-items:center;
+}
+.sp-total-item { display:flex; flex-direction:column; gap:2px; }
+.sp-total-lbl  { font-size:9px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:700; }
+.sp-total-val  { font-size:16px; font-weight:800; color:var(--text); }
+
+/* Attr note */
+.sp-attr-note  { font-size:10px; color:var(--muted); flex:1; text-align:right; }
+
+/* Attribute strip */
+.sp-attr-strip {
+  display:flex; gap:0; border-radius:10px; overflow:hidden;
+  border:1px solid rgba(50,182,255,.15); margin-bottom:14px;
+}
+.sp-attr-cell {
+  flex:1; padding:10px 14px; display:flex; flex-direction:column; gap:3px;
+  background:rgba(255,255,255,.02); text-align:center;
+  border-right:1px solid rgba(255,255,255,.06);
+}
+.sp-attr-cell:last-child { border-right:none; }
+.sp-attr-name  { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.sp-attr-val   { font-size:18px; font-weight:800; color:var(--text); line-height:1; }
+.sp-attr-sub   { font-size:9px; color:var(--muted); }
+.sp-attr-loading { opacity:.4; }
+.sp-attr-implant { color:#a78bfa; }  /* purple tint when implants detected */
+
+/* Sync share card */
+.sp-sync-card {
+  padding:14px 18px; border-radius:10px;
+  background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.08);
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+}
+.sp-sync-info  { flex:1; min-width:0; }
+.sp-sync-title { font-size:12px; font-weight:700; color:var(--text); }
+.sp-sync-sub   { font-size:10px; color:var(--muted); margin-top:2px; }
+.sp-sync-connected { color:#22c55e; }
+</style>
+
+<div class="sk-wrap">
+  <!-- Header -->
+  <div class="sk-header">
+    <div class="sk-title">🎓 Skills</div>
+    <div class="sk-controls">
+      <select id="aliasSelect" class="input" style="width:180px;" onchange="onAliasChange()">
+        {% for c in chars %}
+        <option value="{{ c.alias or c.character_name }}">{{ c.character_name }}{% if c.alias %} ({{ c.alias }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="btn" onclick="onAliasChange()">⟳ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="sk-tabs">
+    <button class="sk-tab active" onclick="switchTab('queue')">Active Queue</button>
+    <button class="sk-tab" onclick="switchTab('planner')">Skill Planner</button>
+  </div>
+
+  <!-- ─── Queue Panel ─── -->
+  <div id="panelQueue" class="sk-panel active">
+    <div id="queueContainer"><div class="sk-empty">Select a character to load skill queue.</div></div>
+  </div>
+
+  <!-- ─── Planner Panel ─── -->
+  <div id="panelPlanner" class="sk-panel">
+
+    <!-- Attribute strip -->
+    <div class="sp-attr-strip" id="attrStrip">
+      <div class="sp-attr-cell sp-attr-loading" id="attrIntel">
+        <div class="sp-attr-name">Intelligence</div>
+        <div class="sp-attr-val">—</div>
+        <div class="sp-attr-sub">primary</div>
+      </div>
+      <div class="sp-attr-cell sp-attr-loading" id="attrMemory">
+        <div class="sp-attr-name">Memory</div>
+        <div class="sp-attr-val">—</div>
+        <div class="sp-attr-sub">secondary</div>
+      </div>
+      <div class="sp-attr-cell sp-attr-loading" id="attrPerc">
+        <div class="sp-attr-name">Perception</div>
+        <div class="sp-attr-val">—</div>
+        <div class="sp-attr-sub">primary</div>
+      </div>
+      <div class="sp-attr-cell sp-attr-loading" id="attrWill">
+        <div class="sp-attr-name">Willpower</div>
+        <div class="sp-attr-val">—</div>
+        <div class="sp-attr-sub">secondary</div>
+      </div>
+      <div class="sp-attr-cell sp-attr-loading" id="attrChar">
+        <div class="sp-attr-name">Charisma</div>
+        <div class="sp-attr-val">—</div>
+        <div class="sp-attr-sub">support</div>
+      </div>
+    </div>
+
+    <div class="sp-layout">
+
+      <!-- Left: skill browser -->
+      <div class="sp-browser">
+        <div class="sp-browser-head">
+          <div class="sp-browser-title">Skill Browser</div>
+          <input id="skillSearch" class="input sp-search" placeholder="Search skills…" oninput="filterSkills()" />
+          <select id="groupFilter" class="input sp-group-sel" onchange="filterSkills()">
+            <option value="">All Groups</option>
+          </select>
+        </div>
+        <div class="sp-skill-list" id="skillBrowserList">
+          <div class="sk-empty" style="padding:20px;">Loading skills…</div>
+        </div>
+      </div>
+
+      <!-- Right: plan -->
+      <div class="sp-plan-panel">
+        <div class="sp-plan-top">
+          <div class="sp-plan-title">Training Plan</div>
+          <div class="sp-plan-actions">
+            <button class="btn" onclick="clearPlan()" title="Clear plan">🗑 Clear</button>
+            <button class="btn" id="importQueueBtn" onclick="importFromQueue()" title="Import current ESI queue">⤵ Import Queue</button>
+            <button class="btn" id="sharePlanBtn" onclick="sharePlan()" title="Share plan with corp via sync server">📡 Share</button>
+          </div>
+        </div>
+
+        <div class="sp-plan-list" id="planList">
+          <div class="sp-plan-empty">Add skills from the browser on the left to build your plan.</div>
+        </div>
+
+        <!-- Totals -->
+        <div class="sp-total-card" id="planTotals">
+          <div class="sp-total-item"><div class="sp-total-lbl">Skills in Plan</div><div class="sp-total-val" id="planSkillCount">0</div></div>
+          <div class="sp-total-item"><div class="sp-total-lbl">Total Training Time</div><div class="sp-total-val" id="planTotalTime">—</div></div>
+          <div class="sp-total-item"><div class="sp-total-lbl">Total SP</div><div class="sp-total-val" id="planTotalSP">—</div></div>
+          <div class="sp-attr-note">Loading character attributes…</div>
+        </div>
+
+        <!-- Sync share status -->
+        <div class="sp-sync-card" id="syncCard" style="display:none;">
+          <div class="sp-sync-info">
+            <div class="sp-sync-title sp-sync-connected">📡 Corp Sync Connected</div>
+            <div class="sp-sync-sub" id="syncShareStatus">Plan not yet shared.</div>
+          </div>
+          <button class="btn" onclick="sharePlan()">Share Plan Now</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/app/api';
+let _alias = '';
+let _queueData = [];      // current rich queue
+let _planItems = [];      // [{typeID, name, rank, level, primaryAttr, secondaryAttr}]
+let _allSkills = [];      // SDE skill list
+let _syncConnected = false;
+
+// ── Character attributes (live from ESI, includes implant bonuses) ────────
+// EVE formula: SP/min = primary + secondary/2; *60 for per hour
+const BASE_ATTRS_DEFAULT = { intelligence:17, memory:17, perception:17, willpower:17, charisma:17 };
+let _charAttrs = { ...BASE_ATTRS_DEFAULT };  // updated when char attributes load
+let _charAttrsLoaded = false;
+
+// SP needed per level (× rank): 0, 250, 1414, 8000, 45255, 256000
+const SP_FOR_LEVEL = [0, 250, 1414, 8000, 45255, 256000];
+
+function spPerHour(primaryAttr, secondaryAttr) {
+  const p = _charAttrs[primaryAttr] || 17;
+  const s = _charAttrs[secondaryAttr] || 17;
+  return (p + s / 2) * 60;
+}
+
+async function loadCharAttributes(alias) {
+  if (!alias) return;
+  try {
+    const r = await fetch(`${API}/eve/character/attributes?alias=${encodeURIComponent(alias)}`, {credentials:'include'});
+    const d = await r.json();
+    if (!d.ok || !d.attributes) throw new Error(d.detail || 'No attributes');
+    const a = d.attributes;
+    _charAttrs = {
+      intelligence: a.intelligence || 17,
+      memory:       a.memory       || 17,
+      perception:   a.perception   || 17,
+      willpower:    a.willpower    || 17,
+      charisma:     a.charisma     || 17,
+    };
+    _charAttrsLoaded = true;
+    updateAttrStrip(a);
+    // Re-render plan with new attributes if plan is open
+    if (_planItems.length) renderPlan();
+  } catch(e) {
+    _charAttrs = { ...BASE_ATTRS_DEFAULT };
+    _charAttrsLoaded = false;
+    updateAttrStrip(null, e.message);
+  }
+}
+
+function updateAttrStrip(attrs, errMsg) {
+  const attrMap = {
+    attrIntel: 'intelligence',
+    attrMemory: 'memory',
+    attrPerc:  'perception',
+    attrWill:  'willpower',
+    attrChar:  'charisma',
+  };
+  // Base values without implants (EVE default remap max is typically around 27)
+  // We can't easily know the base separately from ESI, so we just show the value and hint if high
+  for (const [elId, attrKey] of Object.entries(attrMap)) {
+    const cell = document.getElementById(elId);
+    if (!cell) continue;
+    cell.classList.remove('sp-attr-loading');
+    const valEl   = cell.querySelector('.sp-attr-val');
+    const subEl   = cell.querySelector('.sp-attr-sub');
+    if (errMsg) {
+      valEl.textContent = '—';
+      subEl.textContent = 'unavailable';
+      continue;
+    }
+    const val = attrs[attrKey] || 17;
+    valEl.textContent = val;
+    // Hint implant bonus: base stats are typically 17-27 on a remap; values >27 suggest implants
+    if (val > 27) {
+      cell.classList.add('sp-attr-implant');
+      subEl.textContent = `+${val - 20} implant?`;
+    } else {
+      cell.classList.remove('sp-attr-implant');
+      subEl.textContent = ['intelligence','memory'].includes(attrKey) ? 'science/industry' :
+                          ['perception','willpower'].includes(attrKey) ? 'combat/spaceship' : 'trade/social';
+    }
+  }
+  // Update attr note in totals strip
+  const note = document.querySelector('.sp-attr-note');
+  if (note) {
+    if (errMsg) {
+      note.textContent = 'Using default 17/17 (could not load character attributes)';
+    } else {
+      note.textContent = `Using ${attrs.intelligence}/${attrs.memory} Int/Mem · ${attrs.perception}/${attrs.willpower} Perc/Will (includes implants)`;
+    }
+  }
+}
+
+function spForLevel(level, rank) {
+  return (SP_FOR_LEVEL[level] || 0) * rank;
+}
+
+function trainingTimeSeconds(fromSP, toSP, primaryAttr, secondaryAttr) {
+  const spH = spPerHour(primaryAttr, secondaryAttr);
+  return spH > 0 ? (toSP - fromSP) / spH * 3600 : 0;
+}
+
+function fmtDuration(secs) {
+  if (!secs || secs <= 0) return '—';
+  secs = Math.round(secs);
+  const d = Math.floor(secs / 86400);
+  const h = Math.floor((secs % 86400) / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-GB', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',timeZone:'UTC'}) + ' UTC';
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function fmtSP(n) {
+  if (!n) return '—';
+  if (n >= 1e6) return (n/1e6).toFixed(2) + 'M SP';
+  if (n >= 1e3) return (n/1e3).toFixed(0) + 'k SP';
+  return n + ' SP';
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.sk-tab').forEach((b,i) => b.classList.toggle('active', (tab==='queue'?0:1)===i));
+  document.getElementById('panelQueue').classList.toggle('active', tab==='queue');
+  document.getElementById('panelPlanner').classList.toggle('active', tab==='planner');
+  if (tab === 'planner') {
+    if (_allSkills.length === 0) loadSkillBrowser();
+    if (!_charAttrsLoaded && _alias) loadCharAttributes(_alias);
+  }
+}
+
+// ── Alias change ──────────────────────────────────────────────────────────
+function onAliasChange() {
+  _alias = document.getElementById('aliasSelect').value;
+  _charAttrsLoaded = false;  // force attribute reload on char switch
+  loadQueue();
+  // Reload attributes if planner tab is visible
+  if (document.getElementById('panelPlanner').classList.contains('active')) {
+    loadCharAttributes(_alias);
+  }
+}
+
+// ── Load Queue ────────────────────────────────────────────────────────────
+async function loadQueue() {
+  const cont = document.getElementById('queueContainer');
+  if (!_alias) return;
+  cont.innerHTML = '<div class="sk-empty">⏳ Loading skill queue…</div>';
+  try {
+    const r = await fetch(`${API}/eve/skills/queue_rich?alias=${encodeURIComponent(_alias)}`, {credentials:'include'});
+    const d = await r.json();
+    if (!d.ok) { cont.innerHTML = `<div class="sk-empty">${esc(d.detail||'Error loading queue.')}</div>`; return; }
+    _queueData = d.queue || [];
+    renderQueue(_queueData);
+  } catch(e) {
+    cont.innerHTML = `<div class="sk-empty" style="color:var(--danger);">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderQueue(queue) {
+  const cont = document.getElementById('queueContainer');
+  if (!queue.length) {
+    cont.innerHTML = '<div class="sk-empty">No skills in queue, or missing <code>esi-skills.read_skillqueue.v1</code> scope.</div>';
+    return;
+  }
+
+  const now = Date.now();
+
+  // Find currently training skill (has start_date in the past and finish_date in the future)
+  const training = queue.find(s => s.start_date && s.finish_date &&
+    new Date(s.start_date).getTime() <= now && new Date(s.finish_date).getTime() > now);
+
+  // Hero card
+  let heroHtml = '';
+  if (training) {
+    const startMs = new Date(training.start_date).getTime();
+    const endMs   = new Date(training.finish_date).getTime();
+    const pct     = Math.max(0, Math.min(100, (now - startMs) / (endMs - startMs) * 100));
+    const remSecs = Math.max(0, Math.round((endMs - now) / 1000));
+    const iconUrl = `https://images.evetech.net/types/${training.skill_id}/icon?size=64`;
+    heroHtml = `
+    <div class="sq-hero">
+      <div class="sq-hero-bg"></div>
+      <div class="sq-hero-content">
+        <img class="sq-hero-icon" src="${iconUrl}" onerror="this.style.display='none'">
+        <div class="sq-hero-info">
+          <div class="sq-hero-label">Currently Training</div>
+          <div class="sq-hero-name">${esc(training.skill_name)}</div>
+          <div class="sq-hero-level">Level ${training.finished_level}</div>
+        </div>
+        <div>
+          <div class="sq-hero-time sq-countdown" data-end="${esc(training.finish_date)}">${fmtDuration(remSecs)}</div>
+          <div class="sq-hero-sub">Finishes ${fmtDate(training.finish_date)}</div>
+          <div class="sq-hero-bar-wrap" style="margin-top:8px;">
+            <div class="sq-hero-bar"><div class="sq-hero-bar-fill" style="width:${pct.toFixed(1)}%"></div></div>
+            <div class="sq-hero-pct">${pct.toFixed(1)}% complete</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // Queue list
+  const listItems = queue.map((s, i) => {
+    const isTraining = s === training;
+    const iconUrl = `https://images.evetech.net/types/${s.skill_id}/icon?size=32`;
+    const remSecs = s.finish_date ? Math.max(0, (new Date(s.finish_date).getTime() - now) / 1000) : null;
+
+    // Level pips (trained = filled up to trained_skill_level, training = next pip)
+    const trainedLvl  = s.trained_skill_level ?? 0;
+    const targetLvl   = s.finished_level ?? 1;
+    const pips = Array.from({length:5}, (_, pi) => {
+      const lvl = pi + 1;
+      let cls = 'lvl-pip';
+      if (lvl < targetLvl) cls += ' trained';
+      else if (lvl === targetLvl && isTraining) cls += ' training';
+      else if (lvl <= trainedLvl) cls += ' trained';
+      return `<div class="${cls}"></div>`;
+    }).join('');
+
+    return `<div class="sq-item${isTraining?' training':''}">
+      <div class="sq-item-pos">${i+1}</div>
+      <img class="sq-item-icon" src="${iconUrl}" onerror="this.style.display='none'">
+      <div class="sq-item-name">${esc(s.skill_name)}</div>
+      <div class="lvl-pips">${pips}</div>
+      <div class="sq-item-lvl">→ L${s.finished_level}</div>
+      <div class="sq-item-rem sq-countdown" data-end="${esc(s.finish_date||'')}">${remSecs!=null?fmtDuration(remSecs):'—'}</div>
+      <div class="sq-item-end">${fmtDate(s.finish_date)}</div>
+    </div>`;
+  }).join('');
+
+  // Summary
+  const lastFinish = queue.filter(s=>s.finish_date).sort((a,b)=>new Date(b.finish_date)-new Date(a.finish_date))[0];
+  const totalRemSecs = lastFinish ? Math.max(0, (new Date(lastFinish.finish_date).getTime() - now) / 1000) : 0;
+
+  cont.innerHTML = `
+    ${heroHtml}
+    <div class="sq-list">${listItems}</div>
+    <div class="sq-summary">
+      <div class="sq-sum-item"><div class="sq-sum-lbl">Skills Queued</div><div class="sq-sum-val">${queue.length}</div></div>
+      <div class="sq-sum-item"><div class="sq-sum-lbl">Queue Completes</div><div class="sq-sum-val">${fmtDate(lastFinish?.finish_date)}</div></div>
+      <div class="sq-sum-item"><div class="sq-sum-lbl">Time Remaining</div><div class="sq-sum-val sq-countdown" data-end="${esc(lastFinish?.finish_date||'')}">${fmtDuration(totalRemSecs)}</div></div>
+    </div>`;
+
+  // Start countdown ticker
+  startCountdown();
+}
+
+// ── Live countdown ────────────────────────────────────────────────────────
+let _countdownInterval = null;
+function startCountdown() {
+  if (_countdownInterval) clearInterval(_countdownInterval);
+  _countdownInterval = setInterval(() => {
+    document.querySelectorAll('.sq-countdown[data-end]').forEach(el => {
+      const end = el.dataset.end;
+      if (!end) return;
+      const rem = Math.max(0, (new Date(end).getTime() - Date.now()) / 1000);
+      el.textContent = fmtDuration(rem);
+    });
+  }, 1000);
+}
+
+// ── Skill Browser ─────────────────────────────────────────────────────────
+async function loadSkillBrowser() {
+  const list = document.getElementById('skillBrowserList');
+  list.innerHTML = '<div class="sk-empty" style="padding:20px;">Loading skills…</div>';
+  try {
+    const r = await fetch(`${API}/sde/skills`, {credentials:'include'});
+    _allSkills = await r.json();
+    if (!Array.isArray(_allSkills)) _allSkills = [];
+    populateGroupFilter();
+    filterSkills();
+  } catch(e) {
+    list.innerHTML = `<div class="sk-empty">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function populateGroupFilter() {
+  const sel = document.getElementById('groupFilter');
+  const groups = [...new Set(_allSkills.map(s => s.group))].sort();
+  sel.innerHTML = '<option value="">All Groups</option>' +
+    groups.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+}
+
+function filterSkills() {
+  const q      = (document.getElementById('skillSearch').value || '').toLowerCase();
+  const group  = document.getElementById('groupFilter').value;
+  const list   = document.getElementById('skillBrowserList');
+  const filtered = _allSkills.filter(s =>
+    (!q || s.name.toLowerCase().includes(q)) &&
+    (!group || s.group === group)
+  );
+  if (!filtered.length) {
+    list.innerHTML = '<div class="sk-empty" style="padding:20px;">No skills match.</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(s => `
+    <div class="sp-skill-item" onclick="addSkillToPlan(${s.typeID})">
+      <span class="sp-sk-name">${esc(s.name)}</span>
+      <span class="sp-sk-rank">×${s.rank}</span>
+      <span class="sp-sk-add">＋</span>
+    </div>`).join('');
+}
+
+// ── Plan management ───────────────────────────────────────────────────────
+function addSkillToPlan(typeID) {
+  const skill = _allSkills.find(s => s.typeID === typeID);
+  if (!skill) return;
+  // Default to level 5 unless already in plan
+  const existing = _planItems.find(p => p.typeID === typeID);
+  if (existing) {
+    // Bump level if not at 5 already
+    if (existing.level < 5) existing.level++;
+    renderPlan();
+    return;
+  }
+  _planItems.push({ typeID: skill.typeID, name: skill.name, rank: skill.rank, level: 5, primaryAttr: skill.primaryAttr, secondaryAttr: skill.secondaryAttr });
+  renderPlan();
+}
+
+function removePlanItem(idx) {
+  _planItems.splice(idx, 1);
+  renderPlan();
+}
+
+function movePlanItem(idx, dir) {
+  const to = idx + dir;
+  if (to < 0 || to >= _planItems.length) return;
+  [_planItems[idx], _planItems[to]] = [_planItems[to], _planItems[idx]];
+  renderPlan();
+}
+
+function setPlanLevel(idx, lvl) {
+  if (_planItems[idx]) { _planItems[idx].level = parseInt(lvl); renderPlan(); }
+}
+
+function clearPlan() {
+  _planItems = [];
+  renderPlan();
+}
+
+function renderPlan() {
+  const list = document.getElementById('planList');
+  if (!_planItems.length) {
+    list.innerHTML = '<div class="sp-plan-empty">Add skills from the browser on the left to build your plan.</div>';
+    updatePlanTotals(0, 0);
+    return;
+  }
+
+  let totalSecs = 0, totalSP = 0;
+
+  list.innerHTML = _planItems.map((item, i) => {
+    const iconUrl = `https://images.evetech.net/types/${item.typeID}/icon?size=32`;
+    // SP to train from 0 to desired level
+    const spNeeded = spForLevel(item.level, item.rank);
+    const secs = trainingTimeSeconds(0, spNeeded, item.primaryAttr, item.secondaryAttr);
+    totalSecs += secs;
+    totalSP   += spNeeded;
+
+    const lvlOptions = [1,2,3,4,5].map(l => `<option value="${l}"${l===item.level?' selected':''}>${l}</option>`).join('');
+
+    return `<div class="sp-plan-item">
+      <div class="sp-plan-pos">${i+1}</div>
+      <img class="sp-plan-icon" src="${iconUrl}" onerror="this.style.display='none'">
+      <div class="sp-plan-name">${esc(item.name)}</div>
+      <select class="sp-plan-lvlsel input" onchange="setPlanLevel(${i},this.value)">
+        <option value="" disabled>Lvl</option>${lvlOptions}
+      </select>
+      <div class="sp-plan-time">${fmtDuration(secs)}</div>
+      <div class="sp-plan-move">
+        <button class="sp-plan-mv-btn" onclick="movePlanItem(${i},-1)" title="Move up">▲</button>
+        <button class="sp-plan-mv-btn" onclick="movePlanItem(${i},1)" title="Move down">▼</button>
+      </div>
+      <button class="sp-plan-rm" onclick="removePlanItem(${i})" title="Remove">✕</button>
+    </div>`;
+  }).join('');
+
+  updatePlanTotals(totalSecs, totalSP);
+}
+
+function updatePlanTotals(totalSecs, totalSP) {
+  document.getElementById('planSkillCount').textContent = _planItems.length;
+  document.getElementById('planTotalTime').textContent = fmtDuration(totalSecs);
+  document.getElementById('planTotalSP').textContent   = fmtSP(totalSP);
+}
+
+// ── Import from ESI queue ─────────────────────────────────────────────────
+function importFromQueue() {
+  if (!_queueData.length) { alert('Load the queue tab first.'); return; }
+  if (_planItems.length && !confirm('Replace current plan with ESI queue?')) return;
+  _planItems = _queueData.map(s => {
+    const sde = _allSkills.find(sk => sk.typeID === s.skill_id) || {};
+    return {
+      typeID:        s.skill_id,
+      name:          s.skill_name || `Skill ${s.skill_id}`,
+      rank:          sde.rank || 1,
+      level:         s.finished_level || 1,
+      primaryAttr:   sde.primaryAttr || 'intelligence',
+      secondaryAttr: sde.secondaryAttr || 'memory',
+    };
+  });
+  renderPlan();
+}
+
+// ── Sync share ────────────────────────────────────────────────────────────
+async function checkSyncStatus() {
+  try {
+    const r = await fetch(`${API}/sync/status`, {credentials:'include'});
+    const d = await r.json();
+    _syncConnected = !!(d.connected || d.status === 'connected');
+  } catch { _syncConnected = false; }
+  const card = document.getElementById('syncCard');
+  card.style.display = _syncConnected ? '' : 'none';
+}
+
+async function sharePlan() {
+  if (!_planItems.length) { alert('Plan is empty.'); return; }
+  if (!_syncConnected) { alert('Sync server not connected. Configure it in Settings.'); return; }
+  try {
+    const r = await fetch(`${API}/sync/skill_plan`, {
+      method:'POST', credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ plan: _planItems, alias: _alias }),
+    });
+    const d = await r.json();
+    const status = document.getElementById('syncShareStatus');
+    if (d.ok) {
+      status.textContent = `✅ Plan shared at ${new Date().toLocaleTimeString()}`;
+      status.style.color = '#22c55e';
+    } else {
+      status.textContent = `⚠️ ${d.detail || 'Share failed.'}`;
+      status.style.color = '#f97316';
+    }
+  } catch(e) {
+    alert('Share error: ' + e.message);
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  _alias = document.getElementById('aliasSelect').value;
+  if (_alias) {
+    loadQueue();
+    loadCharAttributes(_alias);  // pre-fetch so planner tab is ready immediately
+  }
+  checkSyncStatus();
+});
+</script>
+{% endblock %}

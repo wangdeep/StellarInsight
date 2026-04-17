@@ -1,0 +1,994 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="split">
+  <section class="card">
+    <div class="row" style="align-items:flex-start;">
+      <div>
+        <h2 style="margin:0;">EVE Overview</h2>
+        <div class="muted tiny" style="margin-top:6px;">
+          Select a linked character. The panel below auto-loads key info; tools still run on-demand and stream output to the console panel on the right.
+        </div>
+      </div>
+    </div>
+
+    {% if chars and chars|length > 0 %}
+      <div class="row left" style="gap:10px; flex-wrap:wrap; margin-top:14px;">
+        <label class="muted">Character</label>
+        <select id="charSelect" class="input">
+          {% for c in chars %}
+            {% set key = (c.alias if c.alias else c.character_name) %}
+            <option value="{{ key }}">{{ c.character_name }}{% if c.alias %} ({{ c.alias }}){% endif %}{% if c.is_default %} [default]{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="autoPanel" class="grid-2" style="margin-top:14px;">
+        <div class="card">
+          <div class="card-h">Overview</div>
+          <div class="kpi-grid">
+            <div class="kpi">
+              <div class="kpi-label">Wallet</div>
+              <div id="kpiWallet" class="kpi-value">—</div>
+              <div id="kpiWalletSub" class="kpi-sub muted tiny"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Skill Queue</div>
+              <div id="kpiSkills" class="kpi-value">—</div>
+              <div id="kpiSkillsSub" class="kpi-sub muted tiny"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Industry Jobs</div>
+              <div id="kpiIndustry" class="kpi-value">—</div>
+              <div id="kpiIndustrySub" class="kpi-sub muted tiny"></div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">PI Planets</div>
+              <div id="kpiPI" class="kpi-value">—</div>
+              <div id="kpiPISub" class="kpi-sub muted tiny"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-h">Identity</div>
+          <div class="kv">
+            <div class="kv-row"><div class="muted">Character</div><div id="idChar">—</div></div>
+            <div class="kv-row"><div class="muted">Corporation</div><div id="idCorp">—</div></div>
+            <div class="kv-row"><div class="muted">Security</div><div id="idSec">—</div></div>
+            <div class="kv-row">
+              <div class="muted">Scopes</div>
+              <div>
+                <span id="idScopesCount" class="pill">—</span>
+                <details class="scope-dd" style="display:inline-block; margin-left:8px;">
+                  <summary class="linkish tiny">view</summary>
+                  <div id="idScopes" class="tiny muted" style="max-height:10em; overflow:auto; margin-top:6px;">—</div>
+                </details>
+              </div>
+            </div>
+          </div>
+          <details id="devTools" class="dev-accordion" style="margin-top:12px;">
+            <summary class="linkish">Developer</summary>
+            <div class="row left" style="margin-top:10px; gap:8px; flex-wrap:wrap;">
+              <button class="btn btn-ghost" onclick="refreshPanel()">Refresh panel</button>
+              <button class="btn btn-ghost" onclick="toggleRaw()">Toggle raw JSON</button>
+            </div>
+            <pre id="rawPanel" class="code dev-only" style="display:none; margin-top:10px; max-height:260px; overflow:auto;"></pre>
+          </details>
+        </div>
+      </div>
+
+      <div class="grid-1" style="margin-top:14px;">
+        <div class="card dash-card" data-key="char_assets">
+          <div class="dash-head">
+            <div class="dash-title"><span>Assets</span><span class="pill">character</span></div>
+            <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+          </div>
+          <div class="muted tiny">Inventory overview pulled from ESI for the selected character.</div>
+          <div class="dash-body" data-body>
+            <div class="muted tiny">Loading…</div>
+          </div>
+          <div class="dash-actions">
+            <button class="btn btn-ghost" data-refresh>Refresh</button>
+            <button class="btn btn-ghost" data-toggle>Details</button>
+          </div>
+          <div class="dash-details" data-details style="display:none;"></div>
+        </div>
+
+        <div class="card dash-card" data-key="char_industry">
+          <div class="dash-head">
+            <div class="dash-title"><span>Industry Jobs</span><span class="pill">character</span></div>
+            <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+          </div>
+          <div class="muted tiny">Active industry jobs for the selected character.</div>
+          <div class="dash-body" data-body>
+            <div class="muted tiny">Loading…</div>
+          </div>
+          <div class="dash-actions">
+            <button class="btn btn-ghost" data-refresh>Refresh</button>
+            <button class="btn btn-ghost" data-toggle>Details</button>
+          </div>
+          <div class="dash-details" data-details style="display:none;"></div>
+        </div>
+
+        <div class="card dash-card" data-key="char_pi">
+          <div class="dash-head">
+            <div class="dash-title"><span>Planetary Interaction</span><span class="pill">character</span></div>
+            <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+          </div>
+          <div class="muted tiny">PI planets + routes where available for your scopes.</div>
+          <div class="dash-body" data-body>
+            <div class="muted tiny">Loading…</div>
+          </div>
+          <div class="dash-actions">
+            <button class="btn btn-ghost" data-refresh>Refresh</button>
+            <button class="btn btn-ghost" data-toggle>Details</button>
+          </div>
+          <div class="dash-details" data-details style="display:none;"></div>
+        </div>
+
+        <div class="card dash-card" data-key="char_wallet">
+          <div class="dash-head">
+            <div class="dash-title"><span>Wallet Balance</span><span class="pill">character</span></div>
+            <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+          </div>
+          <div class="muted tiny">Personal ISK balance.</div>
+          <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+          <div class="dash-actions">
+            <button class="btn btn-ghost" data-refresh>Refresh</button>
+          </div>
+          <div class="dash-details" data-details style="display:none;"></div>
+        </div>
+
+        <div class="card dash-card" data-key="char_journal">
+          <div class="dash-head">
+            <div class="dash-title"><span>Wallet Journal</span><span class="pill">character</span></div>
+            <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+          </div>
+          <div class="muted tiny">Recent wallet transactions showing ISK flow.</div>
+          <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+          <div class="dash-actions">
+            <button class="btn btn-ghost" data-refresh>Refresh</button>
+            <button class="btn btn-ghost" data-toggle>Details</button>
+          </div>
+          <div class="dash-details" data-details style="display:none;"></div>
+        </div>
+
+        <div class="card dash-card" data-key="char_orders">
+          <div class="dash-head">
+            <div class="dash-title"><span>Market Orders</span><span class="pill">character</span></div>
+            <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+          </div>
+          <div class="muted tiny">Active buy and sell orders on the market.</div>
+          <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+          <div class="dash-actions">
+            <button class="btn btn-ghost" data-refresh>Refresh</button>
+            <button class="btn btn-ghost" data-toggle>Details</button>
+          </div>
+          <div class="dash-details" data-details style="display:none;"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px;">
+        <div class="card-h">Corporation</div>
+        <div class="grid-1">
+          <div class="card dash-card" data-key="corp_summary">
+            <div class="dash-head">
+              <div class="dash-title"><span>Corp Summary</span><span class="pill">corp</span></div>
+              <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+            </div>
+            <div class="muted tiny">Basic corporation details for the selected character.</div>
+            <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost" data-refresh>Refresh</button>
+              <button class="btn btn-ghost" data-toggle>Details</button>
+            </div>
+            <div class="dash-details" data-details style="display:none;"></div>
+          </div>
+
+          <div class="card dash-card" data-key="corp_wallets">
+            <div class="dash-head">
+              <div class="dash-title"><span>Corp Wallets</span><span class="pill">corp</span></div>
+              <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+            </div>
+            <div class="muted tiny">Wallet divisions and balances (requires corp wallet scopes).</div>
+            <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost" data-refresh>Refresh</button>
+              <button class="btn btn-ghost" data-toggle>Details</button>
+            </div>
+            <div class="dash-details" data-details style="display:none;"></div>
+          </div>
+
+          <div class="card dash-card" data-key="corp_journal">
+            <div class="dash-head">
+              <div class="dash-title"><span>Corp Journal</span><span class="pill">corp</span></div>
+              <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+            </div>
+            <div class="muted tiny">Division journal view (division 1 by default).</div>
+            <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost" data-refresh>Refresh</button>
+              <button class="btn btn-ghost" data-toggle>Details</button>
+            </div>
+            <div class="dash-details" data-details style="display:none;"></div>
+          </div>
+
+          <div class="card dash-card" data-key="corp_industry">
+            <div class="dash-head">
+              <div class="dash-title"><span>Corp Industry</span><span class="pill">corp</span></div>
+              <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+            </div>
+            <div class="muted tiny">Corporation industry jobs.</div>
+            <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost" data-refresh>Refresh</button>
+              <button class="btn btn-ghost" data-toggle>Details</button>
+            </div>
+            <div class="dash-details" data-details style="display:none;"></div>
+          </div>
+
+          <div class="card dash-card" data-key="corp_structures">
+            <div class="dash-head">
+              <div class="dash-title"><span>Corp Structures</span><span class="pill">corp</span></div>
+              <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+            </div>
+            <div class="muted tiny">Upwell structures, states, and fuel timers.</div>
+            <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost" data-refresh>Refresh</button>
+              <button class="btn btn-ghost" data-toggle>Details</button>
+            </div>
+            <div class="dash-details" data-details style="display:none;"></div>
+          </div>
+
+          <div class="card dash-card" data-key="corp_orders">
+            <div class="dash-head">
+              <div class="dash-title"><span>Corp Market Orders</span><span class="pill">corp</span></div>
+              <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+            </div>
+            <div class="muted tiny">Corporation buy and sell orders.</div>
+            <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost" data-refresh>Refresh</button>
+              <button class="btn btn-ghost" data-toggle>Details</button>
+            </div>
+            <div class="dash-details" data-details style="display:none;"></div>
+          </div>
+
+          <div class="card dash-card" data-key="corp_assets">
+            <div class="dash-head">
+              <div class="dash-title"><span>Corp Assets</span><span class="pill">corp</span></div>
+              <div class="dash-meta"><span class="pill pill-status" data-status>idle</span></div>
+            </div>
+            <div class="muted tiny">Corporation asset inventory across stations and structures.</div>
+            <div class="dash-body" data-body><div class="muted tiny">Loading…</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost" data-refresh>Refresh</button>
+              <button class="btn btn-ghost" data-toggle>Details</button>
+            </div>
+            <div class="dash-details" data-details style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        Tip: If a tool returns <span class="muted">403 / forbidden</span>, your token is valid but your scopes may be missing for that endpoint.
+      </div>
+    {% else %}
+      <div class="card" style="margin-top:14px; text-align:center; padding:40px 24px;">
+        <div style="font-size:2rem; margin-bottom:12px;">🚀</div>
+        <h3 style="margin-top:0;">No characters linked yet</h3>
+        <p class="muted" style="margin-bottom:20px;">Link your EVE character to get started. You'll be redirected to EVE SSO and back.</p>
+        <a href="/eve/login?scope_mode=max_corp" class="btn-primary" style="display:inline-block; padding:10px 28px; background:#7c3aed; color:#fff; border-radius:7px; text-decoration:none; font-weight:700; font-size:14px;">+ Add EVE Character</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="console-wrap">
+    <div class="console-head">
+      <div>
+        <div style="font-weight:800;">Output</div>
+        <div class="muted" id="status">Ready</div>
+      </div>
+      <div class="row" style="gap:8px;">
+        <button class="btn btn-ghost" onclick="clearOut()">Clear</button>
+      </div>
+    </div>
+    <div class="console-body" id="out">{}</div>
+  </section>
+</div>
+
+<script>
+function sel(){
+  const el = document.getElementById('charSelect');
+  return el ? el.value : '';
+}
+
+const endpoints = {
+  dashboard: (a)=> `/app/api/eve/dashboard?alias=${encodeURIComponent(a)}&include_corp=true`,
+  char_summary: (a)=> `/app/api/eve/character/summary?alias=${encodeURIComponent(a)}`,
+  char_wallet: (a)=> `/app/api/eve/character/wallet?alias=${encodeURIComponent(a)}`,
+  char_journal: (a)=> `/app/api/eve/character/journal?alias=${encodeURIComponent(a)}`,
+  char_orders: (a)=> `/app/api/eve/character/orders?alias=${encodeURIComponent(a)}`,
+  char_assets: (a)=> `/app/api/eve/character/assets?alias=${encodeURIComponent(a)}`,
+  char_industry: (a)=> `/app/api/eve/character/industry?alias=${encodeURIComponent(a)}&include_completed=false`,
+  char_pi: (a)=> `/app/api/eve/character/pi?alias=${encodeURIComponent(a)}`,
+
+  corp_summary: (a)=> `/app/api/eve/corp/summary?alias=${encodeURIComponent(a)}`,
+  corp_wallets: (a)=> `/app/api/eve/corp/wallets?alias=${encodeURIComponent(a)}`,
+  corp_journal: (a)=> `/app/api/eve/corp/journal?alias=${encodeURIComponent(a)}&division=1&page=1`,
+  corp_orders: (a)=> `/app/api/eve/corp/orders?alias=${encodeURIComponent(a)}`,
+  corp_assets: (a)=> `/app/api/eve/corp/assets?alias=${encodeURIComponent(a)}`,
+  corp_industry: (a)=> `/app/api/eve/corp/industry?alias=${encodeURIComponent(a)}&include_completed=false`,
+  corp_structures: (a)=> `/app/api/eve/corp/structures?alias=${encodeURIComponent(a)}`,
+};
+
+
+function _fmtIso(iso){
+  if(!iso) return "";
+  try{
+    const d = new Date(iso);
+    if(isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString();
+  }catch(e){ return String(iso); }
+}
+
+function _setHtml(elId, html){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.innerHTML = html;
+}
+
+function _set(elId, val){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.textContent = (val===undefined || val===null || val==="") ? "—" : String(val);
+}
+
+let _lastDashboard = null;
+
+async function refreshPanel(){
+  const a = sel();
+  const url = endpoints.dashboard?.(a);
+  if(!url) return;
+  _set('kpiWallet','…'); _set('kpiSkills','…'); _set('kpiIndustry','…'); _set('kpiPI','…');
+  _set('idChar','…'); _set('idCorp','…'); _set('idSec','…'); _set('idScopes','…');
+  try{
+    const r = await fetch(url, {credentials:'include'});
+    const j = await r.json();
+    if(!r.ok || !j.ok){
+      _set('kpiWallet','—'); _set('kpiSkills','—'); _set('kpiIndustry','—'); _set('kpiPI','—');
+      _set('idChar','—'); _set('idCorp','—'); _set('idSec','—'); _set('idScopes','—');
+      const raw = document.getElementById('rawPanel');
+      if(raw) raw.textContent = JSON.stringify(j, null, 2);
+      return;
+    }
+    _lastDashboard = j;
+    // KPIs
+    _setHtml('kpiWallet', `<span class="kpi-isk">${_ISK_SVG}</span>${_esc(j.wallet?.balance_pretty || j.wallet?.balance || '—')}`);
+    _set('kpiWalletSub', j.wallet?.balance_pretty ? ('Raw: ' + j.wallet?.balance) : '');
+    _set('kpiSkills', j.skills?.queue_len);
+    _set('kpiSkillsSub', j.skills?.next_finish ? ('Next: ' + _fmtIso(j.skills?.next_finish)) : '');
+    _set('kpiIndustry', j.industry?.active_jobs);
+    _set('kpiIndustrySub', j.industry?.soonest_end ? ('Soonest: ' + _fmtIso(j.industry?.soonest_end)) : '');
+    _set('kpiPI', j.pi?.planets);
+    _set('kpiPISub', j.pi?.planets ? '' : '');
+
+    // Identity
+    _set('idChar', (j.character?.character_name || '') + (j.character?.alias ? (' ('+j.character.alias+')') : ''));
+    const corpName = j.corp?.corp?.name || '';
+    const corpTicker = j.corp?.corp?.ticker || '';
+    _set('idCorp', corpName ? (corpName + (corpTicker ? (' ['+corpTicker+']') : '')) : '—');
+    _set('idSec', (j.identity && j.identity.security_status!=null) ? j.identity.security_status : '—');
+    const scopesStr = (j.character?.scopes || j.scopes || j.character?.scope || '—');
+    _set('idScopes', scopesStr);
+    try{
+      const parts = String(scopesStr||'').trim().split(/\s+/).filter(Boolean);
+      const n = (parts.length===1 && parts[0]==='—') ? 0 : parts.length;
+      const pill = document.getElementById('idScopesCount');
+      if(pill) pill.textContent = n ? (n + ' granted') : '—';
+    }catch(e){
+      const pill = document.getElementById('idScopesCount');
+      if(pill) pill.textContent = '—';
+    }
+
+    const raw = document.getElementById('rawPanel');
+    if(raw) raw.textContent = JSON.stringify(j, null, 2);
+  }catch(e){
+    const raw = document.getElementById('rawPanel');
+    if(raw) raw.textContent = String(e);
+  }
+}
+
+// Developer accordion: hide raw/scopes details unless opened
+document.addEventListener('DOMContentLoaded', ()=>{
+  const dev = document.getElementById('devTools');
+  const syncDev = ()=>{
+    if(dev && dev.open){ document.body.classList.add('dev-open'); }
+    else { document.body.classList.remove('dev-open'); }
+  };
+  if(dev){
+    dev.addEventListener('toggle', syncDev);
+    syncDev();
+  }
+});
+function toggleRaw(){
+  const el = document.getElementById('rawPanel');
+  if(!el) return;
+  el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
+}
+
+// --- Console runner (debug / deep dive) ---
+async function fetchTo(key){
+  const a = sel();
+  const url = endpoints[key]?.(a);
+  if(!url) return;
+
+  const status = document.getElementById('status');
+  const out = document.getElementById('out');
+  status.textContent = `Loading ${key}...`;
+  try{
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!res.ok){
+      status.textContent = `Error ${res.status}: ${data?.detail || 'request failed'}`;
+    } else {
+      status.textContent = `Loaded ${key}`;
+    }
+    out.textContent = JSON.stringify(data, null, 2);
+  }catch(e){
+    status.textContent = `Error: ${e}`;
+  }
+}
+
+// --- Dashboard cards (auto-load summaries) ---
+const _cardCache = {}; // key -> {data, fetchedAt}
+
+function _esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, (c)=>({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function _pillKind(kind){
+  // kind: ok | warn | err | idle | load
+  const map = {ok:'pill-ok', warn:'pill-warn', err:'pill-err', idle:'', load:'pill-load'};
+  return map[kind] || '';
+}
+
+function _setCardStatus(card, label, kind){
+  const el = card.querySelector('[data-status]');
+  if(!el) return;
+  el.textContent = label;
+  el.className = `pill pill-status ${_pillKind(kind)}`.trim();
+}
+
+function _setCardBody(card, html){
+  const el = card.querySelector('[data-body]');
+  if(el) el.innerHTML = html;
+}
+
+function _setCardDetails(card, html){
+  const el = card.querySelector('[data-details]');
+  if(el) el.innerHTML = html;
+}
+
+function _kv(rows){
+  const items = (rows||[]).map(([k,v])=>`<div class="kv-row"><div class="muted">${_esc(k)}</div><div>${_esc(v)}</div></div>`).join('');
+  return `<div class="kv">${items}</div>`;
+}
+
+// ---- number formatting helpers ----
+const _NF = new Intl.NumberFormat('en-US');
+const _NF_COMPACT = new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 });
+
+function _isNum(v){
+  return typeof v === 'number' && isFinite(v);
+}
+function _fmtNum(v){
+  if(!_isNum(v)) return String(v);
+  return _NF.format(v);
+}
+function _fmtCompact(v){
+  if(!_isNum(v)) return String(v);
+  // Compact gets weird for small numbers; keep commas until 10k
+  if(Math.abs(v) < 10000) return _NF.format(v);
+  return _NF_COMPACT.format(v);
+}
+function _numCell(v, {compact=true, suffix='', titleMode='full'} = {}){
+  const n = Number(v);
+  if(!isFinite(n)) return _esc(v);
+  const shown = compact ? _fmtCompact(n) : _fmtNum(n);
+  const full = titleMode === 'full' ? _fmtNum(n) : String(n);
+  return { html: `<span title="${_esc(full)}">${_esc(shown)}${suffix}</span>` };
+}
+
+function _td(cell){
+  if(cell && typeof cell === 'object' && 'html' in cell){
+    return `<td>${cell.html}</td>`;
+  }
+  return `<td>${_esc(cell)}</td>`;
+}
+function _table(headers, rows){
+  const th = headers.map(h=>`<th>${_esc(h)}</th>`).join('');
+  const tr = (rows||[]).map(r=>`<tr>${(r||[]).map(c=>_td(c)).join('')}</tr>`).join('');
+  return `<table class="data-table"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
+}
+function eveImg(category, id, variation, size){
+  const s = size || 32;
+  return `https://images.evetech.net/${category}/${id}/${variation}?size=${s}`;
+}
+function typeIcon(typeId, size){ return eveImg('types', typeId, 'icon', size||32); }
+function bpIcon(typeId, size){ return eveImg('types', typeId, 'bp', size||32); }
+function typeRender(typeId, size){ return eveImg('types', typeId, 'render', size||64); }
+
+function _typeName(typeId, j){
+  const m = j && j.type_names ? j.type_names : {};
+  const k = String(typeId||"");
+  return (m && (m[typeId] || m[k])) ? (m[typeId] || m[k]) : String(typeId||'—');
+}
+function _locName(locId, j){
+  const m = j && j.location_names ? j.location_names : {};
+  const k = String(locId||"");
+  return (m && (m[locId] || m[k])) ? (m[locId] || m[k]) : String(locId||'—');
+}
+
+function _idName(id, j){
+  const m = j && j.id_names ? j.id_names : {};
+  const k = String(id||"");
+  return (m && (m[id] || m[k])) ? (m[id] || m[k]) : String(id||'—');
+}
+function _activityName(aid){
+  const m = {
+    1:"manufacturing",
+    3:"research time",
+    4:"research material",
+    5:"copying",
+    7:"reverse engineering",
+    8:"invention",
+    11:"reactions"
+  };
+  const k = Number(aid);
+  return m[k] || String(aid||'—');
+}
+function corpLogo(corpId, size){ return eveImg('corporations', corpId, 'logo', size||64); }
+function charPortrait(charId, size){ return eveImg('characters', charId, 'portrait', size||64); }
+
+const _ISK_SVG = `<svg class="isk-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20a10 10 0 0 0 0-20Zm-3.2 6.8h6.4c.44 0 .8.36.8.8s-.36.8-.8.8H8.8a.8.8 0 0 1-.8-.8c0-.44.36-.8.8-.8Zm0 3.2h4.4c.44 0 .8.36.8.8s-.36.8-.8.8H8.8a.8.8 0 0 1-.8-.8c0-.44.36-.8.8-.8Zm0 3.2h6.4c.44 0 .8.36.8.8s-.36.8-.8.8H8.8a.8.8 0 0 1-.8-.8c0-.44.36-.8.8-.8Z"/></svg>`;
+
+
+function _humanError(resStatus, json){
+  if(resStatus === 403) return {label:'missing scope', kind:'warn', body:'Token OK, but missing required scope for this endpoint.'};
+  if(resStatus === 404) return {label:'not found', kind:'err', body:'Endpoint not found (routing mismatch).'};
+  if(resStatus >= 500) return {label:'server error', kind:'err', body:'Server error while fetching data.'};
+  const msg = (json && (json.detail || json.error || json.message)) ? (json.detail || json.error || json.message) : 'Request failed.';
+  return {label:`error ${resStatus}`, kind:'err', body:String(msg)};
+}
+
+function summarize(key, j){
+  // Return {bodyHtml, detailsHtml}
+  try{
+    if(key === 'char_assets'){
+      const assets = j?.assets || [];
+      const total = Array.isArray(assets) ? assets.length : 0;
+      // top by quantity, preserving type_name and location_name from server enrichment
+      const top = (Array.isArray(assets)?assets:[])
+        .filter(a=>a && typeof a === 'object')
+        .map(a=>({type_id:a.type_id, qty:a.quantity||0, loc:a.location_id, type_name:a.type_name||'', location_name:a.location_name||''}))
+        .sort((a,b)=>(b.qty||0)-(a.qty||0))
+        .slice(0,6);
+      const topQty = (top[0]?.qty!=null) ? Number(top[0].qty) : null;
+      const body = _kv([
+        ['Stacks', _fmtNum(total)],
+        ['Top item', top[0]?.type_name || _typeName(top[0]?.type_id, j)],
+        ['Top qty', (topQty==null || !isFinite(topQty)) ? '—' : _fmtCompact(topQty)],
+      ]);
+      const rows = top.map(x=>[
+        {html:`<img class="type-icon" src="${typeIcon(x.type_id,32)}" loading="lazy" onerror="this.style.display='none'"/>`},
+        x.type_name || _typeName(x.type_id, j),
+        _numCell(x.qty, {compact:true}),
+        x.location_name || _locName(x.loc, j)
+      ]);
+      const details = `<div class="muted tiny" style="margin-bottom:8px;">Top stacks by quantity.</div>` + _table(['', 'item','qty','location'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    if(key === 'char_industry'){
+      const jobs = j?.jobs || [];
+      const n = Array.isArray(jobs) ? jobs.length : 0;
+      const ends = (Array.isArray(jobs)?jobs:[]).map(x=>x?.end_date).filter(Boolean).sort();
+      const soonest = ends[0] ? _fmtIso(ends[0]) : '—';
+
+      // Find a representative item (prefer product_type_id)
+      const first = (Array.isArray(jobs)?jobs:[]).find(x=>x && (x.product_type_id || x.blueprint_type_id)) || {};
+      const topType = first?.product_type_id || first?.blueprint_type_id;
+      const topName = first?.product_type_name || first?.blueprint_type_name || (topType ? _typeName(topType, j) : '—');
+
+      const body = _kv([
+        ['Active jobs', _fmtNum(n)],
+        ['Soonest end', soonest],
+        ['Top item', topName],
+      ]);
+
+      const rows = (Array.isArray(jobs)?jobs:[]).slice(0,10).map(x=>{
+        const prodId = x?.product_type_id;
+        const bpId = x?.blueprint_type_id;
+        const displayId = prodId || bpId;
+        const imgSrc = prodId ? typeIcon(prodId,32) : (bpId ? bpIcon(bpId,32) : '');
+        const fallbackSrc = (prodId && bpId) ? bpIcon(bpId,32) : '';
+        // Prefer per-object enriched names from server, fall back to map lookup
+        const itemName = (prodId ? x?.product_type_name : '') || (bpId ? x?.blueprint_type_name : '') || _typeName(displayId, j);
+        const itemCell = displayId ? {html:`<div class="row left" style="gap:8px;">
+            <img class="type-icon" src="${imgSrc}" loading="lazy" onerror="${fallbackSrc ? `this.src='${fallbackSrc}';this.onerror=function(){this.style.display='none'};` : `this.style.display='none'`}"/>
+            <span>${_esc(itemName)}</span>
+          </div>`} : '—';
+        const fac = x?.facility_id ?? x?.station_id ?? x?.output_location_id;
+        const facName = x?.facility_name || (fac ? _locName(fac, j) : '—');
+        return [
+          itemCell,
+          _activityName(x?.activity_id),
+          _numCell(Number(x?.runs||0), {compact:false}),
+          x?.end_date ? _fmtIso(x.end_date) : '—',
+          facName,
+        ];
+      });
+      const details = _table(['item','activity','runs','end','facility'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    if(key === 'char_pi'){
+      const planets = j?.planets || [];
+      const n = Array.isArray(planets) ? planets.length : 0;
+      const body = _kv([
+        ['Planets', _fmtNum(n)],
+      ]);
+      const rows = (Array.isArray(planets)?planets:[]).slice(0,12).map(x=>[
+        x?.planet_name || (x?.planet_id ? _locName(x.planet_id, j) : '—'),
+        x?.planet_type ?? '—',
+        x?.system_name || (x?.solar_system_id ? _locName(x.solar_system_id, j) : '—'),
+        x?.last_update ? _fmtIso(x.last_update) : '—',
+      ]);
+      const details = _table(['planet','type','system','last_update'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    if(key === 'corp_summary'){
+      const c = j?.corp || {};
+      const homeId = c?.home_station_id;
+      const body = _kv([
+        ['Name', c?.name ?? '—'],
+        ['Ticker', c?.ticker ?? '—'],
+        ['Members', (c?.member_count!=null) ? _fmtNum(Number(c.member_count)) : '—'],
+        ['Tax rate', (c?.tax_rate!=null) ? c.tax_rate : '—'],
+      ]);
+      const details = _kv([
+        ['CEO', c?.ceo_name || (c?.ceo_id ? _idName(c.ceo_id, j) : '—')],
+        ['Alliance', c?.alliance_name || (c?.alliance_id ? _idName(c.alliance_id, j) : '—')],
+        ['Home', c?.home_station_name || (homeId ? _locName(homeId, j) : '—')],
+        ['URL', c?.url ?? '—'],
+      ]);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    if(key === 'corp_wallets'){
+      const wallets = j?.wallets || [];
+      const n = Array.isArray(wallets) ? wallets.length : 0;
+      const top = (Array.isArray(wallets)?wallets:[]).slice(0,6);
+      const totalBal = (Array.isArray(wallets)?wallets:[]).reduce((s,w)=>s + (Number(w?.balance)||0), 0);
+      const body = _kv([
+        ['Divisions', _fmtNum(n)],
+        ['Total', totalBal ? _fmtCompact(totalBal) : '—'],
+      ]);
+      const rows = top.map(w=>[
+        w?.division ?? '—',
+        {html:`<span class="kpi-isk">${_ISK_SVG}</span>${_numCell(Number(w?.balance||0), {compact:true}).html}`}
+      ]);
+      const details = _table(['division','balance'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    if(key === 'corp_journal'){
+      const entries = j?.entries || [];
+      const n = Array.isArray(entries) ? entries.length : 0;
+      const last = (Array.isArray(entries) && entries[0]) ? entries[0] : null;
+      const body = _kv([
+        ['Entries (page 1)', _fmtNum(n)],
+        ['Latest amount', (last?.amount!=null) ? _fmtCompact(Number(last.amount)) : '—'],
+        ['Latest date', last?.date ? _fmtIso(last.date) : '—'],
+      ]);
+      const rows = (Array.isArray(entries)?entries:[]).slice(0,10).map(e=>[
+        e?.date ? _fmtIso(e.date) : '—',
+        {html:`<span class="kpi-isk">${_ISK_SVG}</span>${_numCell(Number(e?.amount||0), {compact:true}).html}`},
+        e?.ref_type ?? '—',
+        e?.first_party_name || (e?.first_party_id ? _idName(e.first_party_id, j) : '—'),
+        e?.second_party_name || (e?.second_party_id ? _idName(e.second_party_id, j) : '—'),
+      ]);
+      const details = _table(['date','amount','ref_type','from','to'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    if(key === 'corp_industry'){
+      const jobs = j?.jobs || [];
+      const n = Array.isArray(jobs) ? jobs.length : 0;
+      const ends = (Array.isArray(jobs)?jobs:[]).map(x=>x?.end_date).filter(Boolean).sort();
+      const soonest = ends[0] ? _fmtIso(ends[0]) : '—';
+
+      const first = (Array.isArray(jobs)?jobs:[]).find(x=>x && (x.product_type_id || x.blueprint_type_id)) || {};
+      const topType = first?.product_type_id || first?.blueprint_type_id;
+      const topName = first?.product_type_name || first?.blueprint_type_name || (topType ? _typeName(topType, j) : '—');
+
+      const body = _kv([
+        ['Active jobs', _fmtNum(n)],
+        ['Soonest end', soonest],
+        ['Top item', topName],
+      ]);
+      const rows = (Array.isArray(jobs)?jobs:[]).slice(0,10).map(x=>{
+        const prodId = x?.product_type_id;
+        const bpId = x?.blueprint_type_id;
+        const displayId = prodId || bpId;
+        const imgSrc = prodId ? typeIcon(prodId,32) : (bpId ? bpIcon(bpId,32) : '');
+        const fallbackSrc = (prodId && bpId) ? bpIcon(bpId,32) : '';
+        // Prefer per-object enriched names from server, fall back to map lookup
+        const itemName = (prodId ? x?.product_type_name : '') || (bpId ? x?.blueprint_type_name : '') || _typeName(displayId, j);
+        const itemCell = displayId ? {html:`<div class="row left" style="gap:8px;">
+            <img class="type-icon" src="${imgSrc}" loading="lazy" onerror="${fallbackSrc ? `this.src='${fallbackSrc}';this.onerror=function(){this.style.display='none'};` : `this.style.display='none'`}"/>
+            <span>${_esc(itemName)}</span>
+          </div>`} : '—';
+        const fac = x?.facility_id ?? x?.station_id ?? x?.output_location_id;
+        const facName = x?.facility_name || (fac ? _locName(fac, j) : '—');
+        return [
+          x?.installer_name || (x?.installer_id ? _idName(x.installer_id, j) : '—'),
+          itemCell,
+          _activityName(x?.activity_id),
+          _numCell(Number(x?.runs||0), {compact:false}),
+          x?.end_date ? _fmtIso(x.end_date) : '—',
+          facName,
+        ];
+      });
+      const details = _table(['installer','item','activity','runs','end','facility'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    // --- Character Wallet Balance ---
+    if(key === 'char_wallet'){
+      const bal = j?.balance ?? j?.wallet_balance ?? j;
+      const balNum = Number(bal);
+      const body = _kv([
+        ['Balance', !isNaN(balNum) ? _fmtCompact(balNum) + ' ISK' : '—'],
+        ['Raw', !isNaN(balNum) ? balNum.toLocaleString() + ' ISK' : '—'],
+      ]);
+      return {bodyHtml: body, detailsHtml: ''};
+    }
+    // --- Character Wallet Journal ---
+    if(key === 'char_journal'){
+      const entries = j?.entries || j?.journal || [];
+      const n = Array.isArray(entries) ? entries.length : 0;
+      const last = (Array.isArray(entries) && entries[0]) ? entries[0] : null;
+      const body = _kv([
+        ['Recent entries', _fmtNum(n)],
+        ['Latest amount', (last?.amount!=null) ? _fmtCompact(Number(last.amount)) + ' ISK' : '—'],
+        ['Latest type', last?.ref_type ?? '—'],
+        ['Latest date', last?.date ? _fmtIso(last.date) : '—'],
+      ]);
+      const rows = (Array.isArray(entries)?entries:[]).slice(0,15).map(e=>[
+        e?.date ? _fmtIso(e.date) : '—',
+        {html:`<span class="kpi-isk">${_ISK_SVG}</span>${_numCell(Number(e?.amount||0), {compact:true}).html}`},
+        e?.ref_type ?? '—',
+        e?.description ? _esc(String(e.description).substring(0,60)) : '—',
+        {html: `<span style="color:${Number(e?.balance||0)>0?'var(--accent)':'var(--muted)'};">${_fmtCompact(Number(e?.balance||0))}</span>`},
+      ]);
+      const details = _table(['date','amount','type','description','balance'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    // --- Character Market Orders ---
+    if(key === 'char_orders'){
+      const orders = j?.orders || [];
+      const n = Array.isArray(orders) ? orders.length : 0;
+      const buys = (Array.isArray(orders)?orders:[]).filter(o=>o?.is_buy_order);
+      const sells = (Array.isArray(orders)?orders:[]).filter(o=>!o?.is_buy_order);
+      const totalValue = (Array.isArray(orders)?orders:[]).reduce((s,o)=>s + (Number(o?.price||0) * Number(o?.volume_remain||0)), 0);
+      const body = _kv([
+        ['Total orders', _fmtNum(n)],
+        ['Buy orders', _fmtNum(buys.length)],
+        ['Sell orders', _fmtNum(sells.length)],
+        ['Est. value', totalValue ? _fmtCompact(totalValue) + ' ISK' : '—'],
+      ]);
+      const rows = (Array.isArray(orders)?orders:[]).slice(0,15).map(o=>{
+        const tid = o?.type_id;
+        // Use enriched type_name from server, fall back to type_names map, then raw ID
+        const tName = o?.type_name || _typeName(tid, j) || String(tid||'—');
+        const typeCell = tid ? {html:`<div class="row left" style="gap:6px;">
+            <img class="type-icon" src="${typeIcon(tid,32)}" loading="lazy" onerror="this.style.display='none'"/>
+            <span>${_esc(tName)}</span>
+          </div>`} : '—';
+        return [
+          o?.is_buy_order ? {html:'<span style="color:var(--accent)">BUY</span>'} : {html:'<span style="color:var(--pop)">SELL</span>'},
+          typeCell,
+          {html:`${_fmtCompact(Number(o?.price||0))} ISK`},
+          `${o?.volume_remain ?? '?'}/${o?.volume_total ?? '?'}`,
+          o?.issued ? _fmtIso(o.issued) : '—',
+        ];
+      });
+      const details = _table(['side','item','price','vol','issued'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    // --- Corp Structures ---
+    if(key === 'corp_structures'){
+      const structs = j?.structures || [];
+      const n = Array.isArray(structs) ? structs.length : 0;
+      const body = _kv([
+        ['Structures', _fmtNum(n)],
+      ]);
+      const now = Date.now();
+      const rows = (Array.isArray(structs)?structs:[]).slice(0,15).map(s=>{
+        const fuelExp = s?.fuel_expires;
+        let fuelCell = '—';
+        if(fuelExp){
+          try{
+            const exp = new Date(fuelExp);
+            const diffH = (exp - now) / 3600000;
+            const diffD = diffH / 24;
+            if(diffD < 3) fuelCell = `<span style="color:var(--danger)">⚠️ ${diffD.toFixed(1)}d</span>`;
+            else if(diffD < 7) fuelCell = `<span style="color:var(--pop)">${diffD.toFixed(1)}d</span>`;
+            else fuelCell = `${diffD.toFixed(0)}d`;
+          }catch(e){ fuelCell = _fmtIso(fuelExp); }
+        }
+        const services = (s?.services || []);
+        const svcNames = Array.isArray(services) ? services.map(sv=>sv?.name || sv?.state || '?').join(', ') : '';
+        return [
+          s?.name || _esc(String(s?.structure_id || '?')),
+          s?.type_name || _esc(String(s?.type_id || '?')),
+          s?.system_name || _esc(String(s?.system_id || '?')),
+          s?.state ?? '—',
+          {html: fuelCell},
+          svcNames || '—',
+        ];
+      });
+      const details = _table(['name','type','system','state','fuel','services'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    // --- Corp Orders ---
+    if(key === 'corp_orders'){
+      const orders = j?.orders || [];
+      const n = Array.isArray(orders) ? orders.length : 0;
+      const buys = (Array.isArray(orders)?orders:[]).filter(o=>o?.is_buy_order);
+      const sells = (Array.isArray(orders)?orders:[]).filter(o=>!o?.is_buy_order);
+      const body = _kv([
+        ['Total orders', _fmtNum(n)],
+        ['Buy / Sell', `${buys.length} / ${sells.length}`],
+      ]);
+      const rows = (Array.isArray(orders)?orders:[]).slice(0,15).map(o=>{
+        const tid = o?.type_id;
+        const tName = o?.type_name || _typeName(tid, j) || String(tid||'—');
+        const typeCell = tid ? {html:`<div class="row left" style="gap:6px;">
+            <img class="type-icon" src="${typeIcon(tid,32)}" loading="lazy" onerror="this.style.display='none'"/>
+            <span>${_esc(tName)}</span>
+          </div>`} : '—';
+        return [
+          o?.is_buy_order ? {html:'<span style="color:var(--accent)">BUY</span>'} : {html:'<span style="color:var(--pop)">SELL</span>'},
+          typeCell,
+          {html:`${_fmtCompact(Number(o?.price||0))} ISK`},
+          `${o?.volume_remain ?? '?'}/${o?.volume_total ?? '?'}`,
+          o?.issued ? _fmtIso(o.issued) : '—',
+        ];
+      });
+      const details = _table(['side','item','price','vol','issued'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+    // --- Corp Assets ---
+    if(key === 'corp_assets'){
+      const items = j?.items || j?.assets || [];
+      const n = j?.total_stacks ?? (Array.isArray(items) ? items.length : 0);
+      const body = _kv([
+        ['Total stacks', _fmtNum(n)],
+        ['Top location', j?.top_location ?? '—'],
+        ['Sample', j?.sample ?? '—'],
+      ]);
+      const sample = (j?.sample_items || items || []).slice(0,15);
+      const rows = sample.map(it=>{
+        const tid = it?.type_id;
+        // Use enriched type_name from server, fall back to map, then raw ID
+        const tName = it?.type_name || it?.name || _typeName(tid, j) || String(tid||'—');
+        const typeCell = tid ? {html:`<div class="row left" style="gap:6px;">
+            <img class="type-icon" src="${typeIcon(tid,32)}" loading="lazy" onerror="this.style.display='none'"/>
+            <span>${_esc(tName)}</span>
+          </div>`} : (tName || '—');
+        // Use enriched location_name from server
+        const locName = it?.location_name || it?.location || _locName(it?.location_id, j) || String(it?.location_id||'—');
+        return [
+          typeCell,
+          _fmtNum(Number(it?.qty || it?.quantity || 0)),
+          it?.where || it?.flag || '—',
+          locName,
+        ];
+      });
+      const details = _table(['item','qty','flag','location'], rows);
+      return {bodyHtml: body, detailsHtml: details};
+    }
+  }catch(e){
+    return {bodyHtml:`<div class="muted tiny">Render error: ${_esc(e)}</div>`, detailsHtml:''};
+  }
+  return {bodyHtml:`<div class="muted tiny">No renderer for ${_esc(key)}</div>`, detailsHtml:''};
+}
+
+async function loadCard(key, force=false){
+  const card = document.querySelector(`.dash-card[data-key="${key}"]`);
+  if(!card) return;
+  const a = sel();
+  const url = endpoints[key]?.(a);
+  if(!url) return;
+  _setCardStatus(card, 'loading', 'load');
+  if(force) _setCardBody(card, '<div class="muted tiny">Loading…</div>');
+  try{
+    const res = await fetch(url, {credentials:'include'});
+    let j = null;
+    try{ j = await res.json(); }catch(_e){ j = {ok:false, detail:'Invalid JSON'}; }
+    if(!res.ok || !j?.ok){
+      const h = _humanError(res.status, j);
+      _setCardStatus(card, h.label, h.kind);
+      _setCardBody(card, `<div class="muted tiny">${_esc(h.body)}</div>`);
+      _setCardDetails(card, `<pre class="code" style="max-height:220px; overflow:auto;">${_esc(JSON.stringify(j, null, 2))}</pre>`);
+      return;
+    }
+    _cardCache[key] = {data:j, fetchedAt: Date.now()};
+    _setCardStatus(card, 'ok', 'ok');
+    const s = summarize(key, j);
+    _setCardBody(card, s.bodyHtml);
+    _setCardDetails(card, s.detailsHtml + `<div class="dev-only" style="margin-top:10px;"><div class="muted tiny" style="margin-bottom:6px;">Raw JSON</div><pre class="code" style="max-height:220px; overflow:auto;">${_esc(JSON.stringify(j, null, 2))}</pre></div>`);
+  }catch(e){
+    _setCardStatus(card, 'error', 'err');
+    _setCardBody(card, `<div class="muted tiny">${_esc(e)}</div>`);
+  }
+}
+
+function attachCardHandlers(){
+  document.querySelectorAll('.dash-card').forEach(card=>{
+    const key = card.getAttribute('data-key');
+    const btnR = card.querySelector('[data-refresh]');
+    const btnT = card.querySelector('[data-toggle]');
+    const details = card.querySelector('[data-details]');
+    if(btnR){
+      btnR.addEventListener('click', ()=>loadCard(key, true));
+    }
+    if(btnT && details){
+      btnT.addEventListener('click', ()=>{
+        const open = details.style.display !== 'none' && details.style.display !== '';
+        details.style.display = open ? 'none' : 'block';
+        btnT.textContent = open ? 'Details' : 'Hide';
+      });
+    }
+  });
+}
+
+async function loadAllCards(){
+  // Load in priority order, sequentially to avoid hammering ESI
+  const priority = ['char_wallet','char_journal','char_orders','char_assets'];
+  const secondary = ['char_industry','char_pi','corp_summary','corp_structures','corp_wallets','corp_journal','corp_orders','corp_assets','corp_industry'];
+
+  // Load priority cards first, one at a time
+  for(const k of priority){
+    await loadCard(k);
+    await new Promise(r=>setTimeout(r, 300));
+  }
+  // Then secondary cards with longer delays
+  for(const k of secondary){
+    await loadCard(k);
+    await new Promise(r=>setTimeout(r, 500));
+  }
+}
+
+function clearOut(){
+  const out = document.getElementById('out');
+  const status = document.getElementById('status');
+  out.textContent = '{}';
+  status.textContent = 'Ready';
+}
+
+// Auto-load panel on first paint
+window.addEventListener('load', ()=>{
+  const el = document.getElementById('charSelect');
+  attachCardHandlers();
+  if(el){
+    el.addEventListener('change', ()=>{
+      refreshPanel();
+      loadAllCards();
+    });
+  }
+  refreshPanel();
+  loadAllCards();
+});
+</script>
+{% endblock %}

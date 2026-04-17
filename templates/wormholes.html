@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero" style="padding-bottom:0;">
+  <h1 style="font-size:28px;letter-spacing:.06em;margin:0;">Wormhole Tracker</h1>
+  <p class="muted" style="margin-top:6px;">Track wormhole connections, chains, and J-space intel.</p>
+</section>
+
+<!-- Tabs -->
+<div class="sec-tabs" style="display:flex;gap:6px;margin:16px 0 0;flex-wrap:wrap;">
+  <button class="sec-tab active" onclick="showWH('active',this)">🕳️ Active Connections</button>
+  <button class="sec-tab" onclick="showWH('report',this)">📝 Report</button>
+  <button class="sec-tab" onclick="showWH('chain',this)">🗺️ Chain Map</button>
+  <button class="sec-tab" onclick="showWH('intel',this)">🔍 Intel</button>
+  <button class="sec-tab" onclick="showWH('history',this)">📜 History</button>
+  <button class="sec-tab" onclick="showWH('types',this)">📖 WH Types</button>
+</div>
+
+<!-- Active Connections -->
+<div class="wh-cat" id="wh-active">
+  <div style="margin-top:14px;">
+    <div class="card">
+      <div class="card-h">Active Wormhole Connections</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input id="filterSys" class="input" placeholder="Filter by system (optional)…" style="flex:1;" />
+        <button class="btn" onclick="loadActive()">Refresh</button>
+      </div>
+      <div id="activeResult" class="mono muted" style="min-height:60px;font-size:12px;white-space:pre-wrap;">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Report -->
+<div class="wh-cat hidden" id="wh-report">
+  <div class="grid-2" style="margin-top:14px;">
+    <div class="card">
+      <div class="card-h">📝 Report New Connection</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:8px;">
+          <input id="rFrom" class="input" placeholder="From system (e.g. Gamdis)" style="flex:1;" />
+          <span style="align-self:center;color:var(--accent);">↔</span>
+          <input id="rTo" class="input" placeholder="To system (e.g. J123456)" style="flex:1;" />
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input id="rType" class="input" placeholder="WH type (e.g. B274)" style="width:120px;" />
+          <select id="rMass" class="input" style="width:130px;">
+            <option value="stable">🟢 Stable</option>
+            <option value="destab">🟡 Destab</option>
+            <option value="crit">🔴 Crit</option>
+            <option value="verge">💀 Verge</option>
+          </select>
+          <select id="rTime" class="input" style="width:130px;">
+            <option value="fresh">🕐 Fresh</option>
+            <option value="reduced">⏳ Reduced</option>
+            <option value="eol">💀 EOL</option>
+          </select>
+        </div>
+        <input id="rNotes" class="input" placeholder="Notes (optional)…" />
+        <button class="btn" onclick="reportWH()">Report Connection</button>
+      </div>
+      <div id="reportResult" class="muted" style="min-height:36px;font-size:13px;margin-top:10px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-h">Quick Actions</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:8px;">
+          <input id="closeId" class="input" placeholder="Connection # to close" style="flex:1;" />
+          <button class="btn" onclick="closeWH()">Close</button>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <input id="updateId" class="input" placeholder="Connection # to update" style="width:140px;" />
+          <select id="uMass" class="input" style="flex:1;">
+            <option value="">Mass…</option>
+            <option value="stable">🟢 Stable</option>
+            <option value="destab">🟡 Destab</option>
+            <option value="crit">🔴 Crit</option>
+          </select>
+          <select id="uTime" class="input" style="flex:1;">
+            <option value="">Time…</option>
+            <option value="fresh">🕐 Fresh</option>
+            <option value="reduced">⏳ Reduced</option>
+            <option value="eol">💀 EOL</option>
+          </select>
+          <button class="btn" onclick="updateWH()">Update</button>
+        </div>
+        <div id="actionResult" class="muted" style="min-height:36px;font-size:13px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chain Map -->
+<div class="wh-cat hidden" id="wh-chain">
+  <div style="margin-top:14px;">
+    <div class="card">
+      <div class="card-h">🗺️ Wormhole Chain Map</div>
+      <button class="btn" onclick="loadChain()" style="margin-bottom:10px;">Refresh Chain</button>
+      <div id="chainResult" class="mono" style="min-height:100px;font-size:13px;white-space:pre-wrap;line-height:1.6;">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- Intel -->
+<div class="wh-cat hidden" id="wh-intel">
+  <div style="margin-top:14px;">
+    <div class="card">
+      <div class="card-h">🔍 System Intel</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input id="intelSys" class="input" placeholder="System name (e.g. J123456)…" style="flex:1;" />
+        <button class="btn" onclick="loadIntel()">Scan</button>
+      </div>
+      <div id="intelResult" class="mono muted" style="min-height:60px;font-size:12px;white-space:pre-wrap;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- History -->
+<div class="wh-cat hidden" id="wh-history">
+  <div style="margin-top:14px;">
+    <div class="card">
+      <div class="card-h">📜 Connection History</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input id="histSys" class="input" placeholder="Filter by system (optional)…" style="flex:1;" />
+        <button class="btn" onclick="loadHistory()">Load</button>
+      </div>
+      <div id="histResult" class="mono muted" style="min-height:60px;font-size:12px;white-space:pre-wrap;">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- WH Types Reference -->
+<div class="wh-cat hidden" id="wh-types">
+  <div style="margin-top:14px;">
+    <div class="card">
+      <div class="card-h">📖 Wormhole Type Reference</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input id="typeLookup" class="input" placeholder="WH type (e.g. B274)…" style="flex:1;" />
+        <button class="btn" onclick="lookupType()">Lookup</button>
+      </div>
+      <div id="typeResult" class="mono muted" style="min-height:36px;font-size:12px;white-space:pre-wrap;"></div>
+      <div style="margin-top:16px;font-size:12px;color:var(--muted);">
+        <strong>Common Types:</strong><br>
+        <span style="color:var(--accent);">C1:</span> N110→HS, J244→LS, Z971→C1 |
+        <span style="color:var(--accent);">C2:</span> B274→HS, A239→LS, D382→C2 |
+        <span style="color:var(--accent);">C3:</span> U210→LS, N968→C3, T405→C4<br>
+        <span style="color:var(--accent);">C4:</span> C247→C3, X877→C4, H900→C5 |
+        <span style="color:var(--accent);">C5:</span> H296→C5, D364→C5, M267→C3 |
+        <span style="color:var(--accent);">C6:</span> V753→C6<br>
+        <span style="color:var(--accent);">K162</span> = Exit (reverse) | <span style="color:var(--accent);">F353</span> = Thera
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .sec-tabs{border-bottom:1px solid rgba(232,238,252,0.08);padding-bottom:10px;}
+  .sec-tab{background:rgba(255,255,255,0.04);border:1px solid rgba(232,238,252,0.08);color:var(--muted);padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:all 0.2s;white-space:nowrap;}
+  .sec-tab:hover{background:rgba(50,182,255,0.08);color:var(--text);border-color:rgba(50,182,255,0.25);}
+  .sec-tab.active{background:rgba(50,182,255,0.12);color:var(--accent);border-color:var(--accent);}
+  .wh-cat.hidden{display:none;}
+</style>
+
+<script>
+function showWH(name,btn){
+  document.querySelectorAll('.wh-cat').forEach(el=>el.classList.add('hidden'));
+  document.querySelectorAll('.sec-tab').forEach(el=>el.classList.remove('active'));
+  document.getElementById('wh-'+name).classList.remove('hidden');
+  if(btn) btn.classList.add('active');
+}
+
+const API='/app/api/console/run';
+async function botQuery(text){
+  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({text})});
+  if(!r.ok) throw new Error('Request failed');
+  const j=await r.json();
+  return j.response||j.error||'No response';
+}
+function fmt(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>')
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`(.*?)`/g,'<code style="background:rgba(50,182,255,0.1);padding:1px 4px;border-radius:3px;">$1</code>');
+}
+function setR(id,html){document.getElementById(id).innerHTML=fmt(html);}
+function loading(id){document.getElementById(id).innerHTML='<span style="color:var(--muted)">⏳ Working…</span>';}
+
+async function loadActive(){
+  loading('activeResult');
+  const sys=document.getElementById('filterSys').value.trim();
+  try{setR('activeResult',await botQuery('wh list'+(sys?' '+sys:'')));}catch(e){setR('activeResult','Error');}
+}
+async function reportWH(){
+  const f=document.getElementById('rFrom').value.trim();
+  const t=document.getElementById('rTo').value.trim();
+  if(!f||!t)return;
+  const type=document.getElementById('rType').value.trim();
+  const mass=document.getElementById('rMass').value;
+  const time_s=document.getElementById('rTime').value;
+  const notes=document.getElementById('rNotes').value.trim();
+  loading('reportResult');
+  let cmd=`wh report ${f} to ${t}`;
+  if(type) cmd+=` type ${type}`;
+  if(mass!='stable') cmd+=` mass ${mass}`;
+  if(time_s!='fresh') cmd+=` time ${time_s}`;
+  if(notes) cmd+=` notes ${notes}`;
+  try{setR('reportResult',await botQuery(cmd)); loadActive();}catch(e){setR('reportResult','Error');}
+}
+async function closeWH(){
+  const id=document.getElementById('closeId').value.trim();
+  if(!id)return;
+  loading('actionResult');
+  try{setR('actionResult',await botQuery('wh close '+id)); loadActive();}catch(e){setR('actionResult','Error');}
+}
+async function updateWH(){
+  const id=document.getElementById('updateId').value.trim();
+  if(!id)return;
+  const mass=document.getElementById('uMass').value;
+  const time_s=document.getElementById('uTime').value;
+  loading('actionResult');
+  let cmd=`wh update ${id}`;
+  if(mass) cmd+=` mass ${mass}`;
+  if(time_s) cmd+=` time ${time_s}`;
+  try{setR('actionResult',await botQuery(cmd)); loadActive();}catch(e){setR('actionResult','Error');}
+}
+async function loadChain(){
+  loading('chainResult');
+  try{setR('chainResult',await botQuery('wh chain'));}catch(e){setR('chainResult','Error');}
+}
+async function loadIntel(){
+  const sys=document.getElementById('intelSys').value.trim();
+  if(!sys)return;
+  loading('intelResult');
+  try{setR('intelResult',await botQuery('wh intel '+sys));}catch(e){setR('intelResult','Error');}
+}
+async function loadHistory(){
+  loading('histResult');
+  const sys=document.getElementById('histSys').value.trim();
+  try{setR('histResult',await botQuery('wh history'+(sys?' '+sys:'')));}catch(e){setR('histResult','Error');}
+}
+async function lookupType(){
+  const t=document.getElementById('typeLookup').value.trim();
+  if(!t)return;
+  loading('typeResult');
+  try{setR('typeResult',await botQuery('wh type info '+t));}catch(e){setR('typeResult','Error');}
+}
+
+// Enter key bindings
+document.querySelectorAll('.card input.input').forEach(el=>{
+  el.addEventListener('keydown',e=>{if(e.key==='Enter'){const btn=e.target.closest('.card').querySelector('.btn');if(btn)btn.click();}});
+});
+
+// Auto-load active connections
+loadActive();
+</script>
+{% endblock %}

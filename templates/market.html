@@ -1,0 +1,513 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+  /* Force wide layout */
+  main.wrap{max-width:100% !important;padding-right:8px !important;}
+  body:not(.sidebar-open) main.wrap{padding-left:8px !important;}
+
+  .mkt-wrap{display:grid;grid-template-columns:clamp(240px,20vw,320px) 1fr;gap:0;margin-top:0;height:calc(100vh - var(--topbar-h) - var(--ticker-h) - 60px);min-height:500px;}
+  @media(max-width:900px){.mkt-wrap{grid-template-columns:1fr;height:auto;}}
+  .mkt-left{border-right:1px solid rgba(60,80,110,0.22);display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+  .mkt-right{display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+  .mkt-tree-scroll{flex:1 1 0;overflow-y:auto;font-size:clamp(11px,1vw,13px);min-height:80px;}
+  .mkt-item-list{overflow-y:auto;flex:1;}
+  .mkt-item-row{display:flex;align-items:center;gap:5px;padding:3px 7px;cursor:pointer;transition:background 0.08s;border-bottom:1px solid rgba(46,51,59,0.3);font-size:clamp(11px,1vw,13px);}
+  .mkt-item-row:hover{background:rgba(50,160,220,0.06);}
+  .mkt-item-row.selected{background:rgba(50,160,220,0.14);}
+  .mkt-item-row img{width:26px;height:26px;border:1px solid rgba(60,80,110,0.28);background: rgba(0,0,0,0.6);}
+  .mkt-detail-hdr{display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid rgba(60,80,110,0.22);background: rgba(0,0,0,0.4);}
+  .mkt-detail-hdr img{width:52px;height:52px;border:1px solid rgba(60,80,110,0.35);background: rgba(0,0,0,0.6);}
+  .mkt-detail-scroll{flex:1;overflow-y:auto;}
+  .order-hdr{padding:4px 8px;font-size:clamp(10px,0.9vw,12px);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(60,80,110,0.22);color:#8b939e;}
+  .order-table{width:100%;border-collapse:collapse;font-size:10px;}
+  .order-table thead th{background: rgba(0,0,0,0.4);border:1px solid rgba(60,80,110,0.28);padding:2px 6px;font-size:clamp(9px,0.8vw,11px);font-weight:700;text-transform:uppercase;color:#6b7280;text-align:left;}
+  .order-table tbody td{padding:2px 6px;border-bottom:1px solid rgba(46,51,59,0.4);font-family:'Consolas','Monaco',monospace;}
+  .order-table tbody tr:hover{background:rgba(50,160,220,0.04);}
+  .best-prices{display:flex;gap:0;border-bottom:1px solid rgba(60,80,110,0.22);}
+  .best-stat{flex:1;padding:6px 8px;border-right:1px solid rgba(60,80,110,0.22);text-align:center;}
+  .best-stat:last-child{border-right:none;}
+  .best-label{font-size:clamp(9px,0.8vw,11px);color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;}
+  .best-val{font-size:clamp(14px,1.2vw,17px);font-weight:700;margin-top:2px;font-family:'Consolas','Monaco',monospace;}
+  .best-hub{font-size:clamp(9px,0.8vw,10px);color:#6b7280;margin-top:1px;}
+  .sell{color:#2fef2f;}.buy{color:#efef2f;}
+  .hist-wrap{padding:8px;border-top:1px solid rgba(60,80,110,0.22);}
+  .hist-title{font-size:clamp(9px,0.8vw,11px);font-weight:700;text-transform:uppercase;color:#8b939e;margin-bottom:4px;}
+  .hist-bar{display:flex;gap:1px;height:60px;align-items:end;}
+  .hist-col{flex:1;display:flex;flex-direction:column;align-items:center;}
+  .hist-fill{width:100%;background:linear-gradient(180deg,rgba(74,168,232,0.6) 0%,rgba(74,168,232,0.15) 100%);min-height:1px;}
+  .hist-lbl{font-size:clamp(7px,0.65vw,9px);color:#4a5060;margin-top:1px;}
+  .hist-range.active{background:rgba(74,168,232,0.18);border-color:rgba(74,168,232,0.5);color:#4aa8e8;}
+  #mktHistory{background: rgba(0,0,0,0.4);}
+  /* Tree nodes */
+  .tn{padding:0;}
+  .tl{padding:3px 4px 3px 0;cursor:pointer;display:flex;align-items:center;gap:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background 0.08s;}
+  .tl:hover{background:rgba(50,160,220,0.08);}
+  .tl.active{background:rgba(50,160,220,0.15);color:#fff;}
+  .tt{width:12px;text-align:center;color:#6b7280;font-size:clamp(9px,0.8vw,11px);flex-shrink:0;cursor:pointer;}
+  .tc{margin-left:12px;display:none;}
+  .tc.open{display:block;}
+</style>
+
+<div class="eve-window" style="margin-top:0;background: rgba(0,0,0,0.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(50,182,255,.12);">
+  <div class="eve-window-title">
+    <span>REGIONAL MARKET</span>
+    <span style="flex:1;"></span>
+    <span style="font-size:9px;color:#6b7280;font-weight:400;text-transform:none;">XYLON Market Browser</span>
+  </div>
+  <div class="eve-window-body">
+    <div class="eve-tabs" id="mktTopTabs">
+      <div class="eve-tab active" id="tabBrowse" onclick="switchMktTab('browse',this)">Browse</div>
+      <div class="eve-tab" id="tabOrders" onclick="switchMktTab('orders',this)">My Orders</div>
+    </div>
+    <div class="mkt-wrap">
+      <div class="mkt-left">
+        <div style="padding:4px;"><input id="mktSearch" class="eve-input" placeholder="Search items…" style="width:100%;font-size:12px;padding:4px 7px;" oninput="searchItems()"/></div>
+        <div id="catTree" class="mkt-tree-scroll eve-scroll"><div style="padding:12px;color:#6b7280;font-size:10px;">Loading market tree…</div></div>
+        <div id="itemResultsWrap" style="display:none;flex:0 1 38%;min-height:60px;overflow:hidden;display:none;flex-direction:column;border-top:1px solid rgba(60,80,110,0.22);">
+          <div id="itemResultsHdr" style="padding:3px 8px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(60,80,110,0.18);flex-shrink:0;">ITEMS</div>
+          <div id="itemResults" class="mkt-item-list eve-scroll" style="flex:1;overflow-y:auto;max-height:none;"></div>
+        </div>
+      </div>
+      <div class="mkt-right">
+        <div id="mktHeader" style="display:none;"></div>
+        <div class="eve-tabs" id="itemTabs" style="display:none;">
+          <div class="eve-tab active" id="itemTabMarket" onclick="switchItemTab('market',this)">Market Data</div>
+          <div class="eve-tab" id="itemTabHistory" onclick="switchItemTab('history',this)">Price History</div>
+        </div>
+        <div id="mktDetail" class="mkt-detail-scroll eve-scroll">
+          <div style="padding:20px;text-align:center;color:#4a5060;font-size:11px;">Browse categories or search for an item to view market data.</div>
+        </div>
+        <div id="mktHistory" style="display:none;flex-direction:column;flex:1;overflow:hidden;padding:8px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;">
+            <span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#8b939e;letter-spacing:0.05em;">Range</span>
+            <button class="eve-btn hist-range active" data-days="7"  onclick="setHistRange(7,this)"  style="font-size:9px;padding:2px 8px;">7D</button>
+            <button class="eve-btn hist-range"        data-days="30" onclick="setHistRange(30,this)" style="font-size:9px;padding:2px 8px;">30D</button>
+            <button class="eve-btn hist-range"        data-days="90" onclick="setHistRange(90,this)" style="font-size:9px;padding:2px 8px;">90D</button>
+            <span id="histStatus" style="font-size:9px;color:#6b7280;margin-left:4px;"></span>
+          </div>
+          <div style="flex:1;position:relative;min-height:0;">
+            <canvas id="histChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- My Orders panel — sibling of mkt-wrap inside eve-window-body -->
+    <div id="ordersPanel" style="display:none;flex:1;overflow-y:auto;padding:8px;background: rgba(0,0,0,0.4);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:4px 0;border-bottom:1px solid rgba(60,80,110,0.22);">
+        <span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#8b939e;">Character</span>
+        <select id="ordersCharSelect" class="eve-select" style="font-size:10px;" onchange="loadMyOrders()">
+          {% if chars %}{% for c in chars %}<option value="{{ c.alias or c.character_name }}">{{ c.character_name }}</option>{% endfor %}{% else %}<option value="">No characters linked</option>{% endif %}
+        </select>
+        <button class="eve-btn" onclick="loadMyOrders()" style="font-size:9px;padding:2px 8px;">↻ Refresh</button>
+        <span id="ordersStatus" style="font-size:9px;color:#6b7280;"></span>
+      </div>
+      <div id="ordersList"><span style="color:#6b7280;font-size:10px;">Select a character and click Refresh.</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const API='/app/api',SDE=API+'/sde';
+const EVE_IMG='https://images.evetech.net/types';
+function eveImg(tid,v,sz){return `${EVE_IMG}/${tid}/${v||'icon'}?size=${sz||64}`;}
+function imgErr(img,tid,v){
+  if(v==='icon'){img.src=eveImg(tid,'render',64);img.onerror=function(){imgErr(img,tid,'render');};}
+  else{img.style.opacity='0.15';img.onerror=null;}
+}
+function typeImg(tid,sz){return `<img src="${eveImg(tid,'icon',sz||64)}" onerror="imgErr(this,${tid},'icon')" loading="lazy"/>`;}
+function _esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function fmtISK(v){const n=parseFloat(v);if(isNaN(n))return'—';if(n>=1e9)return(n/1e9).toFixed(2)+'B';if(n>=1e6)return(n/1e6).toFixed(2)+'M';if(n>=1e3)return(n/1e3).toFixed(1)+'K';return n.toFixed(2);}
+function fmtNum(v){return parseFloat(v).toLocaleString(undefined,{maximumFractionDigits:0});}
+function fmtFullISK(v){const n=parseFloat(v);if(isNaN(n))return'—';return n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+' ISK';}
+
+let _searchTimer=null,_allGroups=[],_groupsByParent={};
+let _currentItem={typeID:null,name:'',history:[],hubs:{}};
+let _histRange=7,_histChart=null;
+
+async function loadTree(){
+  const el=document.getElementById('catTree');
+  try{
+    const r=await fetch(SDE+'/market_groups',{credentials:'include'});
+    if(!r.ok){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">API ${r.status}. <a href="/app/api/sde/diag" style="color:#4aa8e8;">Diagnostics</a></div>`;return;}
+    const data=await r.json();
+    // Handle error object
+    if(data&&data.error){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">SDE error: ${data.error}. Run: <code>bash scripts/download_sde.sh</code></div>`;return;}
+    _allGroups=Array.isArray(data)?data:Object.values(data);
+    if(!_allGroups.length){el.innerHTML='<div style="padding:8px;color:#6b7280;font-size:10px;">Empty market groups.</div>';return;}
+    // Build parent map — root groups have parentGroupID of null/None/0
+    _groupsByParent={};
+    _allGroups.forEach(g=>{
+      const pid=g.parentGroupID;
+      const key=(pid===null||pid===undefined||pid===0)?'root':String(pid);
+      if(!_groupsByParent[key])_groupsByParent[key]=[];
+      _groupsByParent[key].push(g);
+    });
+    Object.values(_groupsByParent).forEach(arr=>arr.sort((a,b)=>(a.marketGroupName||'').localeCompare(b.marketGroupName||'')));
+    const html=renderTreeLevel('root');
+    if(html){el.innerHTML=html;}
+    else{el.innerHTML='<div style="padding:8px;color:#6b7280;">No root categories found. Check SDE data.</div>';}
+  }catch(e){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">Error: ${e.message}</div>`;}
+}
+
+function renderTreeLevel(parentKey){
+  const children=_groupsByParent[parentKey]||[];
+  if(!children.length)return'';
+  return children.map(g=>{
+    const gid=g.marketGroupID;
+    const hasKids=(_groupsByParent[String(gid)]||[]).length>0;
+    const toggle=hasKids?`<span class="tt" onclick="event.stopPropagation();togCat(this,${gid})">&#9656;</span>`:`<span class="tt" style="visibility:hidden;">&#9656;</span>`;
+    const onclickAttr = hasKids
+      ? `onclick="event.stopPropagation();togCat(this.querySelector('.tt'),${gid});loadCatItems(${gid},'${_esc(g.marketGroupName||'').replace(/'/g,"\\'")}',event)"`
+      : `onclick="loadCatItems(${gid},'${_esc(g.marketGroupName||'').replace(/'/g,"\\'")}',event)"`;
+    const childSlot = hasKids ? `<div class="tc" id="cat-${gid}"></div>` : '';
+    return `<div class="tn" data-gid="${gid}"><div class="tl" ${onclickAttr}>${toggle}<span>${_esc(g.marketGroupName||'?')}</span></div>${childSlot}</div>`;
+  }).join('');
+}
+
+// Lazy expand: render children into the container only on first open
+function togCat(el,gid){
+  if(!el)return;
+  const tn=el.closest('.tn');
+  const cd=tn?tn.querySelector('.tc'):null;
+  if(!cd)return;
+  const opening=!cd.classList.contains('open');
+  cd.classList.toggle('open');
+  el.innerHTML=cd.classList.contains('open')?'&#9662;':'&#9656;';
+  if(opening&&!cd.dataset.rendered){
+    cd.innerHTML=renderTreeLevel(String(gid));
+    cd.dataset.rendered='1';
+  }
+}
+
+async function loadCatItems(groupID,groupName,evt){
+  const wrap=document.getElementById('itemResultsWrap');wrap.style.display='flex';const el=document.getElementById('itemResults');document.getElementById('itemResultsHdr').textContent=groupName||'ITEMS';
+  el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">Loading…</div>';
+  document.querySelectorAll('.tl').forEach(l=>l.classList.remove('active'));
+  evt?.target?.closest('.tl')?.classList.add('active');
+  try{
+    const r=await fetch(SDE+'/market_group_items/'+groupID,{credentials:'include'});
+    let items=await r.json();if(!Array.isArray(items))items=Object.values(items);
+    if(!items.length){el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">No items.</div>';return;}
+    items.sort((a,b)=>(a.typeName||'').localeCompare(b.typeName||''));
+    el.innerHTML=items.map(i=>`<div class="mkt-item-row" onclick="selectItem(${i.typeID},'${_esc(i.typeName||'').replace(/'/g,"\\'")}')" data-tid="${i.typeID}">${typeImg(i.typeID,32)}<span>${_esc(i.typeName||'?')}</span></div>`).join('');
+  }catch(e){el.innerHTML=`<div style="padding:6px;color:#ef2f2f;font-size:10px;">${e.message}</div>`;}
+}
+
+function searchItems(){clearTimeout(_searchTimer);_searchTimer=setTimeout(doSearch,350);}
+
+async function doSearch(){
+  const q=document.getElementById('mktSearch').value.trim();const el=document.getElementById('itemResults');
+  const wrap=document.getElementById('itemResultsWrap');
+  if(!q||q.length<2){wrap.style.display='none';return;}
+  wrap.style.display='flex';el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">Searching…</div>';
+  try{
+    const r=await fetch(SDE+'/type_search?q='+encodeURIComponent(q),{credentials:'include'});
+    let items=await r.json();if(!Array.isArray(items))items=[];
+    if(!items.length){el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">No results.</div>';return;}
+    el.innerHTML=items.map(i=>`<div class="mkt-item-row" onclick="selectItem(${i.typeID},'${_esc(i.typeName||'').replace(/'/g,"\\'")}')" data-tid="${i.typeID}">${typeImg(i.typeID,32)}<div style="flex:1;"><div>${_esc(i.typeName||'?')}</div>${i.groupName ? "<div style=\"font-size:8px;color:#4a5060;\">" + _esc(i.groupName) + "</div>" : ""}</div></div>`).join('');
+  }catch(e){el.innerHTML=`<div style="padding:6px;color:#ef2f2f;font-size:10px;">${e.message}</div>`;}
+}
+
+async function selectItem(typeID,name){
+  document.querySelectorAll('.mkt-item-row').forEach(e=>e.classList.remove('selected'));
+  const s=document.querySelector(`.mkt-item-row[data-tid="${typeID}"]`);if(s)s.classList.add('selected');
+  document.getElementById('mktHeader').style.display='block';
+  document.getElementById('itemTabs').style.display='flex';
+  // Reset to Market Data tab on new item selection
+  switchItemTab('market', document.getElementById('itemTabMarket'));
+  document.getElementById('mktHeader').innerHTML=`<div class="mkt-detail-hdr">${typeImg(typeID,64)}<div><div style="font-size:14px;font-weight:700;color:#e8ecf2;">${_esc(name)}</div><div style="font-size:10px;color:#6b7280;margin-top:2px;">Type ID: ${typeID}</div></div></div>`;
+  const det=document.getElementById('mktDetail');det.innerHTML='<div style="padding:12px;color:#6b7280;font-size:10px;">Loading prices…</div>';
+  try{
+    const r=await fetch(SDE+'/market_prices/'+typeID,{credentials:'include'});const data=await r.json();
+    const hubs=data.hubs||{},history=data.history||[],priceSource=data.price_source||'fuzzwork';
+    _currentItem={typeID,name,history,hubs};
+    let bestSell=Infinity,bestSellHub='',bestBuy=0,bestBuyHub='';
+    Object.entries(hubs).forEach(([hub,d])=>{if(!d)return;const sMin=parseFloat(d.sell?.min)||0,bMax=parseFloat(d.buy?.max)||0;if(sMin>0&&sMin<bestSell){bestSell=sMin;bestSellHub=hub;}if(bMax>bestBuy){bestBuy=bMax;bestBuyHub=hub;}});
+    const srcBadge=priceSource==='esi_fallback'?`<div style="font-size:9px;color:#f59e0b;margin-bottom:4px;">⚠ Fuzzwork unavailable — ESI regional prices</div>`:'';
+    let html=`${srcBadge}<div class="best-prices"><div class="best-stat"><div class="best-label">Best Sell</div><div class="best-val sell">${fmtISK(bestSell===Infinity?0:bestSell)} ISK</div><div class="best-hub">${_esc(bestSellHub)}</div></div><div class="best-stat"><div class="best-label">Best Buy</div><div class="best-val buy">${fmtISK(bestBuy)} ISK</div><div class="best-hub">${_esc(bestBuyHub)}</div></div>${bestSell<Infinity&&bestBuy>0?`<div class="best-stat"><div class="best-label">Margin</div><div class="best-val" style="color:#4aa8e8;">${((bestSell-bestBuy)/bestSell*100).toFixed(1)}%</div></div>`:''}</div>`;
+    Object.entries(hubs).forEach(([hub,d])=>{
+      if(!d)return;const sell=d.sell||{},buy=d.buy||{};
+      html+=`<div class="order-hdr">${_esc(hub)}</div><table class="order-table"><thead><tr><th>Type</th><th>Volume</th><th>Price</th></tr></thead><tbody>`;
+      if(parseFloat(sell.min)>0)html+=`<tr><td class="sell">Sell Min</td><td>${fmtNum(sell.volume||0)}</td><td class="sell">${fmtFullISK(sell.min)}</td></tr>`;
+      if(parseFloat(buy.max)>0)html+=`<tr><td class="buy">Buy Max</td><td>${fmtNum(buy.volume||0)}</td><td class="buy">${fmtFullISK(buy.max)}</td></tr>`;
+      html+=`</tbody></table>`;
+    });
+    if(history.length){const maxAvg=Math.max(...history.map(h=>h.average||0));html+=`<div class="hist-wrap"><div class="hist-title">Price History (The Forge, ${history.length}d)</div><div class="hist-bar">${history.map(h=>{const pct=maxAvg>0?(h.average/maxAvg*100):0;return `<div class="hist-col"><div class="hist-fill" style="height:${pct}%;"></div><div class="hist-lbl">${(h.date||'').slice(5,10)}</div></div>`;}).join('')}</div><div style="font-size:9px;color:#6b7280;margin-top:4px;">Latest: ${fmtISK(history[history.length-1]?.average||0)} avg · ${fmtNum(history[history.length-1]?.volume||0)} vol</div></div>`;}
+    det.innerHTML=html||'<div style="padding:12px;color:#6b7280;">No market data available.</div>';
+  }catch(e){det.innerHTML=`<div style="padding:12px;color:#ef2f2f;font-size:10px;">${e.message}</div>`;}
+}
+
+document.addEventListener('DOMContentLoaded', loadTree);
+
+// ── Tab switching ─────────────────────────────────────────────────────────
+function switchMktTab(tab, btn) {
+  document.querySelectorAll('#mktTopTabs .eve-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const browseWrap = document.querySelector('.mkt-wrap');
+  const ordersPanel = document.getElementById('ordersPanel');
+  if (tab === 'browse') {
+    browseWrap.style.display = 'grid';
+    ordersPanel.style.display = 'none';
+  } else {
+    browseWrap.style.display = 'none';
+    ordersPanel.style.display = 'flex';
+    loadMyOrders();
+  }
+}
+
+// ── My Orders ─────────────────────────────────────────────────────────────
+function fmtDate(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'2-digit'});
+}
+
+async function loadMyOrders() {
+  const sel = document.getElementById('ordersCharSelect');
+  const alias = sel ? sel.value : '';
+  const status = document.getElementById('ordersStatus');
+  const list = document.getElementById('ordersList');
+  if (!alias) { list.innerHTML = '<span style="color:#6b7280;font-size:10px;">No character selected.</span>'; return; }
+  status.textContent = 'Loading…';
+  list.innerHTML = '<div style="padding:12px;color:#6b7280;font-size:10px;">Loading orders…</div>';
+  try {
+    const r = await fetch(API + '/eve/character/orders?alias=' + encodeURIComponent(alias), {credentials:'include'});
+    const d = await r.json();
+    if (!d.ok) { list.innerHTML = `<div style="padding:8px;color:#ef2f2f;font-size:10px;">${d.error||'Error loading orders'}</div>`; status.textContent=''; return; }
+    const orders = d.orders || [];
+    if (!orders.length) { list.innerHTML = '<div style="padding:12px;color:#6b7280;font-size:10px;">No active market orders.</div>'; status.textContent='0 orders'; return; }
+
+    const sells = orders.filter(o => !o.is_buy_order).sort((a,b) => a.type_id - b.type_id);
+    const buys  = orders.filter(o =>  o.is_buy_order).sort((a,b) => a.type_id - b.type_id);
+    status.textContent = orders.length + ' orders';
+
+    // Type and location names come from the API response directly
+    const nameMap = d.type_names || {};
+    const locMap = d.location_names || {};
+
+    function orderTable(rows, isBuy) {
+      if (!rows.length) return '<div style="padding:4px 0;color:#6b7280;font-size:9px;">None</div>';
+      return `<table style="width:100%;border-collapse:collapse;font-size:10px;">
+        <thead><tr style="background: rgba(0,0,0,0.6);">
+          <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Item</th>
+          <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Qty</th>
+          <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Price</th>
+          <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Total</th>
+          <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Location</th>
+          <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Expires</th>
+        </tr></thead>
+        <tbody>${rows.map(o => {
+          const name = nameMap[o.type_id] || ('Type ' + o.type_id);
+          const pct = o.volume_total > 0 ? Math.round((1 - o.volume_remain/o.volume_total)*100) : 0;
+          const total = (o.price * o.volume_remain).toFixed(0);
+          const priceCol = isBuy ? '#efef2f' : '#2fef2f';
+          const fillBar = pct > 0 ? `<div style="width:${pct}%;height:2px;background:${priceCol};opacity:0.6;margin-top:1px;border-radius:1px;"></div>` : '';
+          const locationName = locMap[String(o.location_id)] || (o.location_id > 1e12 ? 'Player Structure' : 'Unknown');
+          return `<tr style="border-bottom:1px solid rgba(46,51,59,0.3);" onmouseenter="this.style.background='rgba(50,160,220,0.05)'" onmouseleave="this.style.background=''">
+            <td style="padding:3px 6px;"><div style="display:flex;align-items:center;gap:5px;">${typeImg(o.type_id,32)}<div><div>${_esc(name)}</div>${fillBar}<div style="font-size:8px;color:#6b7280;">${pct}% filled</div></div></div></td>
+            <td style="padding:3px 6px;text-align:right;font-family:monospace;">${fmtNum(o.volume_remain)} / ${fmtNum(o.volume_total)}</td>
+            <td style="padding:3px 6px;text-align:right;font-family:monospace;color:${priceCol};">${fmtISK(o.price)} ISK</td>
+            <td style="padding:3px 6px;text-align:right;font-family:monospace;">${fmtISK(parseInt(total))} ISK</td>
+            <td style="padding:3px 6px;color:#8b939e;font-size:9px;">${locationName}</td>
+            <td style="padding:3px 6px;color:#8b939e;font-size:9px;">${fmtDate(o.issued)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+    }
+
+    list.innerHTML = `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#2fef2f;letter-spacing:0.05em;padding:4px 0;border-bottom:1px solid rgba(47,239,47,0.15);margin-bottom:4px;">
+          📤 SELL ORDERS (${sells.length})
+        </div>
+        ${orderTable(sells, false)}
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#efef2f;letter-spacing:0.05em;padding:4px 0;border-bottom:1px solid rgba(239,239,47,0.15);margin-bottom:4px;">
+          📥 BUY ORDERS (${buys.length})
+        </div>
+        ${orderTable(buys, true)}
+      </div>`;
+
+  } catch(e) { list.innerHTML = `<div style="padding:8px;color:#ef2f2f;font-size:10px;">Error: ${e.message}</div>`; status.textContent=''; }
+}
+
+// ── Item tab switching (Market Data / Price History) ──────────────────────
+function switchItemTab(tab, btn) {
+  document.querySelectorAll('#itemTabs .eve-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const det = document.getElementById('mktDetail');
+  const hist = document.getElementById('mktHistory');
+  if (tab === 'market') {
+    det.style.display = 'block';
+    hist.style.display = 'none';
+  } else {
+    det.style.display = 'none';
+    hist.style.display = 'flex';
+    renderHistChart(_histRange);
+  }
+}
+
+function setHistRange(days, btn) {
+  _histRange = days;
+  document.querySelectorAll('.hist-range').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderHistChart(days);
+}
+
+function renderHistChart(days) {
+  const statusEl = document.getElementById('histStatus');
+  const history = _currentItem.history || [];
+  const hubs = _currentItem.hubs || {};
+
+  const slice = history.slice(-days);
+  if (!slice.length) {
+    statusEl.textContent = 'No history data.';
+    if (_histChart) { _histChart.destroy(); _histChart = null; }
+    return;
+  }
+
+  // Build OHLC candle data from ESI daily history
+  // ESI gives: date, average, highest, lowest, order_count, volume
+  // Approximate open/close from average with slight variance for visual clarity
+  const candles = slice.map((d, i) => {
+    const avg = parseFloat(d.average) || 0;
+    const high = parseFloat(d.highest) || avg;
+    const low  = parseFloat(d.lowest)  || avg;
+    const prev = i > 0 ? (parseFloat(slice[i-1].average) || avg) : avg;
+    // open = previous day average, close = this day average
+    const open  = prev;
+    const close = avg;
+    return { x: d.date, o: open, h: high, l: low, c: close, v: parseInt(d.volume)||0 };
+  });
+
+  // Best current sell price from Fuzzwork hubs (Jita preferred)
+  let currentPrice = null;
+  const hubOrder = ['Jita','Amarr','Dodixie','Rens','Hek'];
+  for (const hub of hubOrder) {
+    const sell = hubs[hub]?.sell?.min;
+    if (sell && parseFloat(sell) > 0) { currentPrice = parseFloat(sell); break; }
+  }
+
+  statusEl.textContent = `${slice.length} days · The Forge`;
+
+  const canvas = document.getElementById('histChart');
+  if (_histChart) { _histChart.destroy(); _histChart = null; }
+
+  const upColor   = 'rgba(47,239,47,0.85)';
+  const downColor = 'rgba(239,47,47,0.85)';
+  const wickColor = 'rgba(180,180,180,0.6)';
+
+  // Chart.js doesn't have built-in candlestick — implement as custom bar chart
+  // Use floating bar chart: bar from low→high, then overlay open→close box
+  const labels = candles.map(c => c.x.slice(5)); // MM-DD
+
+  // Dataset 1: wick (low to high) — thin line via borderWidth trick
+  const wickData = candles.map(c => [c.l, c.h]);
+  // Dataset 2: body (open to close)
+  const bodyData  = candles.map(c => [Math.min(c.o,c.c), Math.max(c.o,c.c)]);
+  const bodyColors = candles.map(c => c.c >= c.o ? upColor : downColor);
+
+  // Dataset 3: current price overlay line
+  const overlayData = currentPrice ? candles.map(() => currentPrice) : [];
+
+  _histChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Wick',
+          data: wickData,
+          backgroundColor: wickColor,
+          borderColor: wickColor,
+          borderWidth: 1,
+          barPercentage: 0.15,
+          categoryPercentage: 1.0,
+          order: 2,
+        },
+        {
+          label: 'Body',
+          data: bodyData,
+          backgroundColor: bodyColors,
+          borderColor: bodyColors,
+          borderWidth: 0,
+          barPercentage: 0.6,
+          categoryPercentage: 1.0,
+          order: 1,
+        },
+        ...(currentPrice ? [{
+          label: 'Current Sell (Jita)',
+          data: overlayData,
+          type: 'line',
+          borderColor: 'rgba(74,168,232,0.9)',
+          borderWidth: 1.5,
+          borderDash: [4,3],
+          pointRadius: 0,
+          fill: false,
+          order: 0,
+        }] : []),
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const i = items[0].dataIndex;
+              return slice[i]?.date || '';
+            },
+            label: (item) => {
+              if (item.datasetIndex === 2) return `Current Sell: ${fmtFullISK(item.raw)}`;
+              if (item.datasetIndex === 1) {
+                const c = candles[item.dataIndex];
+                return [
+                  `Open:  ${fmtISK(c.o)} ISK`,
+                  `Close: ${fmtISK(c.c)} ISK`,
+                  `High:  ${fmtISK(c.h)} ISK`,
+                  `Low:   ${fmtISK(c.l)} ISK`,
+                  `Vol:   ${fmtNum(c.v)}`,
+                ];
+              }
+              return null;
+            },
+            filter: (item) => item.datasetIndex !== 0, // hide wick from tooltip
+          },
+          backgroundColor: 'rgba(10,15,24,0.92)',
+          borderColor: 'rgba(60,80,110,0.5)',
+          borderWidth: 1,
+          titleColor: '#e8ecf2',
+          bodyColor: '#8b939e',
+          bodyFont: { family: 'Consolas,Monaco,monospace', size: 11 },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#4a5060',
+            font: { size: 9 },
+            maxTicksLimit: days <= 7 ? 7 : days <= 30 ? 10 : 12,
+            maxRotation: 0,
+          },
+          grid: { color: 'rgba(60,80,110,0.12)' },
+        },
+        y: {
+          position: 'right',
+          ticks: {
+            color: '#6b7280',
+            font: { family: 'Consolas,Monaco,monospace', size: 10 },
+            callback: (v) => fmtISK(v),
+          },
+          grid: { color: 'rgba(60,80,110,0.12)' },
+        },
+      },
+    }
+  });
+}
+
+</script>
+{% endblock %}

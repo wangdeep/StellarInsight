@@ -1,0 +1,924 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero" style="padding-bottom:0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+  <div>
+    <h1 style="font-size:28px;letter-spacing:.06em;margin:0;">Settings</h1>
+    <p class="muted" style="margin-top:6px;">EVE character management and app configuration.</p>
+  </div>
+  {% if is_premium %}
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.25);">
+    <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:#22c55e;stroke-width:2.5;flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
+    <span style="font-size:13px;font-weight:600;color:#22c55e;">Premium Active</span>
+  </div>
+  {% endif %}
+</section>
+
+{% if is_premium and reinstall_key %}
+<!-- ── Reinstall key card ─────────────────────────────────────────────────── -->
+<div style="margin-top:16px;padding:16px 18px;border-radius:14px;background:rgba(255,140,0,.06);border:1px solid rgba(255,140,0,.25);display:flex;flex-direction:column;gap:10px;">
+  <div style="display:flex;align-items:flex-start;gap:10px;">
+    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#ff8c00;stroke-width:2.2;flex-shrink:0;margin-top:1px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <div>
+      <div style="font-size:13px;font-weight:700;color:#ff8c00;margin-bottom:3px;">Save Your Reinstall Key</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.5;">This key is tied to your character and lets you restore premium on a fresh install without paying again. <strong style="color:var(--text);">Keep it somewhere safe</strong> — it won't be recoverable if you lose it and reset the app.</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span id="reinstallKeyDisplay" class="mono" style="font-size:15px;letter-spacing:.12em;color:var(--text);font-weight:700;word-break:break-all;">{{ reinstall_key }}</span>
+    <button class="btn btn-ghost" style="font-size:11px;padding:4px 10px;flex-shrink:0;" onclick="copyReinstallKey()">Copy</button>
+  </div>
+</div>
+{% endif %}
+
+{% if not is_premium %}
+<!-- ── Premium access overlay ────────────────────────────────────────────── -->
+<div id="premiumOverlay" style="position:fixed;inset:0;z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;">
+  <!-- Blurred backdrop that lets content show through faintly -->
+  <div style="position:absolute;inset:0;backdrop-filter:blur(14px) brightness(0.45);-webkit-backdrop-filter:blur(14px) brightness(0.45);background: rgba(0,0,0,0.6);"></div>
+
+  <!-- Access card -->
+  <div style="position:relative;z-index:1;width:100%;max-width:480px;background: rgba(0,0,0,0.8);border:1px solid rgba(34,197,94,.30);border-radius:20px;padding:32px 28px;box-shadow:0 0 60px rgba(34,197,94,.08),0 20px 60px rgba(0,0,0,.6);">
+
+    <!-- Header -->
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:50%;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.30);margin-bottom:14px;">
+        <svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:none;stroke:#22c55e;stroke-width:2;" aria-hidden="true">
+          <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+        </svg>
+      </div>
+      <div style="font-size:22px;font-weight:700;letter-spacing:.04em;margin-bottom:6px;">Stellar Insight Premium</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.5;">One-time activation — yours permanently.</div>
+    </div>
+
+    <!-- Benefits list -->
+    <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:24px;">
+      <div class="prem-benefit">
+        <svg viewBox="0 0 24 24" class="prem-check"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <div>
+          <div class="prem-b-title">Link Multiple Characters</div>
+          <div class="prem-b-sub">Track alts, industry toons, and scouts all in one app</div>
+        </div>
+      </div>
+      <div class="prem-benefit">
+        <svg viewBox="0 0 24 24" class="prem-check"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        <div>
+          <div class="prem-b-title">Corp Sharing Server</div>
+          <div class="prem-b-sub">Host or join a live sync server — share navigation, fits &amp; skill plans with corpmates in real time</div>
+        </div>
+      </div>
+      <div class="prem-benefit">
+        <svg viewBox="0 0 24 24" class="prem-check"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <div>
+          <div class="prem-b-title">Full Settings Access</div>
+          <div class="prem-b-sub">Asset downloads, ESI cache control, theme &amp; app configuration</div>
+        </div>
+      </div>
+      <div class="prem-benefit">
+        <svg viewBox="0 0 24 24" class="prem-check"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <div>
+          <div class="prem-b-title">All Future Features</div>
+          <div class="prem-b-sub">Every premium feature added going forward, at no extra cost</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div style="border-top:1px solid rgba(255,255,255,.07);margin-bottom:24px;"></div>
+
+    <!-- Tab switcher -->
+    <div style="display:flex;gap:8px;margin-bottom:22px;" id="premTabBar">
+      <button id="tabKeyBtn" class="prem-tab prem-tab-active" onclick="switchPremTab('key')">Access Key</button>
+      <button id="tabIskBtn" class="prem-tab" onclick="switchPremTab('isk')">ISK Payment</button>
+      <button id="tabRiBtn" class="prem-tab" onclick="switchPremTab('reinstall')">Reinstall</button>
+    </div>
+
+    <!-- KEY PANEL -->
+    <div id="panelKey">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Enter your one-time access key or developer code.</div>
+      <div style="display:flex;gap:8px;">
+        <input id="keyInput" type="text" placeholder="SNEK-XXXX-XXXX-XXXX"
+          style="flex:1;padding:10px 13px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--text);font-family:monospace;font-size:13px;min-width:0;"
+          oninput="clearPremStatus()" onkeydown="if(event.key==='Enter')redeemKey()" />
+        <button class="btn" id="redeemBtn" style="font-size:13px;white-space:nowrap;" onclick="redeemKey()">Redeem</button>
+      </div>
+      <div id="keyStatus" style="margin-top:8px;font-size:12px;min-height:1.4em;"></div>
+    </div>
+
+    <!-- REINSTALL PANEL -->
+    <div id="panelReinstall" style="display:none;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Already paid? Enter your character-bound reinstall key. The key only works with the character that originally purchased premium.</div>
+      <div style="display:flex;gap:8px;">
+        <input id="riInput" type="text" placeholder="SNEK-XXXX-XXXX-XXXX"
+          style="flex:1;padding:10px 13px;border-radius:9px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--text);font-family:monospace;font-size:13px;min-width:0;"
+          oninput="clearReinstallStatus()" onkeydown="if(event.key==='Enter')redeemReinstallKey()" />
+        <button class="btn" id="riBtn" style="font-size:13px;white-space:nowrap;" onclick="redeemReinstallKey()">Restore</button>
+      </div>
+      <div id="riStatus" style="margin-top:8px;font-size:12px;min-height:1.4em;"></div>
+    </div>
+
+    <!-- ISK PANEL -->
+    <div id="panelIsk" style="display:none;">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+        Send <strong style="color:var(--text);">{{ payment_price_b }}B ISK</strong> in-game to character ID
+        <span class="mono" style="color:var(--accent);font-size:12px;">{{ payment_char_id }}</span>
+        with <strong style="color:var(--text);">"{{ payment_memo }}"</strong> anywhere in the memo field.
+      </div>
+
+      <!-- Payment reference -->
+      <div style="background:rgba(50,182,255,.06);border:1px solid rgba(50,182,255,.14);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Your instance reference (include in memo)</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="mono" id="instanceRef" style="font-size:16px;letter-spacing:.12em;color:var(--text);font-weight:700;">{{ payment_memo }}-{{ instance_ref }}</span>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;flex-shrink:0;" onclick="copyInstanceRef()">Copy</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px;">Type this exact string in the ISK transfer memo field.</div>
+      </div>
+
+      <button class="btn" id="verifyPayBtn" style="width:100%;font-size:13px;justify-content:center;" onclick="verifyPayment()">
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>
+        I've Sent the ISK — Verify Now
+      </button>
+      <div id="iskStatus" style="margin-top:10px;font-size:12px;min-height:1.4em;text-align:center;"></div>
+    </div>
+
+    <!-- Footer note -->
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06);text-align:center;font-size:11px;color:rgba(154,164,178,.45);">
+      Payment is non-refundable · ESI verification is local and private · No external servers
+    </div>
+  </div>
+</div>
+
+<style>
+.prem-tab {
+  flex:1;padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.10);
+  background:rgba(255,255,255,.03);color:var(--muted);font-size:13px;cursor:pointer;transition:all .15s;
+}
+.prem-tab-active {
+  background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.35);color:#22c55e;font-weight:600;
+}
+.prem-benefit {
+  display:flex;align-items:flex-start;gap:12px;padding:10px 12px;
+  border-radius:10px;background:rgba(34,197,94,.04);border:1px solid rgba(34,197,94,.10);
+}
+.prem-check {
+  width:16px;height:16px;fill:none;stroke:#22c55e;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+  flex-shrink:0;margin-top:2px;
+}
+.prem-b-title { font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px; }
+.prem-b-sub   { font-size:11px;color:var(--muted);line-height:1.45; }
+</style>
+{% endif %}
+
+<!-- Linked EVE Characters -->
+<div class="card" style="margin-top:18px;">
+  <div class="card-h">Linked EVE Characters</div>
+  {% if chars and chars|length > 0 %}
+    <div style="display:flex;flex-direction:column;gap:10px;">
+    {% for c in chars %}
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:12px;background: rgba(0,0,0,0.4);border:1px solid rgba(154,164,178,.10);">
+        <img style="width:40px;height:40px;border-radius:8px;object-fit:cover;" src="https://images.evetech.net/characters/{{ c.character_id }}/portrait?size=64" alt="" loading="lazy" onerror="this.style.display='none'" />
+        <div style="flex:1;">
+          <div style="font-weight:600;">{{ c.character_name }}</div>
+          <div class="muted tiny">ID {{ c.character_id }}{% if c.is_default %} · <span style="color:var(--accent)">default</span>{% endif %}</div>
+        </div>
+        {% if not c.is_default %}
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;" onclick="setDefaultChar('{{ c.alias or c.character_name }}')">Set Default</button>
+        {% endif %}
+        <button class="btn btn-ghost" style="font-size:12px;padding:6px 10px;color:#ef4444;border-color:rgba(239,68,68,.2);" onclick="removeChar('{{ c.alias or c.character_name }}')">Remove</button>
+      </div>
+    {% endfor %}
+    </div>
+    <div style="margin-top:14px;">
+      <a class="btn" href="/eve/login?scope_mode=max_corp" style="text-decoration:none;">
+        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="12" ry="4"/></svg>Add Another Character</a>
+    </div>
+  {% else %}
+    <div class="muted" style="margin-bottom:14px;">No EVE characters linked yet.</div>
+    <a class="btn" href="/eve/login?scope_mode=max_corp" style="text-decoration:none;">
+      <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="12" rx="12" ry="4"/></svg>Add Character</a>
+  {% endif %}
+</div>
+
+<!-- ESI Cache -->
+<div class="card" style="margin-top:14px;">
+  <div class="card-h">ESI Cache</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+    Character data (blueprints, assets, skills, industry jobs) auto-refreshes every 30 minutes.
+    Use the button below to force an immediate refresh for all linked characters.
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="btn" id="esiRefreshBtn" onclick="refreshAllESI()">↺ Refresh All Characters Now</button>
+    <span id="esiRefreshStatus" style="font-size:12px;color:var(--muted);"></span>
+  </div>
+</div>
+
+<!-- App Info -->
+<div class="card" style="margin-top:14px;">
+  <div class="card-h">App Info</div>
+  <div style="display:flex;flex-direction:column;gap:8px;font-size:13px;">
+    <div style="display:flex;justify-content:space-between;">
+      <span class="muted">Client ID</span>
+      <span class="mono" style="font-size:12px;color:var(--muted);">{{ client_id[:8] }}…</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;">
+      <span class="muted">Port</span>
+      <span class="mono" style="font-size:12px;">{{ port }}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;">
+      <span class="muted">Callback URL</span>
+      <span class="mono" style="font-size:12px;">http://localhost:{{ port }}/eve/callback</span>
+    </div>
+  </div>
+</div>
+
+<!-- Asset Downloads -->
+<div class="card" style="margin-top:14px;" id="assetCard">
+  <div class="card-h">Asset Downloads</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+    Re-download game data assets. Use this if features seem broken or data looks stale.
+  </div>
+
+  <!-- SDE row -->
+  <div style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div>
+        <span style="font-weight:600;font-size:13px;">EVE Static Data Export</span>
+        <span id="sdeTag" style="margin-left:8px;font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(50,182,255,.1);color:var(--accent);">checking…</span>
+      </div>
+      <button class="btn btn-ghost" id="sdeBtn" style="font-size:12px;padding:5px 12px;" onclick="redownloadSde()">↺ Re-download</button>
+    </div>
+    <div class="asset-bar-wrap" id="sdeBarWrap" style="display:none;">
+      <div class="asset-bar" id="sdeBar" style="background:var(--accent);"></div>
+    </div>
+    <div id="sdeSt" style="font-size:11px;color:var(--muted);min-height:1.2em;margin-top:3px;"></div>
+  </div>
+
+  <!-- Nebulae row -->
+  <div style="margin-bottom:4px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+      <div>
+        <span style="font-weight:600;font-size:13px;">Nebula Images</span>
+        <span id="nebTag" style="margin-left:8px;font-size:11px;padding:2px 7px;border-radius:4px;background:rgba(168,85,247,.1);color:#a855f7;">checking…</span>
+      </div>
+      <button class="btn btn-ghost" id="nebBtn" style="font-size:12px;padding:5px 12px;" onclick="redownloadNebulae()">↺ Re-download</button>
+    </div>
+    <div class="asset-bar-wrap" id="nebBarWrap" style="display:none;">
+      <div class="asset-bar" id="nebBar" style="background:#a855f7;"></div>
+    </div>
+    <div id="nebSt" style="font-size:11px;color:var(--muted);min-height:1.2em;margin-top:3px;"></div>
+  </div>
+
+  <!-- Re-download all -->
+  <div style="border-top:1px solid rgba(50,182,255,.08);margin-top:14px;padding-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="btn" id="allBtn" onclick="redownloadAll()" style="font-size:13px;">↺ Re-download Everything</button>
+    <span id="allSt" style="font-size:12px;color:var(--muted);"></span>
+  </div>
+</div>
+
+<style>
+.asset-bar-wrap{background:rgba(255,255,255,.07);border-radius:5px;height:10px;overflow:hidden;}
+.asset-bar{height:100%;border-radius:5px;width:0%;transition:width .35s ease;}
+</style>
+
+<!-- Corp Sharing -->
+<div class="card" style="margin-top:14px;" id="syncCard">
+  <div class="card-h" style="display:flex;align-items:center;justify-content:space-between;">
+    <span>Corp Sharing</span>
+    <span id="syncDot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#555;flex-shrink:0;margin-left:8px;"></span>
+  </div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">
+    Share live navigation, fits, and skill plans with corp members in real time.
+    One person hosts (creates a room code), everyone else joins with that code.
+  </div>
+
+  <!-- Connected state -->
+  <div id="syncConnected" style="display:none;">
+    <div style="padding:12px 14px;border-radius:10px;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.18);margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:#22c55e;stroke-width:2.5;flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
+        <span style="font-weight:600;font-size:13px;color:#22c55e;">Connected</span>
+        <span id="syncCorpName" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+      <!-- Room code (shown when admin — share this with corpmates) -->
+      <div id="syncRoomCodeRow" style="display:none;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Room Code — share with corpmates to join</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span id="syncRoomCodeDisplay" class="mono" style="font-size:16px;letter-spacing:.14em;font-weight:700;"></span>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;" onclick="copyRoomCode()">Copy</button>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" style="font-size:12px;color:#ef4444;border-color:rgba(239,68,68,.2);" onclick="disconnectSync()">Disconnect</button>
+  </div>
+
+  <!-- Disconnected state -->
+  <div id="syncDisconnected">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn" style="font-size:13px;" onclick="openSetupModal()">
+        <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;vertical-align:middle;margin-right:6px;"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
+        Host for My Corp
+      </button>
+      <button class="btn btn-ghost" style="font-size:13px;" onclick="openJoinModal()">
+        Join with Room Code
+      </button>
+    </div>
+    <div id="syncSetupStatus" style="margin-top:10px;font-size:12px;min-height:1.4em;"></div>
+  </div>
+</div>
+
+<!-- ── Host Setup Modal ──────────────────────────────────────────────────── -->
+<div id="syncSetupModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.80);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div style="background:#0f1117;border:1px solid rgba(50,182,255,.18);border-radius:16px;padding:28px 30px;width:460px;max-width:calc(100vw - 32px);position:relative;">
+    <button onclick="closeSetupModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">×</button>
+
+    <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Host Corp Sharing</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
+      This registers your corp on the relay server and gives you a <strong style="color:var(--text);">room code</strong> (SNEK-XXXX).
+      Share the code with corpmates so they can join.
+    </div>
+
+    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Relay Server URL</label>
+    <input id="setupRelayUrl" type="text" placeholder="http://insight.stellarforge.nexus/share"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:monospace;" />
+    <div style="font-size:11px;color:var(--muted);margin-top:5px;margin-bottom:18px;">Leave blank to use the default shared relay.</div>
+
+    <div id="setupModalStatus" style="font-size:12px;min-height:1.4em;margin-bottom:12px;text-align:center;"></div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeSetupModal()">Cancel</button>
+      <button class="btn" id="setupRegisterBtn" onclick="doHostSetup()">Register My Corp →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Join Modal (member) ──────────────────────────────────────────────── -->
+<div id="syncJoinModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.80);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div style="background:#0f1117;border:1px solid rgba(50,182,255,.18);border-radius:16px;padding:28px 30px;width:440px;max-width:calc(100vw - 32px);position:relative;">
+    <button onclick="closeJoinModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">×</button>
+
+    <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Join Corp Sharing</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
+      Enter the <strong style="color:var(--text);">room code</strong> your corp host shared with you.
+    </div>
+
+    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Room Code</label>
+    <input id="joinRoomCode" type="text" placeholder="SNEK-XXXX"
+      style="width:100%;box-sizing:border-box;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:16px;outline:none;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;"
+      oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')doJoin()" />
+
+    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Relay Server URL <span style="font-weight:400;color:var(--muted);">(optional — leave blank for default)</span></label>
+    <input id="joinRelayUrl" type="text" placeholder="http://insight.stellarforge.nexus/share"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:12px;outline:none;font-family:monospace;margin-bottom:14px;" />
+
+    <div id="joinStatus" style="font-size:12px;min-height:1.4em;margin-bottom:12px;text-align:center;"></div>
+
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeJoinModal()">Cancel</button>
+      <button class="btn" id="joinBtn" onclick="doJoin()">Join →</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.setup-step {
+  flex:1; text-align:center; font-size:11px; padding:7px 4px;
+  border-bottom:2px solid rgba(255,255,255,.08); color:var(--muted);
+  transition:all .2s;
+}
+.setup-step.active {
+  color:var(--accent); border-bottom-color:var(--accent); font-weight:600;
+}
+.setup-step.done {
+  color:#22c55e; border-bottom-color:#22c55e;
+}
+.sync-char-opt {
+  display:flex; align-items:center; gap:10px; padding:9px 12px;
+  border-radius:8px; border:1px solid rgba(255,255,255,.1);
+  background:rgba(255,255,255,.04); cursor:pointer; transition:all .15s;
+}
+.sync-char-opt:hover { background:rgba(50,182,255,.08); border-color:rgba(50,182,255,.25); }
+.sync-char-opt.selected { background:rgba(50,182,255,.12); border-color:var(--accent); }
+</style>
+
+<!-- Reset App -->
+<div class="card" style="margin-top:14px;border-color:rgba(239,68,68,.2);">
+  <div class="card-h" style="color:#ef4444;">⚠️ Reset App</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+    Removes all linked EVE characters and clears all cached data. You will need to re-link your characters after resetting.
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <button class="btn" id="resetBtn" onclick="resetApp()"
+      style="background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.3);color:#ef4444;">
+      🗑 Reset App
+    </button>
+    <span id="resetStatus" style="font-size:12px;color:var(--muted);"></span>
+  </div>
+</div>
+
+<script>
+async function setDefaultChar(alias){
+  try{
+    const r = await fetch('/app/api/eve/default', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({alias})});
+    if(r.ok) location.reload();
+  }catch(e){ alert('Error: ' + e.message); }
+}
+
+async function removeChar(alias){
+  if(!confirm(`Remove character "${alias}"? This cannot be undone.`)) return;
+  try{
+    const r = await fetch(`/app/api/eve/character?alias=${encodeURIComponent(alias)}`, {method:'DELETE', credentials:'include'});
+    if(r.ok) location.reload();
+    else alert('Failed to remove character.');
+  }catch(e){ alert('Error: ' + e.message); }
+}
+
+async function refreshAllESI(){
+  const btn = document.getElementById('esiRefreshBtn');
+  const status = document.getElementById('esiRefreshStatus');
+  btn.disabled = true;
+  btn.textContent = '↺ Refreshing...';
+  status.textContent = '';
+  try{
+    const r = await fetch('/app/api/esi/cache/refresh_all', {method:'POST', credentials:'include'});
+    const j = await r.json();
+    const total = (j.results||[]).length;
+    const ok = (j.results||[]).filter(x=>!x.errors?.length).length;
+    const errs = total - ok;
+    status.style.color = errs > 0 ? 'var(--danger)' : 'var(--accent)';
+    status.textContent = errs > 0
+      ? `${ok}/${total} OK, ${errs} with errors`
+      : `${ok} character${ok!==1?'s':''} refreshed successfully`;
+  }catch(e){
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false;
+  btn.textContent = '↺ Refresh All Characters Now';
+}
+
+// ── Asset downloads ──────────────────────────────────────────────────────
+let _sdePolling = false, _nebPolling = false;
+
+function _setTag(el, text, ok){
+  el.textContent = text;
+  el.style.background = ok ? 'rgba(34,197,94,.12)' : ok===false ? 'rgba(239,68,68,.12)' : 'rgba(157,177,209,.1)';
+  el.style.color = ok ? '#22c55e' : ok===false ? '#ef4444' : 'var(--muted)';
+}
+
+async function loadAssetStatus(){
+  try{
+    const r = await fetch('/app/api/settings/asset_status');
+    const d = await r.json();
+    // SDE
+    const s = d.sde;
+    const sdeTag = document.getElementById('sdeTag');
+    if(s.installed){
+      _setTag(sdeTag, `✓ Installed (${s.size_mb} MB)`, true);
+    } else {
+      _setTag(sdeTag, '✗ Missing', false);
+    }
+    // Resume any in-progress download indicators
+    if(s.dl_status === 'downloading' && !_sdePolling){ _sdePolling=true; _pollSde(); }
+    // Nebulae
+    const n = d.nebulae;
+    const nebTag = document.getElementById('nebTag');
+    if(n.have >= n.total){
+      _setTag(nebTag, `✓ ${n.have}/${n.total} images`, true);
+    } else if(n.have > 0){
+      _setTag(nebTag, `${n.have}/${n.total} images`, null);
+    } else {
+      _setTag(nebTag, '✗ Not downloaded', false);
+    }
+    if(n.dl_status === 'downloading' && !_nebPolling){ _nebPolling=true; _pollNeb(); }
+  }catch(e){}
+}
+
+async function redownloadSde(){
+  if(!confirm('This will delete the existing SDE and re-download it (~85 MB).\n\nContinue?')) return;
+  const btn = document.getElementById('sdeBtn');
+  btn.disabled = true;
+  document.getElementById('sdeBarWrap').style.display = '';
+  document.getElementById('sdeSt').textContent = 'Deleting existing SDE…';
+  _setTag(document.getElementById('sdeTag'), 'Downloading…', null);
+  try{
+    const r = await fetch('/app/api/settings/redownload_sde', {method:'POST'});
+    const j = await r.json();
+    if(!j.ok){ document.getElementById('sdeSt').textContent = 'Error: ' + (j.error||'unknown'); btn.disabled=false; return; }
+    _sdePolling = true;
+    _pollSde();
+  }catch(e){ document.getElementById('sdeSt').textContent = 'Error: '+e.message; btn.disabled=false; }
+}
+
+async function redownloadNebulae(){
+  if(!confirm('This will delete all cached nebula images and re-download them (~15 MB total).\n\nContinue?')) return;
+  const btn = document.getElementById('nebBtn');
+  btn.disabled = true;
+  document.getElementById('nebBarWrap').style.display = '';
+  document.getElementById('nebSt').textContent = 'Clearing cached images…';
+  _setTag(document.getElementById('nebTag'), 'Downloading…', null);
+  try{
+    const r = await fetch('/app/api/settings/redownload_nebulae', {method:'POST'});
+    const j = await r.json();
+    if(!j.ok){ document.getElementById('nebSt').textContent = 'Error: ' + (j.error||'unknown'); btn.disabled=false; return; }
+    _nebPolling = true;
+    _pollNeb();
+  }catch(e){ document.getElementById('nebSt').textContent = 'Error: '+e.message; btn.disabled=false; }
+}
+
+async function redownloadAll(){
+  if(!confirm('This will delete and re-download all assets:\n  • EVE Static Data Export (~85 MB)\n  • 54 Nebula Images (~15 MB)\n\nContinue?')) return;
+  document.getElementById('allBtn').disabled = true;
+  document.getElementById('allSt').textContent = 'Starting…';
+  // Kick off SDE first; nebulae will auto-start after SDE finishes
+  document.getElementById('sdeBarWrap').style.display = '';
+  document.getElementById('nebBarWrap').style.display = '';
+  _setTag(document.getElementById('sdeTag'), 'Downloading…', null);
+  try{
+    const r = await fetch('/app/api/settings/redownload_sde', {method:'POST'});
+    const j = await r.json();
+    if(!j.ok){ document.getElementById('allSt').textContent = 'Error: ' + j.error; document.getElementById('allBtn').disabled=false; return; }
+    document.getElementById('allSt').textContent = 'Phase 1/2: Downloading SDE…';
+    _sdePolling = true;
+    _pollSde(async ()=>{
+      // Phase 2: nebulae
+      document.getElementById('allSt').textContent = 'Phase 2/2: Downloading nebula images…';
+      const r2 = await fetch('/app/api/settings/redownload_nebulae', {method:'POST'});
+      const j2 = await r2.json();
+      if(j2.ok){ _nebPolling=true; _pollNeb(()=>{ document.getElementById('allSt').textContent = 'All assets downloaded.'; document.getElementById('allBtn').disabled=false; }); }
+      else { document.getElementById('allSt').textContent = 'Nebulae error: '+(j2.error||'unknown'); document.getElementById('allBtn').disabled=false; }
+    });
+  }catch(e){ document.getElementById('allSt').textContent = 'Error: '+e.message; document.getElementById('allBtn').disabled=false; }
+}
+
+async function _pollSde(onDone){
+  try{
+    const r = await fetch('/app/api/setup/sde_status');
+    const d = await r.json();
+    const pct = d.progress||0;
+    document.getElementById('sdeBar').style.width = pct+'%';
+
+    if(d.ready){
+      // File verified present — genuinely installed
+      document.getElementById('sdeBar').style.width = '100%';
+      document.getElementById('sdeSt').textContent = 'Complete — SDE ready';
+      _setTag(document.getElementById('sdeTag'), '✓ Installed', true);
+      document.getElementById('sdeBtn').disabled = false;
+      _sdePolling = false;
+      if(onDone) onDone();
+      return;
+    }
+    if(d.status==='error'){
+      document.getElementById('sdeSt').textContent = 'Error: '+(d.error||'unknown');
+      _setTag(document.getElementById('sdeTag'), '✗ Failed', false);
+      document.getElementById('sdeBtn').disabled = false;
+      _sdePolling = false;
+      return;
+    }
+    if(d.status==='done' && !d.ready){
+      // Task finished but file not found — treat as error
+      document.getElementById('sdeSt').textContent = 'Download finished but SDE file not found — try again';
+      _setTag(document.getElementById('sdeTag'), '✗ Failed', false);
+      document.getElementById('sdeBtn').disabled = false;
+      _sdePolling = false;
+      return;
+    }
+    document.getElementById('sdeSt').textContent = pct<91 ? `Downloading… ${pct}%` : 'Decompressing…';
+  }catch(e){}
+  setTimeout(()=>_pollSde(onDone), 800);
+}
+
+async function _pollNeb(onDone){
+  try{
+    const r = await fetch('/app/api/setup/nebulae_status');
+    const d = await r.json();
+    const pct = d.progress||0;
+    document.getElementById('nebBar').style.width = pct+'%';
+    const tot = d.total||54, done = d.done||0;
+    if(d.status==='done'){
+      document.getElementById('nebBar').style.width = '100%';
+      document.getElementById('nebSt').textContent = `Complete — ${tot} images downloaded`;
+      _setTag(document.getElementById('nebTag'), `✓ ${tot}/${tot} images`, true);
+      document.getElementById('nebBtn').disabled = false;
+      _nebPolling = false;
+      if(onDone) onDone();
+      return;
+    }
+    if(d.status==='error'){
+      document.getElementById('nebSt').textContent = 'Error: '+(d.error||'unknown');
+      _setTag(document.getElementById('nebTag'), '⚠ Partial', null);
+      document.getElementById('nebBtn').disabled = false;
+      _nebPolling = false;
+      return;
+    }
+    document.getElementById('nebSt').textContent = `Downloading ${done} / ${tot} images…`;
+  }catch(e){}
+  setTimeout(()=>_pollNeb(onDone), 600);
+}
+
+// Asset status loaded via the combined init block at the bottom of this script
+
+async function resetApp(){
+  if(!confirm('This will delete ALL linked characters and cached data.\n\nAre you sure you want to reset the app?')) return;
+  const btn = document.getElementById('resetBtn');
+  const status = document.getElementById('resetStatus');
+  btn.disabled = true;
+  btn.textContent = '⏳ Resetting…';
+  status.textContent = '';
+  try{
+    const r = await fetch('/app/api/eve/reset_all', {method:'POST', credentials:'include'});
+    const j = await r.json();
+    if(j.ok){
+      status.style.color = 'var(--accent)';
+      status.textContent = `Reset complete. Reloading…`;
+      setTimeout(()=>location.reload(), 1200);
+    } else {
+      status.style.color = 'var(--danger)';
+      status.textContent = 'Reset failed.';
+      btn.disabled = false;
+      btn.textContent = '🗑 Reset App';
+    }
+  }catch(e){
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+    btn.textContent = '🗑 Reset App';
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// Corp Sharing — relay-based room codes
+// ══════════════════════════════════════════════════════
+
+async function loadSyncStatus(){
+  try{
+    const r = await fetch('/app/api/sync/status');
+    const d = await r.json();
+    const dot = document.getElementById('syncDot');
+    if(d.configured && d.connected){
+      dot.style.background = '#22c55e';
+      dot.title = 'Connected to relay';
+    } else if(d.configured){
+      dot.style.background = '#f59e0b';
+      dot.title = 'Configured — connecting…';
+    } else {
+      dot.style.background = '#555';
+      dot.title = 'Not connected';
+    }
+    if(d.configured){
+      document.getElementById('syncConnected').style.display = '';
+      document.getElementById('syncDisconnected').style.display = 'none';
+      const corpName = d.corp_name ? '— ' + d.corp_name : '';
+      document.getElementById('syncCorpName').textContent = corpName;
+      if(d.is_admin && d.room_code){
+        document.getElementById('syncRoomCodeRow').style.display = '';
+        document.getElementById('syncRoomCodeDisplay').textContent = d.room_code;
+      } else {
+        document.getElementById('syncRoomCodeRow').style.display = 'none';
+      }
+    } else {
+      document.getElementById('syncConnected').style.display = 'none';
+      document.getElementById('syncDisconnected').style.display = '';
+    }
+  }catch(e){}
+}
+
+function copyRoomCode(){
+  const text = document.getElementById('syncRoomCodeDisplay')?.textContent?.trim();
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(()=>btn.textContent=orig, 1500);
+  });
+}
+
+async function disconnectSync(){
+  if(!confirm('Disconnect from the corp sharing relay? You can reconnect later with the same room code.')) return;
+  try{
+    await fetch('/app/api/sync/disconnect', {method:'DELETE'});
+    loadSyncStatus();
+  }catch(e){ alert('Error: ' + e.message); }
+}
+
+// ── Host setup modal ──────────────────────────────────
+function openSetupModal(){
+  document.getElementById('syncSetupModal').style.display = 'flex';
+  document.getElementById('setupModalStatus').textContent = '';
+  document.getElementById('setupRegisterBtn').disabled = false;
+  // Pre-fill default relay URL
+  const urlInput = document.getElementById('setupRelayUrl');
+  if(!urlInput.value) urlInput.value = 'http://insight.stellarforge.nexus/share';
+}
+function closeSetupModal(){
+  document.getElementById('syncSetupModal').style.display = 'none';
+}
+
+async function doHostSetup(){
+  const relayUrl = (document.getElementById('setupRelayUrl').value||'').trim() || 'http://insight.stellarforge.nexus/share';
+  const statusEl = document.getElementById('setupModalStatus');
+  const btn = document.getElementById('setupRegisterBtn');
+  btn.disabled = true;
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Registering with relay…';
+  try{
+    const r = await fetch('/app/api/sync/setup', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({relay_url: relayUrl})
+    });
+    const d = await r.json();
+    if(!r.ok){
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = 'Error: ' + (d.detail||'Unknown error');
+      btn.disabled = false;
+      return;
+    }
+    statusEl.style.color = '#22c55e';
+    statusEl.innerHTML = `✓ Registered! Room code: <strong class="mono" style="font-size:15px;letter-spacing:.12em;">${d.room_code}</strong><br>
+      <span style="font-size:11px;color:var(--muted);">Share this code with corpmates.</span>`;
+    setTimeout(()=>{ closeSetupModal(); loadSyncStatus(); }, 2500);
+  }catch(e){
+    statusEl.style.color = '#ef4444';
+    statusEl.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+// ── Join modal (member) ───────────────────────────────
+function openJoinModal(){
+  document.getElementById('syncJoinModal').style.display = 'flex';
+  document.getElementById('joinStatus').textContent = '';
+  document.getElementById('joinBtn').disabled = false;
+  const urlInput = document.getElementById('joinRelayUrl');
+  if(!urlInput.value) urlInput.value = 'http://insight.stellarforge.nexus/share';
+}
+function closeJoinModal(){
+  document.getElementById('syncJoinModal').style.display = 'none';
+}
+
+async function doJoin(){
+  const roomCode = (document.getElementById('joinRoomCode').value||'').trim().toUpperCase();
+  const relayUrl = (document.getElementById('joinRelayUrl').value||'').trim() || 'http://insight.stellarforge.nexus/share';
+  const statusEl = document.getElementById('joinStatus');
+  const btn = document.getElementById('joinBtn');
+  if(!roomCode){
+    statusEl.style.color = '#f59e0b';
+    statusEl.textContent = 'Enter a room code (format: SNEK-XXXX).';
+    return;
+  }
+  btn.disabled = true;
+  statusEl.style.color = 'var(--muted)';
+  statusEl.textContent = 'Joining relay…';
+  try{
+    const r = await fetch('/app/api/sync/join', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({room_code: roomCode, relay_url: relayUrl})
+    });
+    const d = await r.json();
+    if(!r.ok){
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = 'Error: ' + (d.detail||'Unknown error');
+      btn.disabled = false;
+      return;
+    }
+    statusEl.style.color = '#22c55e';
+    statusEl.textContent = `✓ Joined ${d.corp_name || 'the corp relay'}!`;
+    setTimeout(()=>{ closeJoinModal(); loadSyncStatus(); }, 1200);
+  }catch(e){
+    statusEl.style.color = '#ef4444';
+    statusEl.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+// ── Init on page load ─────────────────────────────────
+loadAssetStatus();
+loadSyncStatus();
+
+// ── Premium overlay logic ──────────────────────────────
+function switchPremTab(tab) {
+  document.getElementById('panelKey').style.display       = tab === 'key'       ? '' : 'none';
+  document.getElementById('panelIsk').style.display       = tab === 'isk'       ? '' : 'none';
+  document.getElementById('panelReinstall').style.display = tab === 'reinstall'  ? '' : 'none';
+  document.getElementById('tabKeyBtn').classList.toggle('prem-tab-active', tab === 'key');
+  document.getElementById('tabIskBtn').classList.toggle('prem-tab-active', tab === 'isk');
+  document.getElementById('tabRiBtn').classList.toggle('prem-tab-active',  tab === 'reinstall');
+}
+
+function clearPremStatus() {
+  const el = document.getElementById('keyStatus');
+  if (el) el.textContent = '';
+}
+
+function clearReinstallStatus() {
+  const el = document.getElementById('riStatus');
+  if (el) el.textContent = '';
+}
+
+function setPremStatus(elId, msg, ok) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = ok ? '#22c55e' : '#ef4444';
+}
+
+async function redeemKey() {
+  const key = (document.getElementById('keyInput')?.value || '').trim();
+  if (!key) { setPremStatus('keyStatus', 'Enter a key first.', false); return; }
+  const btn = document.getElementById('redeemBtn');
+  btn.disabled = true;
+  setPremStatus('keyStatus', 'Checking…', true);
+  try {
+    const r = await fetch('/app/api/premium/redeem_key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      setPremStatus('keyStatus', `✓ Access granted for ${d.character}! Reloading…`, true);
+      setTimeout(() => location.reload(), 1400);
+    } else {
+      setPremStatus('keyStatus', d.error || 'Invalid key.', false);
+      btn.disabled = false;
+    }
+  } catch(e) {
+    setPremStatus('keyStatus', 'Request failed: ' + e.message, false);
+    btn.disabled = false;
+  }
+}
+
+async function verifyPayment() {
+  const btn = document.getElementById('verifyPayBtn');
+  btn.disabled = true;
+  setPremStatus('iskStatus', 'Checking your wallet journal via ESI…', true);
+  try {
+    const r = await fetch('/app/api/premium/verify_payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const d = await r.json();
+    if (d.ok) {
+      setPremStatus('iskStatus', `✓ Payment verified for ${d.character}! Reloading…`, true);
+      setTimeout(() => location.reload(), 1400);
+    } else {
+      setPremStatus('iskStatus', d.error || 'No matching payment found.', false);
+      btn.disabled = false;
+    }
+  } catch(e) {
+    setPremStatus('iskStatus', 'Request failed: ' + e.message, false);
+    btn.disabled = false;
+  }
+}
+
+function copyInstanceRef() {
+  const text = document.getElementById('instanceRef')?.textContent?.trim();
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+function copyReinstallKey() {
+  const text = document.getElementById('reinstallKeyDisplay')?.textContent?.trim();
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+async function redeemReinstallKey() {
+  const key = (document.getElementById('riInput')?.value || '').trim();
+  if (!key) { setPremStatus('riStatus', 'Enter your reinstall key first.', false); return; }
+  const btn = document.getElementById('riBtn');
+  btn.disabled = true;
+  setPremStatus('riStatus', 'Checking…', true);
+  try {
+    const r = await fetch('/app/api/premium/redeem_reinstall_key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      setPremStatus('riStatus', `✓ Premium restored for ${d.character}! Reloading…`, true);
+      setTimeout(() => location.reload(), 1400);
+    } else {
+      setPremStatus('riStatus', d.error || 'Invalid key.', false);
+      btn.disabled = false;
+    }
+  } catch(e) {
+    setPremStatus('riStatus', 'Request failed: ' + e.message, false);
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}
