@@ -923,6 +923,10 @@ def create_app() -> FastAPI:
         from fastapi.responses import RedirectResponse
         return RedirectResponse(url=f"{APP_PREFIX}/navigator", status_code=302)
 
+    @app.get(f"{APP_PREFIX}/intel", response_class=HTMLResponse)
+    def intel_page(request: Request, user=Depends(require_user)):
+        return templates.TemplateResponse(request, "intel.html", {"user": user, "theme": get_theme_vars()})
+
     # ── Chain Mapper API ────────────────────────────────────────────────────────
     from eve.chain_mapper import (
         chain_state as _chain_state,

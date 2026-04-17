@@ -2164,10 +2164,10 @@ function renderChainPanel(){
       <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
         <div style="display:flex;justify-content:space-between;font-size:11px;">
           <span style="color:var(--muted);">Mass</span>
-          <span style="color:${cmMassCol(c.mass)};font-weight:600;">${{stable:'🟢 Stable',destab:'🟡 Destab',crit:'🔴 Critical'}[c.mass]||c.mass}</span></div>
+          <span style="color:${cmMassCol(c.mass)};font-weight:600;">${ {stable:'🟢 Stable',destab:'🟡 Destab',crit:'🔴 Critical'}[c.mass]||c.mass}</span></div>
         <div style="display:flex;justify-content:space-between;font-size:11px;">
           <span style="color:var(--muted);">Time</span>
-          <span style="font-weight:600;">${{fresh:'🕐 Fresh',eol:'💀 EOL'}[c.eol]||c.eol}</span></div>
+          <span style="font-weight:600;">${ {fresh:'🕐 Fresh',eol:'💀 EOL'}[c.eol]||c.eol}</span></div>
         ${c.is_frig?'<div style="font-size:10px;color:#fbbf24;">⚡ Frig hole</div>':''}
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
           <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmCycMass(${c.id})">⚖ Mass</button>

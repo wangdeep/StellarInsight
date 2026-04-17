@@ -1,0 +1,891 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+/* ── Page shell ──────────────────────────────────────────────── */
+main.wrap {
+  max-width:100% !important;
+  padding-top:calc(var(--topbar-h,72px) + var(--ticker-h,32px) + 4px) !important;
+  padding-right:0 !important; padding-bottom:0 !important;
+  padding-left:0 !important;
+  background:rgba(0,0,0,.6);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  display:flex; flex-direction:column;
+  height:100vh; overflow:hidden;
+}
+body:not(.sidebar-open) main.wrap { padding-left:0 !important; }
+
+/* ── Top bar ─────────────────────────────────────────────────── */
+#intelTopBar {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 18px 10px 18px;
+  background:rgba(0,0,0,.55);
+  border-bottom:1px solid rgba(50,182,255,.12);
+  flex-shrink:0;
+}
+#intelTopBar h1 {
+  font-size:13px; font-weight:700; color:var(--text);
+  text-transform:uppercase; letter-spacing:.08em; margin:0;
+}
+#intelTopBar .itb-sub {
+  font-size:10px; color:var(--muted); letter-spacing:.05em;
+}
+#intelSearch {
+  margin-left:auto;
+  background:rgba(255,255,255,.05); border:1px solid rgba(50,182,255,.18);
+  border-radius:6px; color:var(--text); font-size:12px;
+  padding:5px 10px; width:200px; outline:none;
+}
+#intelSearch:focus { border-color:rgba(50,182,255,.45); }
+
+/* ── Two-column layout ───────────────────────────────────────── */
+#intelRoot {
+  display:flex; flex:1; min-height:0; overflow:hidden;
+}
+
+/* ── Left sidebar: guide list ────────────────────────────────── */
+#intelSidebar {
+  width:220px; flex-shrink:0;
+  background:rgba(0,0,0,.45);
+  border-right:1px solid rgba(50,182,255,.1);
+  overflow-y:auto; padding:10px 0;
+}
+.is-cat-header {
+  font-size:9px; font-weight:700; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.12em;
+  padding:12px 16px 5px;
+}
+.is-cat-header:not(:first-child) { padding-top:18px; }
+.is-article {
+  display:block; padding:7px 16px 7px 22px;
+  font-size:12px; color:rgba(180,210,255,.7);
+  cursor:pointer; transition:background .12s, color .12s;
+  border-left:2px solid transparent;
+  text-decoration:none;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.is-article:hover { background:rgba(50,182,255,.07); color:var(--text); }
+.is-article.active {
+  color:var(--accent); border-left-color:var(--accent);
+  background:rgba(50,182,255,.1);
+}
+.is-badge {
+  float:right; font-size:9px; padding:1px 5px;
+  border-radius:3px; background:rgba(50,182,255,.15);
+  color:var(--muted); margin-left:4px; letter-spacing:.03em;
+}
+.is-badge.new { background:rgba(34,197,94,.2); color:#4ade80; }
+.is-badge.soon { background:rgba(255,180,50,.12); color:rgba(255,180,50,.7); }
+
+/* ── Article content pane ────────────────────────────────────── */
+#intelContent {
+  flex:1; overflow-y:auto; padding:0;
+}
+.ia-pane { display:none; }
+.ia-pane.active { display:block; }
+
+/* ── Article layout ──────────────────────────────────────────── */
+.ia-body {
+  max-width:860px; margin:0 auto; padding:28px 32px 60px;
+}
+.ia-hero {
+  border:1px solid rgba(50,182,255,.14);
+  border-radius:12px; overflow:hidden; position:relative;
+  background:rgba(0,0,0,.6); margin-bottom:28px; padding:24px 28px;
+}
+.ia-hero-bg {
+  position:absolute; inset:0;
+  background:linear-gradient(135deg, rgba(50,182,255,.06) 0%, rgba(4,8,18,.95) 70%);
+  pointer-events:none;
+}
+.ia-hero-content { position:relative; z-index:1; }
+.ia-hero-tag {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.14em;
+  color:var(--accent); margin-bottom:6px;
+}
+.ia-hero-title {
+  font-size:26px; font-weight:800; color:var(--text); margin:0 0 6px;
+  line-height:1.2;
+}
+.ia-hero-sub { font-size:13px; color:rgba(180,210,255,.65); }
+.ia-hero-meta {
+  margin-top:12px; display:flex; gap:18px; flex-wrap:wrap;
+}
+.ia-meta-chip {
+  font-size:10px; color:var(--muted); display:flex; align-items:center; gap:5px;
+}
+.ia-meta-chip svg { opacity:.5; }
+
+/* ── Article sections ────────────────────────────────────────── */
+.ia-section { margin-bottom:32px; }
+.ia-h2 {
+  font-size:14px; font-weight:700; color:var(--text);
+  text-transform:uppercase; letter-spacing:.07em;
+  border-bottom:1px solid rgba(50,182,255,.15);
+  padding-bottom:7px; margin:0 0 14px;
+}
+.ia-h3 {
+  font-size:12px; font-weight:700; color:var(--accent);
+  text-transform:uppercase; letter-spacing:.06em;
+  margin:18px 0 8px;
+}
+.ia-p {
+  font-size:13px; color:rgba(200,220,255,.8); line-height:1.65;
+  margin:0 0 10px;
+}
+.ia-tip {
+  background:rgba(50,182,255,.07); border:1px solid rgba(50,182,255,.18);
+  border-radius:8px; padding:12px 16px; margin:12px 0;
+  font-size:12px; color:rgba(180,210,255,.8); line-height:1.6;
+}
+.ia-tip strong { color:var(--accent); }
+.ia-warn {
+  background:rgba(255,140,50,.06); border:1px solid rgba(255,140,50,.2);
+  border-radius:8px; padding:12px 16px; margin:12px 0;
+  font-size:12px; color:rgba(255,200,150,.8); line-height:1.6;
+}
+.ia-warn strong { color:#f97316; }
+
+/* ── Level cards row ─────────────────────────────────────────── */
+.ia-levels { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+@media(max-width:680px){ .ia-levels{grid-template-columns:1fr 1fr;} }
+.ia-level-card {
+  background:rgba(255,255,255,.03); border:1px solid rgba(50,182,255,.13);
+  border-radius:9px; padding:14px 14px 12px; position:relative; overflow:hidden;
+}
+.ia-level-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+}
+.ia-level-card.l1::before { background:linear-gradient(90deg,#22c55e,transparent); }
+.ia-level-card.l2::before { background:linear-gradient(90deg,#3b82f6,transparent); }
+.ia-level-card.l3::before { background:linear-gradient(90deg,#f59e0b,transparent); }
+.ia-level-card.l4::before { background:linear-gradient(90deg,#ef4444,transparent); }
+.ia-level-num { font-size:22px; font-weight:800; color:var(--text); }
+.ia-level-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:6px; }
+.ia-level-ship { font-size:11px; color:rgba(180,210,255,.7); margin-bottom:4px; }
+.ia-level-isk { font-size:10px; color:#22c55e; font-weight:600; }
+.ia-level-req { font-size:10px; color:var(--muted); margin-top:5px; line-height:1.5; }
+
+/* ── NPC damage table ────────────────────────────────────────── */
+.npc-table { width:100%; border-collapse:collapse; font-size:12px; }
+.npc-table th {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); text-align:left; padding:7px 10px;
+  border-bottom:1px solid rgba(50,182,255,.15);
+}
+.npc-table td {
+  padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.04);
+  color:rgba(200,220,255,.8); vertical-align:top;
+}
+.npc-table tr:hover td { background:rgba(50,182,255,.05); }
+.npc-table tr:last-child td { border-bottom:none; }
+.npc-faction { font-weight:700; color:var(--text); white-space:nowrap; }
+.npc-region { font-size:10px; color:var(--muted); }
+.dmg-pip {
+  display:inline-block; padding:2px 7px; border-radius:4px;
+  font-size:10px; font-weight:600; margin:1px 2px;
+  white-space:nowrap;
+}
+.dmg-em  { background:rgba(130,80,220,.25); color:#c084fc; }
+.dmg-th  { background:rgba(239,68,68,.22);  color:#fca5a5; }
+.dmg-kin { background:rgba(50,182,255,.2);  color:#93c5fd; }
+.dmg-exp { background:rgba(251,146,60,.22); color:#fdba74; }
+.dmg-all { background:rgba(100,100,100,.2); color:rgba(200,200,200,.8); }
+
+/* ── Ship tier cards ─────────────────────────────────────────── */
+.ship-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:580px){ .ship-grid{grid-template-columns:1fr;} }
+.ship-card {
+  background:rgba(255,255,255,.03); border:1px solid rgba(50,182,255,.13);
+  border-radius:9px; padding:14px 16px;
+}
+.ship-card-name { font-size:14px; font-weight:700; color:var(--text); margin-bottom:2px; }
+.ship-card-race { font-size:10px; color:var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
+.ship-card-desc { font-size:12px; color:rgba(180,210,255,.7); line-height:1.6; }
+.ship-card-tags { margin-top:9px; display:flex; flex-wrap:wrap; gap:4px; }
+.ship-tag {
+  font-size:10px; padding:2px 7px; border-radius:4px; font-weight:600;
+  background:rgba(50,182,255,.1); color:rgba(130,180,255,.8);
+}
+.ship-tag.best { background:rgba(34,197,94,.15); color:#4ade80; }
+.ship-tag.warn { background:rgba(251,146,60,.15); color:#fdba74; }
+
+/* ── Marauder cards ──────────────────────────────────────────── */
+.mrd-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:580px){ .mrd-grid{grid-template-columns:1fr;} }
+.mrd-card {
+  background:rgba(255,255,255,.03); border-radius:10px; padding:16px 18px;
+  position:relative; overflow:hidden;
+}
+.mrd-card.amarr { border:1px solid rgba(220,180,60,.25); }
+.mrd-card.amarr .mrd-accent { color:#fcd34d; }
+.mrd-card.caldari { border:1px solid rgba(50,182,255,.25); }
+.mrd-card.caldari .mrd-accent { color:#93c5fd; }
+.mrd-card.minmatar { border:1px solid rgba(239,68,68,.25); }
+.mrd-card.minmatar .mrd-accent { color:#fca5a5; }
+.mrd-card.gallente { border:1px solid rgba(34,197,94,.25); }
+.mrd-card.gallente .mrd-accent { color:#4ade80; }
+.mrd-name { font-size:16px; font-weight:800; color:var(--text); }
+.mrd-class { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px; }
+.mrd-accent { }
+.mrd-row { display:flex; gap:6px; margin-bottom:4px; align-items:baseline; }
+.mrd-label { font-size:10px; color:var(--muted); width:80px; flex-shrink:0; }
+.mrd-val { font-size:12px; color:rgba(200,220,255,.85); }
+.mrd-desc { font-size:12px; color:rgba(180,210,255,.65); line-height:1.55; margin-top:10px; }
+
+/* ── Income breakdown table ──────────────────────────────────── */
+.income-table { width:100%; border-collapse:collapse; font-size:12px; }
+.income-table th {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); text-align:left; padding:7px 10px;
+  border-bottom:1px solid rgba(50,182,255,.15);
+}
+.income-table td {
+  padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.04);
+  color:rgba(200,220,255,.8);
+}
+.income-table tr:last-child td { border-bottom:none; }
+.isk-val { color:#22c55e; font-weight:600; }
+
+/* ── Playstyle selector ──────────────────────────────────────── */
+.playstyle-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+@media(max-width:580px){ .playstyle-grid{grid-template-columns:1fr;} }
+.ps-card {
+  background:rgba(255,255,255,.03); border:1px solid rgba(50,182,255,.13);
+  border-radius:9px; padding:16px;
+}
+.ps-title { font-size:13px; font-weight:700; color:var(--text); margin-bottom:6px; }
+.ps-desc { font-size:12px; color:rgba(180,210,255,.7); line-height:1.6; }
+.ps-pro { font-size:11px; color:#4ade80; margin-top:8px; }
+.ps-con { font-size:11px; color:#fca5a5; margin-top:2px; }
+
+/* ── Tips list ───────────────────────────────────────────────── */
+.tip-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:8px; }
+.tip-list li {
+  display:flex; gap:10px; align-items:flex-start;
+  background:rgba(50,182,255,.04); border:1px solid rgba(50,182,255,.1);
+  border-radius:7px; padding:10px 14px; font-size:12px;
+  color:rgba(200,220,255,.8); line-height:1.6;
+}
+.tip-list li::before {
+  content:'◆'; color:var(--accent); font-size:10px; margin-top:2px; flex-shrink:0;
+}
+
+/* ── Coming soon pane ────────────────────────────────────────── */
+.ia-soon {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  min-height:340px; color:var(--muted); font-size:13px; gap:10px;
+}
+.ia-soon svg { opacity:.2; }
+.ia-soon-title { font-size:14px; font-weight:600; color:rgba(180,210,255,.4); }
+</style>
+
+<div id="intelTopBar">
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+  <h1>Intel</h1>
+  <span class="itb-sub">Guides &amp; Reference</span>
+  <input id="intelSearch" type="text" placeholder="Search guides…" oninput="intelFilter(this.value)" />
+</div>
+
+<div id="intelRoot">
+
+  <!-- ── Sidebar ───────────────────────────────────────────── -->
+  <nav id="intelSidebar">
+    <div class="is-cat-header">Missions</div>
+    <a class="is-article active" data-pane="missions-handbook" onclick="showArticle('missions-handbook',this)">
+      Mission Runner's Handbook <span class="is-badge new">Updated</span>
+    </a>
+    <a class="is-article" data-pane="burner-missions" onclick="showArticle('burner-missions',this)">
+      Burner Mission Guide <span class="is-badge soon">Soon</span>
+    </a>
+    <a class="is-article" data-pane="standings-guide" onclick="showArticle('standings-guide',this)">
+      Standings &amp; LP Stores <span class="is-badge soon">Soon</span>
+    </a>
+
+    <div class="is-cat-header">Ships &amp; Fitting</div>
+    <a class="is-article" data-pane="fitting-101" onclick="showArticle('fitting-101',this)">
+      Fitting 101 <span class="is-badge soon">Soon</span>
+    </a>
+    <a class="is-article" data-pane="marauder-deep" onclick="showArticle('marauder-deep',this)">
+      Marauder Deep Dive <span class="is-badge soon">Soon</span>
+    </a>
+
+    <div class="is-cat-header">Wormholes</div>
+    <a class="is-article" data-pane="wh-101" onclick="showArticle('wh-101',this)">
+      Wormhole Basics <span class="is-badge soon">Soon</span>
+    </a>
+    <a class="is-article" data-pane="wh-sites" onclick="showArticle('wh-sites',this)">
+      WH Site Catalog <span class="is-badge soon">Soon</span>
+    </a>
+
+    <div class="is-cat-header">Industry</div>
+    <a class="is-article" data-pane="industry-101" onclick="showArticle('industry-101',this)">
+      Industry Primer <span class="is-badge soon">Soon</span>
+    </a>
+  </nav>
+
+  <!-- ── Content pane ──────────────────────────────────────── -->
+  <div id="intelContent">
+
+    <!-- ════════════════════════════════════════════════════════
+         ARTICLE: Mission Runner's Handbook
+         ════════════════════════════════════════════════════════ -->
+    <div class="ia-pane active" id="pane-missions-handbook">
+    <div class="ia-body">
+
+      <!-- Hero -->
+      <div class="ia-hero">
+        <div class="ia-hero-bg"></div>
+        <div class="ia-hero-content">
+          <div class="ia-hero-tag">Mission Running · Security Agents</div>
+          <h2 class="ia-hero-title">Mission Runner's Handbook</h2>
+          <p class="ia-hero-sub">A complete guide to ISK, LP, and standing — from your first L1 to blitzing L4s in a Marauder.</p>
+          <div class="ia-hero-meta">
+            <span class="ia-meta-chip">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              ~20 min read
+            </span>
+            <span class="ia-meta-chip">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              All skill levels
+            </span>
+            <span class="ia-meta-chip">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
+              High-sec &amp; Low-sec
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Introduction -->
+      <div class="ia-section">
+        <h3 class="ia-h2">What Are Missions?</h3>
+        <p class="ia-p">Security missions are PvE assignments given by NPC agents. You fly to a deadspace pocket, destroy the enemy forces (and sometimes complete an objective like destroying a specific structure or picking up a cargo item), and return to collect your reward — ISK, Loyalty Points, and standings.</p>
+        <p class="ia-p">Missions are the most accessible ISK-making activity in EVE, available from day one, and scalable all the way up to Marauder-level income that competes with null-sec ratting. They also build faction standings that unlock better agents, faction store access, and reduced market taxes in station.</p>
+        <div class="ia-tip"><strong>Key Insight:</strong> Bounties and mission rewards are just the appetizer. Loyalty Points (LP) are often worth 3-5× the cash reward and are where the real income lives — especially if you pick the right faction to grind.</div>
+      </div>
+
+      <!-- Mission Levels -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Mission Levels at a Glance</h3>
+        <div class="ia-levels">
+          <div class="ia-level-card l1">
+            <div class="ia-level-label">Level</div>
+            <div class="ia-level-num">1</div>
+            <div class="ia-level-ship">Frigates · Destroyers</div>
+            <div class="ia-level-isk">~1–3M ISK / hr</div>
+            <div class="ia-level-req">Default standing. For new players only — move on quickly.</div>
+          </div>
+          <div class="ia-level-card l2">
+            <div class="ia-level-label">Level</div>
+            <div class="ia-level-num">2</div>
+            <div class="ia-level-ship">Cruisers · BCs</div>
+            <div class="ia-level-isk">~5–15M ISK / hr</div>
+            <div class="ia-level-req">1.0 standing with corp or 0.0 with faction. Good for intermediate training.</div>
+          </div>
+          <div class="ia-level-card l3">
+            <div class="ia-level-label">Level</div>
+            <div class="ia-level-num">3</div>
+            <div class="ia-level-ship">BCs · Battleships</div>
+            <div class="ia-level-isk">~25–50M ISK / hr</div>
+            <div class="ia-level-req">3.0 standing with corp. Strong mid-game content. Drake is king here.</div>
+          </div>
+          <div class="ia-level-card l4">
+            <div class="ia-level-label">Level</div>
+            <div class="ia-level-num">4</div>
+            <div class="ia-level-ship">Battleships · Marauders</div>
+            <div class="ia-level-isk">~80–300M ISK / hr</div>
+            <div class="ia-level-req">5.0 standing with corp or 3.0 with faction. The primary income tier for veterans.</div>
+          </div>
+        </div>
+        <div class="ia-tip" style="margin-top:12px;"><strong>Level 5 missions</strong> exist but are designed for low-sec and small fleets. They offer huge LP but require significant logistics — not a solo high-sec activity.</div>
+      </div>
+
+      <!-- NPC Damage Types -->
+      <div class="ia-section">
+        <h3 class="ia-h2">NPC Faction Damage Reference</h3>
+        <p class="ia-p">Every pirate faction deals a specific mix of damage types and has corresponding resistance holes. Knowing this lets you fit the right tank and the right ammo — it's the single biggest efficiency multiplier in mission running.</p>
+        <p class="ia-p">The four damage types are <span class="dmg-pip dmg-em">EM</span> <span class="dmg-pip dmg-th">Thermal</span> <span class="dmg-pip dmg-kin">Kinetic</span> <span class="dmg-pip dmg-exp">Explosive</span>. Match your tank resists to what the enemy shoots, and use the ammo type that hits their lowest resistance.</p>
+
+        <table class="npc-table" style="margin-top:14px;">
+          <thead>
+            <tr>
+              <th>Faction</th>
+              <th>Found In</th>
+              <th>Damage They Deal</th>
+              <th>Tank Against</th>
+              <th>Shoot With</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="npc-faction">Angel Cartel</div><div class="npc-region">Heimatar · Metropolis · Molden Heath</div></td>
+              <td>Minmatar / Republic space</td>
+              <td><span class="dmg-pip dmg-exp">Explosive</span><span class="dmg-pip dmg-kin">Kinetic</span></td>
+              <td><span class="dmg-pip dmg-exp">Explosive</span><span class="dmg-pip dmg-kin">Kinetic</span></td>
+              <td><span class="dmg-pip dmg-exp">Explosive</span> primary</td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Blood Raiders</div><div class="npc-region">Domain · Kador · Devoid</div></td>
+              <td>Amarr Empire space</td>
+              <td><span class="dmg-pip dmg-em">EM</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-em">EM</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-em">EM</span> primary</td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Guristas Pirates</div><div class="npc-region">Lonetrek · Black Rise · The Citadel</div></td>
+              <td>Caldari State space</td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span> primary</td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Sansha's Nation</div><div class="npc-region">Stain · Catch · Devoid · Period Basis</div></td>
+              <td>Deep Amarr / Catch border space</td>
+              <td><span class="dmg-pip dmg-em">EM</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-em">EM</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-em">EM</span> primary</td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Serpentis</div><div class="npc-region">Placid · Syndicate · Everyshore</div></td>
+              <td>Gallente / Fed space</td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span> primary</td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Mordu's Legion</div><div class="npc-region">Black Rise · Placid</div></td>
+              <td>Caldari / Gallente border</td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span> / <span class="dmg-pip dmg-em">EM</span></td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Rogue Drones</div><div class="npc-region">Vale of the Silent · Cobalt Edge · various</div></td>
+              <td>Drone regions, some missions</td>
+              <td><span class="dmg-pip dmg-all">All types</span> (EM + Explosive heavy)</td>
+              <td><span class="dmg-pip dmg-all">All types</span> (balance is best)</td>
+              <td><span class="dmg-pip dmg-em">EM</span> / <span class="dmg-pip dmg-th">Thermal</span></td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Amarr Empire</div><div class="npc-region">Faction Warfare / Storyline</div></td>
+              <td>Opposing FW or storyline missions</td>
+              <td><span class="dmg-pip dmg-em">EM</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-em">EM</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-em">EM</span> primary</td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Caldari State</div><div class="npc-region">Faction Warfare / Storyline</div></td>
+              <td>Opposing FW or storyline missions</td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span><span class="dmg-pip dmg-th">Thermal</span></td>
+              <td><span class="dmg-pip dmg-exp">Explosive</span> / <span class="dmg-pip dmg-em">EM</span></td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Gallente Federation</div><div class="npc-region">Faction Warfare / Storyline</div></td>
+              <td>Opposing FW or storyline missions</td>
+              <td><span class="dmg-pip dmg-th">Thermal</span><span class="dmg-pip dmg-kin">Kinetic</span></td>
+              <td><span class="dmg-pip dmg-th">Thermal</span><span class="dmg-pip dmg-kin">Kinetic</span></td>
+              <td><span class="dmg-pip dmg-kin">Kinetic</span> primary</td>
+            </tr>
+            <tr>
+              <td><div class="npc-faction">Minmatar Republic</div><div class="npc-region">Faction Warfare / Storyline</div></td>
+              <td>Opposing FW or storyline missions</td>
+              <td><span class="dmg-pip dmg-exp">Explosive</span><span class="dmg-pip dmg-kin">Kinetic</span></td>
+              <td><span class="dmg-pip dmg-exp">Explosive</span><span class="dmg-pip dmg-kin">Kinetic</span></td>
+              <td><span class="dmg-pip dmg-em">EM</span> primary</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="ia-tip" style="margin-top:12px;"><strong>Pro tip:</strong> Missiles and drones can freely switch between all four damage types, making them universally excellent for mission running. Turret users are locked to their weapon's damage profile — choose your ship and ammo before undocking.</div>
+      </div>
+
+      <!-- Tanking -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Tank Types</h3>
+        <p class="ia-p">Your tank determines how long you survive in a mission pocket. The goal is to stack resistance to the faction's specific damage types, not just raw HP. A 60,000 EHP shield with the right resists beats a 90,000 EHP buffer with the wrong ones.</p>
+
+        <h3 class="ia-h3">Shield Tank</h3>
+        <p class="ia-p">Uses mid slots for Shield Extenders, Hardeners, and Boost Amplifiers. Shields regenerate passively over time, making passive shield builds possible (Drake, Rattlesnake, Golem). Active shield tanking uses Shield Boosters powered by cap. Shields have higher natural resistance to EM than armor but weaker against Explosive — choose shield when facing Guristas, Serpentis, or Mordu.</p>
+
+        <h3 class="ia-h3">Armor Tank</h3>
+        <p class="ia-p">Uses low slots for Armor Plating, Armor Hardeners, and Armor Repairers. Armor has higher base HP and better natural resistance to Explosive, but repairs consume significant capacitor. Armor is preferred against EM/Thermal heavy factions (Blood Raiders, Sansha, Amarr) and is the go-to for Paladin and Kronos pilots. Combine an Armor Repairer with damage control and hardeners for a formidable active tank.</p>
+
+        <h3 class="ia-h3">Buffer vs. Active</h3>
+        <p class="ia-p">Buffer tanking stacks as much EHP as possible and relies on killing enemies faster than they kill you — great for blitzing. Active tanking uses repairers that continuously repair damage — better for sustained combat against high-DPS pockets, and essential for Marauder Bastion cycles. Most endgame mission ships use active armor or shield reps inside Bastion.</p>
+
+        <div class="ia-warn"><strong>Critical:</strong> Always use a Damage Control module. It provides resistance bonuses to shields, armor, and structure simultaneously and is the single best EHP module in the game slot for slot — no mission runner should undock without one.</div>
+      </div>
+
+      <!-- Ship Progression -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Ship Progression Path</h3>
+
+        <h3 class="ia-h3">Starting Out — L1 to L3</h3>
+        <div class="ship-grid">
+          <div class="ship-card">
+            <div class="ship-card-name">Drake</div>
+            <div class="ship-card-race">Caldari · Battle Cruiser</div>
+            <div class="ship-card-desc">The classic L3 mission ship. Passive shield tank with heavy missiles means you barely need to cap-manage. Deals Kinetic/Thermal damage. Fly it until you can sit in a battleship comfortably.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag best">Best L3</span>
+              <span class="ship-tag">Passive Tank</span>
+              <span class="ship-tag">Missiles</span>
+            </div>
+          </div>
+          <div class="ship-card">
+            <div class="ship-card-name">Myrmidon</div>
+            <div class="ship-card-race">Gallente · Battle Cruiser</div>
+            <div class="ship-card-desc">Drone battlecruiser with a flexible damage profile. Can change damage types by swapping drone types, which is useful when facing varied mission enemies. Active armor tank.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag">Flexible Damage</span>
+              <span class="ship-tag">Drones</span>
+              <span class="ship-tag">Active Armor</span>
+            </div>
+          </div>
+          <div class="ship-card">
+            <div class="ship-card-name">Harbinger</div>
+            <div class="ship-card-race">Amarr · Battle Cruiser</div>
+            <div class="ship-card-desc">Strong medium laser platform with excellent armor bonus. EM/Thermal damage profile. Strong but laser cap usage can be demanding — take Capacitor skills seriously before flying this.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag">Lasers</span>
+              <span class="ship-tag">EM/Thermal</span>
+              <span class="ship-tag">Cap Hungry</span>
+            </div>
+          </div>
+          <div class="ship-card">
+            <div class="ship-card-name">Hurricane</div>
+            <div class="ship-card-race">Minmatar · Battle Cruiser</div>
+            <div class="ship-card-desc">Fast, hard-hitting autocannon platform with flexible damage via ammo choice. Projectiles use no cap, making it very forgiving to fly. Solid choice for Angel Cartel regions.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag">Flexible Damage</span>
+              <span class="ship-tag">Projectiles</span>
+              <span class="ship-tag">Cap-Free</span>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="ia-h3">L4 Battleship Tier</h3>
+        <div class="ship-grid">
+          <div class="ship-card">
+            <div class="ship-card-name">Raven / Raven Navy Issue</div>
+            <div class="ship-card-race">Caldari · Battleship</div>
+            <div class="ship-card-desc">The most accessible L4 starter. Cruise missiles with good range let you kill enemies at a comfortable distance. Shield tank is straightforward. The Navy Issue improves damage and agility meaningfully.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag best">Great Starter</span>
+              <span class="ship-tag">Missiles</span>
+              <span class="ship-tag">Shield</span>
+            </div>
+          </div>
+          <div class="ship-card">
+            <div class="ship-card-name">Dominix</div>
+            <div class="ship-card-race">Gallente · Battleship</div>
+            <div class="ship-card-desc">The premier drone battleship. Send out five heavies and let them do the work while you maintain range. Flexible damage is its biggest strength — switch between EM, Thermal, Kinetic, or Explosive by changing drone types.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag best">Universal Damage</span>
+              <span class="ship-tag">Drones</span>
+              <span class="ship-tag">Active Armor</span>
+            </div>
+          </div>
+          <div class="ship-card">
+            <div class="ship-card-name">Machariel</div>
+            <div class="ship-card-race">Angel Cartel · Pirate BS</div>
+            <div class="ship-card-desc">Fast, agile, and hard-hitting with 800mm autocannons or artillery. Beloved by blitzers for its warp speed and massive alpha. Best in Angel-rat regions where you can leverage its Explosive damage. Expensive but elite.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag best">Blitz King</span>
+              <span class="ship-tag">Fast</span>
+              <span class="ship-tag">Explosive</span>
+              <span class="ship-tag warn">Pricey</span>
+            </div>
+          </div>
+          <div class="ship-card">
+            <div class="ship-card-name">Rattlesnake</div>
+            <div class="ship-card-race">Guristas · Pirate BS</div>
+            <div class="ship-card-desc">The best non-Marauder mission ship in the game. Combines heavy missiles with a large drone bay, a massive passive shield tank, and drone/missile bonuses. Can passively tank most L4 pockets without any active reps. Expensive, but worth it.</div>
+            <div class="ship-card-tags">
+              <span class="ship-tag best">Best Non-Marauder</span>
+              <span class="ship-tag">Passive Tank</span>
+              <span class="ship-tag">Drones + Missiles</span>
+              <span class="ship-tag warn">Expensive</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Marauders -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Marauders — The Endgame</h3>
+        <p class="ia-p">Marauders are T2 battleships built specifically for high-end PvE. Their defining feature is the <strong>Bastion Module</strong>: an active high-slot module you cycle to lock in a defensive/offensive mode. While Bastion is active you gain massive resistance bonuses, extended weapon range and rate of fire, and a +60% bonus to local armor repair and shield boost amounts (with a 20% reduction in repper cycle time and cap cost). The tradeoff: you cannot receive remote repairs or remote capacitor transfers while in Bastion.</p>
+        <p class="ia-p">As of the Legion Major Update (September 2025), the repair bonus was reduced from 100% to 60% but compensated with the repper efficiency bonus, keeping sustained tank strong. Marauders also <strong>lost their Micro Jump Drive cooldown reduction bonus</strong> in that update — repositioning between pockets now takes the standard 60-second MJD spool time rather than the old accelerated window. They also have built-in Tractor Beam and Salvager utilities. T2 modules are sufficient to handle any L4 mission.</p>
+        <div class="ia-tip"><strong>Bastion Tip:</strong> Activate Bastion as soon as you're taking fire in a pocket and keep it cycling. Since the MJD cooldown bonus is gone, plan your warp-in position carefully and use the MJD to reach a good range on first land — you can still reposition between cycles but it takes a full minute each time.</div>
+
+        <div class="mrd-grid" style="margin-top:16px;">
+          <div class="mrd-card amarr">
+            <div class="mrd-name">Paladin</div>
+            <div class="mrd-class mrd-accent">Amarr · Laser Platform</div>
+            <div class="mrd-row"><span class="mrd-label">Damage type</span><span class="mrd-val"><span class="dmg-pip dmg-em">EM</span> <span class="dmg-pip dmg-th">Thermal</span></span></div>
+            <div class="mrd-row"><span class="mrd-label">Tank type</span><span class="mrd-val">Active Armor</span></div>
+            <div class="mrd-row"><span class="mrd-label">Weapon system</span><span class="mrd-val">Mega Pulse Lasers (T2)</span></div>
+            <div class="mrd-row"><span class="mrd-label">Best against</span><span class="mrd-val">Blood Raiders · Sansha · Amarr</span></div>
+            <div class="mrd-desc">The classic mission Marauder. Lasers cannot change damage type but can instantly swap ammo for range — close-range Conflagration for melting battleships, long-range Aurora for sniping frigates. Excellent perma-rep armor tank. Capacitor management is key; use Cap Boosters if needed.</div>
+          </div>
+          <div class="mrd-card caldari">
+            <div class="mrd-name">Golem</div>
+            <div class="mrd-class mrd-accent">Caldari · Missile Platform</div>
+            <div class="mrd-row"><span class="mrd-label">Damage type</span><span class="mrd-val">All types (ammo choice)</span></div>
+            <div class="mrd-row"><span class="mrd-label">Tank type</span><span class="mrd-val">Active Shield</span></div>
+            <div class="mrd-row"><span class="mrd-label">Weapon system</span><span class="mrd-val">Torpedo / Cruise Missiles</span></div>
+            <div class="mrd-row"><span class="mrd-label">Best against</span><span class="mrd-val">Any faction (flex damage)</span></div>
+            <div class="mrd-desc">The most relaxed Marauder to fly. Missiles hit everything regardless of range, speed or signature, and you can switch ammo to any damage type for any faction. Bastion combines with an active shield booster for a tank that trivially handles any L4. Recommended for pilots learning Marauder gameplay.</div>
+          </div>
+          <div class="mrd-card minmatar">
+            <div class="mrd-name">Vargur</div>
+            <div class="mrd-class mrd-accent">Minmatar · Projectile Platform</div>
+            <div class="mrd-row"><span class="mrd-label">Damage type</span><span class="mrd-val">All types (ammo choice)</span></div>
+            <div class="mrd-row"><span class="mrd-label">Tank type</span><span class="mrd-val">Active Shield</span></div>
+            <div class="mrd-row"><span class="mrd-label">Weapon system</span><span class="mrd-val">800mm Autocannons (T2)</span></div>
+            <div class="mrd-row"><span class="mrd-label">Best against</span><span class="mrd-val">Angel Cartel · Serpentis · any</span></div>
+            <div class="mrd-desc">The "Goldilocks" Marauder — highest applied DPS of the four, flexible damage types via ammo selection, cap-free weapons (projectiles use no capacitor), and excellent range out to 40km with good skills. The best choice if you plan to mission across multiple pirate regions.</div>
+          </div>
+          <div class="mrd-card gallente">
+            <div class="mrd-name">Kronos</div>
+            <div class="mrd-class mrd-accent">Gallente · Hybrid + Drones</div>
+            <div class="mrd-row"><span class="mrd-label">Damage type</span><span class="mrd-val"><span class="dmg-pip dmg-kin">Kinetic</span> <span class="dmg-pip dmg-th">Thermal</span></span></div>
+            <div class="mrd-row"><span class="mrd-label">Tank type</span><span class="mrd-val">Active Armor</span></div>
+            <div class="mrd-row"><span class="mrd-label">Weapon system</span><span class="mrd-val">Railguns or Blasters + Drones</span></div>
+            <div class="mrd-row"><span class="mrd-label">Best against</span><span class="mrd-val">Guristas · Serpentis</span></div>
+            <div class="mrd-desc">The drone Marauder, combining large hybrid turrets with a significant drone bay. Blaster fits deal massive short-range DPS but require getting close. Rail fits give range but lower DPS. Drones add flexible supplemental damage. Good for pilots already comfortable with Gallente ships.</div>
+          </div>
+          <div class="mrd-card" style="border:1px solid rgba(180,120,255,.25); grid-column:1/-1;">
+            <div class="mrd-name">Babaroga <span style="font-size:11px;font-weight:400;color:rgba(180,150,255,.6);">— New (Legion 2025)</span></div>
+            <div class="mrd-class" style="color:#c084fc;">Triglavian Collective · Entropic Disintegrator</div>
+            <div style="display:flex;flex-wrap:wrap;gap:24px;margin-top:6px;">
+              <div>
+                <div class="mrd-row"><span class="mrd-label">Damage type</span><span class="mrd-val"><span class="dmg-pip dmg-em">EM</span> <span class="dmg-pip dmg-th">Thermal</span> (ramps)</span></div>
+                <div class="mrd-row"><span class="mrd-label">Tank type</span><span class="mrd-val">Active Armor</span></div>
+                <div class="mrd-row"><span class="mrd-label">Weapon system</span><span class="mrd-val">Supratidal Entropic Disintegrator</span></div>
+                <div class="mrd-row"><span class="mrd-label">Best against</span><span class="mrd-val">Drifters · Sleepless Guardians</span></div>
+              </div>
+              <div style="flex:1;min-width:200px;">
+                <div class="mrd-desc">The 5th Marauder, introduced with the Legion expansion. Its Entropic Disintegrator takes 2–3 minutes to ramp to maximum DPS, which is a significant disadvantage in mission running where pockets are cleared before full ramp is reached. Community consensus: it is <strong>not more efficient than empire Marauders for standard L4 missions</strong>. Excels at extended fights against Drifters and Sleepless Guardians where ramp time pays off. Interesting, but not the tool for grinding security missions.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Income Breakdown -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Income Breakdown</h3>
+        <p class="ia-p">Mission income comes from four stacking sources. Understanding the ratio between them lets you choose the right strategy for your goals.</p>
+
+        <table class="income-table">
+          <thead>
+            <tr>
+              <th>Income Source</th>
+              <th>Typical Amount (L4)</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Mission Reward + Time Bonus</td>
+              <td><span class="isk-val">3–15M ISK</span></td>
+              <td>Flat cash reward. Complete fast for the time bonus — usually doubles the reward.</td>
+            </tr>
+            <tr>
+              <td>Bounties</td>
+              <td><span class="isk-val">5–20M ISK</span></td>
+              <td>Paid automatically per kill. Varies heavily by mission.</td>
+            </tr>
+            <tr>
+              <td>Loot &amp; Salvage</td>
+              <td><span class="isk-val">5–25M ISK</span></td>
+              <td>Full-clear only. Can ~double per-mission income. Skip when blitzing.</td>
+            </tr>
+            <tr>
+              <td>Loyalty Points (LP)</td>
+              <td><span class="isk-val">30–150M ISK value</span></td>
+              <td>The biggest earner. Value depends heavily on faction — Sisters of EVE LP is worth 2-5× that of generic empire factions.</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3 class="ia-h3">ISK/hr Benchmarks</h3>
+        <table class="income-table" style="margin-top:8px;">
+          <thead>
+            <tr><th>Setup</th><th>Est. ISK/hr</th><th>Notes</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>T1 Battleship (full clear)</td><td><span class="isk-val">50–80M</span></td><td>Good starting point. Rattlesnake is the best of this tier.</td></tr>
+            <tr><td>T1 Battleship (blitz)</td><td><span class="isk-val">60–100M</span></td><td>Requires mission knowledge to know which ships to kill.</td></tr>
+            <tr><td>Marauder (full clear)</td><td><span class="isk-val">120–180M</span></td><td>Built-in salvager makes full-clear fast.</td></tr>
+            <tr><td>Marauder (blitz)</td><td><span class="isk-val">160–220M</span></td><td>Strong ISK/hr, majority from LP.</td></tr>
+            <tr><td>Marauder + Burner Alts</td><td><span class="isk-val">200–300M</span></td><td>Top-tier high-sec income. Requires dedicated burner ship alts and mission knowledge.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- LP Store -->
+      <div class="ia-section">
+        <h3 class="ia-h2">LP Store Strategy</h3>
+        <p class="ia-p">Not all LP is created equal. The ISK value of Loyalty Points varies wildly between corporations. As a general rule, target at least <strong>1,000 ISK per LP</strong> as a floor — elite choices can reach 3,000–6,000 ISK/LP.</p>
+
+        <h3 class="ia-h3">High-Value Factions to Grind</h3>
+        <ul class="tip-list">
+          <li><strong>Sisters of EVE (SoE):</strong> The gold standard. Their LP store sells the Astero, Stratios, and Nestor — beloved exploration and combat ships that hold strong market demand. Aim for 3,000–5,000+ ISK/LP. The catch: SoE agents are spread across low-sec and unusual locations.</li>
+          <li><strong>Caldari Navy:</strong> Excellent LP store with Caldari Navy Scourge Heavy Missiles and Caldari Navy ships (Raven Navy Issue, etc.). Strong and accessible from Caldari high-sec. Typically yields 1,500–3,000 ISK/LP.</li>
+          <li><strong>Ammatar Mandate / Kador / Border factions:</strong> Unique implants and faction modules that have niche but consistent market demand. Research specific items on the Fuzzwork LP Store tool before committing.</li>
+          <li><strong>Generic empire factions (Federal Defense Union, State Protectorate, etc.):</strong> Faction warfare LP stores. FW missions give LP at 3–5× the rate of security missions with lower standings requirements — but they are PvP-exposed content in low-sec.</li>
+        </ul>
+        <div class="ia-tip"><strong>Tool:</strong> Use <strong>fuzzwork.co.uk/lpstore</strong> to check the current ISK/LP value of any faction store before grinding. The market shifts constantly — LP values change week to week based on demand for specific items.</div>
+        <div class="ia-tip"><strong>Skill Bonus:</strong> Each level of the <strong>Security Connections</strong> skill adds +10% LP per mission from Security division agents (to a max of +50% at level V). Note: the plain "Connections" skill is a separate skill that improves effective standing, not LP — make sure you're training the right one.</div>
+      </div>
+
+      <!-- Blitzing vs Full Clear -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Blitzing vs. Full Clear</h3>
+        <p class="ia-p">These are two fundamentally different playstyles with different ISK sources, skill floors, and experiences.</p>
+        <div class="playstyle-grid">
+          <div class="ps-card">
+            <div class="ps-title">⚡ Blitzing</div>
+            <div class="ps-desc">Kill only the enemy ships required to trigger mission completion, warp out immediately, turn in the mission, and accept the next one as fast as possible. The majority of income comes from LP — you leave most bounties and all salvage on the table.</div>
+            <div class="ps-pro">✔ Highest ISK/hr ceiling (200–300M+)</div>
+            <div class="ps-pro">✔ Less time per mission pocket</div>
+            <div class="ps-pro">✔ Far more missions completed per session</div>
+            <div class="ps-con">✗ Requires knowing mission trigger NPCs</div>
+            <div class="ps-con">✗ Less satisfying per-mission (no full clear)</div>
+            <div class="ps-con">✗ Standing loss risk from declining bad missions</div>
+          </div>
+          <div class="ps-card">
+            <div class="ps-title">⚔ Full Clear</div>
+            <div class="ps-desc">Kill every NPC in the pocket, loot all wrecks, salvage with a Noctis or your Marauder's built-in salvager, collect all rewards. More ISK per individual mission, but fewer missions per hour.</div>
+            <div class="ps-pro">✔ More ISK per mission (loot + salvage)</div>
+            <div class="ps-pro">✔ Satisfying, thorough playstyle</div>
+            <div class="ps-pro">✔ Good for learning mission layouts</div>
+            <div class="ps-con">✗ Lower ISK/hr ceiling (~120–180M)</div>
+            <div class="ps-con">✗ Time spent salvaging can feel slow</div>
+          </div>
+        </div>
+        <div class="ia-tip" style="margin-top:12px;"><strong>Hybrid approach:</strong> Many veteran mission runners blitz the mission pocket, then drop a can/bookmark and return with a dedicated <strong>Noctis</strong> salvager alt to clean up the wrecks in the background. This captures most of the ISK/hr from blitzing while recovering a significant portion of loot/salvage income.</div>
+      </div>
+
+      <!-- Standings -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Standings &amp; Agent Access</h3>
+        <p class="ia-p">Your standing determines which level of agent will give you missions. The game checks your <em>effective standing</em> — the highest of your standing with the specific agent, their corporation, or their faction. All three are checked against the same threshold, so reaching 5.0 with a corporation is just as valid as 5.0 with the broader faction.</p>
+
+        <table class="npc-table">
+          <thead><tr><th>Agent Level</th><th>Effective Standing Required</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td>Level 1</td><td><span style="color:#22c55e;">0.0 (Default)</span></td><td>Available to all pilots from day one.</td></tr>
+            <tr><td>Level 2</td><td><span style="color:#22c55e;">1.0+</span></td><td>Easy to reach after a handful of L1 missions.</td></tr>
+            <tr><td>Level 3</td><td><span style="color:#f59e0b;">3.0+</span></td><td>A few days of consistent L2 running.</td></tr>
+            <tr><td>Level 4</td><td><span style="color:#ef4444;">5.0+</span></td><td>The main grind. Takes weeks of dedicated missioning.</td></tr>
+            <tr><td>Level 5</td><td><span style="color:#ef4444;">7.0+</span></td><td>Low-sec content. Rarely the goal for solo high-sec runners.</td></tr>
+          </tbody>
+        </table>
+
+        <h3 class="ia-h3">Storyline Missions</h3>
+        <p class="ia-p">Every 16th mission you complete triggers a Storyline mission from a special agent. Storyline missions give <strong>much larger faction standing gains</strong> than regular missions — they are the primary driver of faction standing improvement. Never decline or skip a storyline mission.</p>
+
+        <h3 class="ia-h3">Declining Missions</h3>
+        <p class="ia-p">You can decline one mission per agent every 4 hours without penalty. Declining more often causes standing loss. If you want to decline frequently (to fish for quick blitzable missions), keep your corp standing well above 5.0 as a buffer. The skill <strong>Diplomacy</strong> raises your effective faction standing, helping you access agents even when your raw faction standing has dipped.</p>
+        <div class="ia-warn"><strong>Watch out:</strong> Declining or failing missions against an NPC corporation (e.g., running Caldari missions) also slightly reduces your standing with the opposing faction's enemies (e.g., Gallente Federation). In most cases this is minor, but it can matter for market taxes and access to other agents over time.</div>
+      </div>
+
+      <!-- Pro Tips -->
+      <div class="ia-section">
+        <h3 class="ia-h2">Pro Tips</h3>
+        <ul class="tip-list">
+          <li>Always check the mission details for the <strong>enemy faction name</strong> before undocking. Swap your hardeners and ammo to match. This takes 30 seconds and can halve your completion time.</li>
+          <li>Use <strong>EVE Ref</strong> (everef.net) or <strong>Pyfa</strong> for fitting validation before investing in expensive modules. Theoretical EHP and DPS numbers matter — flying blind is expensive.</li>
+          <li>The <strong>Micro Jump Drive</strong> is not optional on a Marauder. It lets you reposition every 60 seconds between Bastion cycles to new optimal range, turning slow battleship travel into non-issue.</li>
+          <li>Use the in-game <strong>Mission Journal</strong> (alt+J) to track your current standings, available storyline missions, and pending rewards from missions already completed.</li>
+          <li>When you reach 5.0 standing with a corporation, consider doing a <strong>Calibration Agent</strong> (Data Center) missions to boost faction standing directly — this can unlock other corps within the faction faster.</li>
+          <li>Keep your <strong>Cargo Capacity</strong> skill and a Mobile Tractor Unit (MTU) in your cargo. Drop the MTU at range when you land in a pocket — it pulls all wrecks to you automatically, saving enormous time when full-clearing.</li>
+          <li>The <strong>Fuzzwork Missioning page</strong> (fuzzwork.co.uk) contains exact mission objective data including trigger ships, warp-in distances, and alternate pockets. Bookmark it — it's indispensable for blitzing.</li>
+          <li>If you plan to run missions long-term, train <strong>Social V</strong>, <strong>Security Connections V</strong>, and <strong>Diplomacy IV</strong> early. The standing and LP bonuses compound over thousands of missions. Do not confuse "Connections" (standing modifier) with "Security Connections" (LP bonus) — they are different skills.</li>
+        </ul>
+      </div>
+
+    </div><!-- /ia-body -->
+    </div><!-- /pane-missions-handbook -->
+
+    <!-- ════════════════════════════════════════════════════════
+         COMING SOON panes
+         ════════════════════════════════════════════════════════ -->
+    <div class="ia-pane" id="pane-burner-missions">
+      <div class="ia-body"><div class="ia-soon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <div class="ia-soon-title">Burner Mission Guide</div>
+        <div>Coming soon.</div>
+      </div></div>
+    </div>
+    <div class="ia-pane" id="pane-standings-guide">
+      <div class="ia-body"><div class="ia-soon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <div class="ia-soon-title">Standings &amp; LP Stores</div>
+        <div>Coming soon.</div>
+      </div></div>
+    </div>
+    <div class="ia-pane" id="pane-fitting-101">
+      <div class="ia-body"><div class="ia-soon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <div class="ia-soon-title">Fitting 101</div>
+        <div>Coming soon.</div>
+      </div></div>
+    </div>
+    <div class="ia-pane" id="pane-marauder-deep">
+      <div class="ia-body"><div class="ia-soon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <div class="ia-soon-title">Marauder Deep Dive</div>
+        <div>Coming soon.</div>
+      </div></div>
+    </div>
+    <div class="ia-pane" id="pane-wh-101">
+      <div class="ia-body"><div class="ia-soon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <div class="ia-soon-title">Wormhole Basics</div>
+        <div>Coming soon.</div>
+      </div></div>
+    </div>
+    <div class="ia-pane" id="pane-wh-sites">
+      <div class="ia-body"><div class="ia-soon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <div class="ia-soon-title">WH Site Catalog</div>
+        <div>Coming soon.</div>
+      </div></div>
+    </div>
+    <div class="ia-pane" id="pane-industry-101">
+      <div class="ia-body"><div class="ia-soon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        <div class="ia-soon-title">Industry Primer</div>
+        <div>Coming soon.</div>
+      </div></div>
+    </div>
+
+  </div><!-- /intelContent -->
+</div><!-- /intelRoot -->
+
+<script>
+function showArticle(key, el) {
+  // Hide all panes
+  document.querySelectorAll('.ia-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.is-article').forEach(a => a.classList.remove('active'));
+  // Show target
+  var pane = document.getElementById('pane-' + key);
+  if (pane) pane.classList.add('active');
+  if (el) el.classList.add('active');
+  // Scroll content to top
+  document.getElementById('intelContent').scrollTop = 0;
+}
+
+function intelFilter(q) {
+  q = q.toLowerCase().trim();
+  document.querySelectorAll('.is-article').forEach(function(a) {
+    var text = a.textContent.toLowerCase();
+    a.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}
