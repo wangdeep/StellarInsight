@@ -303,34 +303,38 @@ def find_route(
     except Exception as e:
         return {"error": f"Gate graph error: {e}"}
 
-    # Chain connections (name-based, need to resolve to IDs or use pseudo-IDs)
-    chain_sys_by_name: Dict[str, int] = {}  # chain name -> pseudo-id
-    CHAIN_BASE = 9_000_000_000  # pseudo-IDs for chain WH systems
-    chain_id_counter = CHAIN_BASE
-
     if use_chain:
-        state = chain_state()
-        # Map chain system IDs to real EVE IDs where possible
-        chain_real: Dict[int, int] = {}  # chain_id -> real_eve_id
-        for s in state["systems"]:
-            real_id = name_to_id.get(s["name"].lower())
-            if real_id:
-                chain_real[s["id"]] = real_id
-                chain_sys_by_name[s["name"].lower()] = real_id
-            else:
-                # WH system — assign pseudo-id
-                chain_id_counter += 1
-                chain_real[s["id"]] = chain_id_counter
-                chain_sys_by_name[s["name"].lower()] = chain_id_counter
-                id_to_name[chain_id_counter] = s["name"]
+        # Read from the Navigator's map tables (map_systems / map_connections)
+        # which store real EVE solarSystemIDs — no pseudo-ID mapping required.
+        try:
+            from .memory_sqlite import MemoryStore
+            _store = MemoryStore(_db_path())
+            _seen_chain: set = set()
+            for _mid in ("corp", "personal"):
+                # Ensure WH systems that may not appear in SDE's k-space listing
+                # are present in our lookup dicts.
+                for _s in _store.map_get_systems(_mid):
+                    _sid = _s["system_id"]
+                    if _sid and _sid not in id_to_name:
+                        id_to_name[_sid] = _s["system_name"]
+                        id_to_sec[_sid]  = _s.get("sec_status") or 0.0
 
-        for c in state["connections"]:
-            if c["eol"] == "eol" or c["mass"] == "crit":
-                continue  # Skip dangerous connections in routing
-            fid = chain_real.get(c["from_id"])
-            tid = chain_real.get(c["to_id"])
-            if fid and tid:
-                _add_edge(fid, tid, "wormhole")
+                for _c in _store.map_get_connections(_mid):
+                    _ms = (_c.get("mass_status") or "").lower()
+                    _ts = (_c.get("time_status") or "").lower()
+                    if _ms == "crit" or _ts == "eol":
+                        continue  # skip dangerous / end-of-life connections
+                    _fid = _c.get("from_sys_id")
+                    _tid = _c.get("to_sys_id")
+                    if not _fid or not _tid:
+                        continue
+                    _key = (min(_fid, _tid), max(_fid, _tid))
+                    if _key in _seen_chain:
+                        continue
+                    _seen_chain.add(_key)
+                    _add_edge(_fid, _tid, "wormhole")
+        except Exception as _e:
+            logger.warning("chain use_chain error: %s", _e)
 
     # Thera connections
     if use_thera and thera_connections:
