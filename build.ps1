@@ -1,17 +1,29 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Builds StellarInsight.exe and the Windows installer in one shot.
+    Builds StellarInsight.exe, the installer, and optionally publishes a GitHub Release.
 
-.DESCRIPTION
-    1. Checks prerequisites (Python, Inno Setup)
-    2. Installs / upgrades all Python dependencies
-    3. Runs PyInstaller  ->  dist\StellarInsight.exe
-    4. Runs Inno Setup   ->  installer\StellarInsight_Setup.exe
+.PARAMETER Release
+    After building, bump the version, commit, tag, and publish to GitHub Releases.
+
+.PARAMETER Version
+    Explicit version string to use when releasing (e.g. "1.2.0").
+    If omitted the patch number is auto-incremented.
 
 .EXAMPLE
+    # Normal build only
     powershell -ExecutionPolicy Bypass -File .\build.ps1
+
+    # Build + publish release (auto-bumps patch: 1.0.0 -> 1.0.1)
+    powershell -ExecutionPolicy Bypass -File .\build.ps1 -Release
+
+    # Build + publish release with explicit version
+    powershell -ExecutionPolicy Bypass -File .\build.ps1 -Release -Version "1.1.0"
 #>
+param(
+    [switch]$Release,
+    [string]$Version = ""
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -34,6 +46,36 @@ Head "Stellar Insight -- Windows Build"
 Info "Working directory: $PSScriptRoot"
 
 # ---------------------------------------------------------------------------
+# Version management
+# ---------------------------------------------------------------------------
+$versionFile = Join-Path $PSScriptRoot "VERSION"
+$currentVersion = (Get-Content $versionFile -Raw).Trim()
+
+if ($Release) {
+    if ($Version -ne "") {
+        $newVersion = $Version.Trim()
+    } else {
+        # Auto-increment patch: 1.0.0 -> 1.0.1
+        $parts = $currentVersion.Split('.')
+        $parts[2] = [string]([int]$parts[2] + 1)
+        $newVersion = $parts -join '.'
+    }
+    Info "Version: $currentVersion  ->  $newVersion"
+    # Update VERSION file
+    Set-Content $versionFile $newVersion
+    # Update installer.iss
+    (Get-Content "installer.iss" -Raw) -replace '#define AppVersion\s+"[^"]+"', "#define AppVersion      `"$newVersion`"" |
+        Set-Content "installer.iss"
+    # Update app.py
+    (Get-Content "app.py" -Raw) -replace 'version="[0-9]+\.[0-9]+\.[0-9]+"', "version=`"$newVersion`"" |
+        Set-Content "app.py"
+    $currentVersion = $newVersion
+} else {
+    $newVersion = $currentVersion
+    Info "Version: $currentVersion  (use -Release to publish)"
+}
+
+# ---------------------------------------------------------------------------
 Head "Step 1 / 4 -- Checking Python"
 
 $py = $null
@@ -42,19 +84,14 @@ foreach ($candidate in @("python", "python3", "py")) {
         $ver = & $candidate --version 2>&1
         if ($ver -match "Python 3\.(\d+)") {
             $minor = [int]$Matches[1]
-            if ($minor -lt 10) {
-                Warn "Python 3.$minor found -- 3.10+ recommended"
-                continue
-            }
+            if ($minor -lt 10) { Warn "Python 3.$minor found -- 3.10+ recommended"; continue }
             $py = $candidate
             Ok "$ver  ($candidate)"
             break
         }
     } catch { }
 }
-if (-not $py) {
-    Fail "Python 3.10+ not found. Install from https://python.org and add to PATH."
-}
+if (-not $py) { Fail "Python 3.10+ not found. Install from https://python.org and add to PATH." }
 
 # ---------------------------------------------------------------------------
 Head "Step 2 / 4 -- Installing / upgrading dependencies"
@@ -89,7 +126,7 @@ Ok "All dependencies installed"
 Head "Step 3 / 4 -- Building executable with PyInstaller"
 
 if (-not (Test-Path "xylon_eve.spec")) {
-    Fail "xylon_eve.spec not found. Run this script from inside the xylon_eve\ folder."
+    Fail "xylon_eve.spec not found. Run this script from inside the StellarInsight\ folder."
 }
 
 foreach ($dir in @("build", "dist")) {
@@ -104,9 +141,7 @@ Info "Running PyInstaller (this takes a minute)..."
 if ($LASTEXITCODE -ne 0) { Fail "PyInstaller failed -- see output above." }
 
 $exe = Join-Path $PSScriptRoot "dist\StellarInsight.exe"
-if (-not (Test-Path $exe)) {
-    Fail "Expected dist\StellarInsight.exe was not produced."
-}
+if (-not (Test-Path $exe)) { Fail "Expected dist\StellarInsight.exe was not produced." }
 
 $sizeMB = [math]::Round((Get-Item $exe).Length / 1MB, 1)
 Ok "dist\StellarInsight.exe  ($($sizeMB) MB)"
@@ -115,60 +150,85 @@ Ok "dist\StellarInsight.exe  ($($sizeMB) MB)"
 Head "Step 4 / 4 -- Building installer with Inno Setup"
 
 $iscc = $null
-$isccCandidates = @(
+foreach ($c in @(
     "iscc",
     "${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe",
     "${env:ProgramFiles}\Inno Setup 6\iscc.exe",
     "${env:ProgramFiles(x86)}\Inno Setup 5\iscc.exe",
     "${env:ProgramFiles}\Inno Setup 5\iscc.exe"
-)
-
-foreach ($c in $isccCandidates) {
-    if (Test-Path $c -ErrorAction SilentlyContinue) {
-        $iscc = $c
-        break
-    }
-    try {
-        $null = & $c /? 2>&1
-        if ($LASTEXITCODE -eq 0) { $iscc = $c; break }
-    } catch { }
+)) {
+    if (Test-Path $c -ErrorAction SilentlyContinue) { $iscc = $c; break }
+    try { $null = & $c /? 2>&1; if ($LASTEXITCODE -eq 0) { $iscc = $c; break } } catch { }
 }
 
+$setup = $null
 if (-not $iscc) {
     Warn "Inno Setup not found -- skipping installer step."
-    Warn "To build the installer:"
-    Warn "  1. Install Inno Setup 6: https://jrsoftware.org/isdl.php"
-    Warn "  2. Run this script again, or run:  iscc installer.iss"
+    Warn "Install from https://jrsoftware.org/isdl.php then rebuild."
 } else {
-    if (-not (Test-Path "installer.iss")) {
-        Fail "installer.iss not found."
-    }
-
-    if (-not (Test-Path "installer")) {
-        New-Item -ItemType Directory "installer" | Out-Null
-    }
-
+    if (-not (Test-Path "installer")) { New-Item -ItemType Directory "installer" | Out-Null }
     Info "Running Inno Setup compiler..."
     & $iscc installer.iss
     if ($LASTEXITCODE -ne 0) { Fail "Inno Setup failed -- see output above." }
-
     $setup = Join-Path $PSScriptRoot "installer\StellarInsight_Setup.exe"
-    if (-not (Test-Path $setup)) {
-        Fail "Expected installer\StellarInsight_Setup.exe was not produced."
-    }
-
+    if (-not (Test-Path $setup)) { Fail "Expected installer\StellarInsight_Setup.exe was not produced." }
     $sizeMB2 = [math]::Round((Get-Item $setup).Length / 1MB, 1)
     Ok "installer\StellarInsight_Setup.exe  ($($sizeMB2) MB)"
 }
 
 # ---------------------------------------------------------------------------
+# GitHub Release (only when -Release flag is set)
+# ---------------------------------------------------------------------------
+if ($Release) {
+    Head "Step 5 / 5 -- Publishing GitHub Release v$newVersion"
+
+    # Check gh CLI is available
+    $gh = $null
+    try { $null = & gh --version 2>&1; $gh = "gh" } catch { }
+    if (-not $gh) { Fail "GitHub CLI (gh) not found. Install from https://cli.github.com then run: gh auth login" }
+
+    if (-not $setup) { Fail "Installer was not built -- cannot publish release without it." }
+
+    # Commit version bumps
+    Info "Committing version bump..."
+    & git add VERSION installer.iss app.py
+    & git commit -m "chore: bump version to $newVersion"
+    if ($LASTEXITCODE -ne 0) { Warn "Git commit failed -- maybe nothing changed?" }
+
+    # Tag
+    Info "Tagging v$newVersion..."
+    & git tag -a "v$newVersion" -m "Release v$newVersion"
+    if ($LASTEXITCODE -ne 0) { Fail "Git tag failed." }
+
+    # Push commit + tag
+    Info "Pushing to GitHub..."
+    & git push
+    & git push --tags
+    if ($LASTEXITCODE -ne 0) { Fail "Git push failed." }
+
+    # Create GitHub Release and upload installer
+    Info "Creating GitHub Release..."
+    & gh release create "v$newVersion" $setup `
+        --title "Stellar Insight v$newVersion" `
+        --notes "## Stellar Insight v$newVersion`n`nDownload and run ``StellarInsight_Setup.exe`` to install or update." `
+        --latest
+    if ($LASTEXITCODE -ne 0) { Fail "GitHub release creation failed." }
+
+    Ok "GitHub Release v$newVersion published!"
+    Info "https://github.com/wangdeep/StellarInsight/releases/tag/v$newVersion"
+}
+
+# ---------------------------------------------------------------------------
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Green
-Write-Host "  Build complete!" -ForegroundColor Green
+Write-Host "  Build complete!  v$newVersion" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Standalone exe  ->  dist\StellarInsight.exe" -ForegroundColor White
-if ($iscc) {
+if ($setup) {
     Write-Host "  Installer       ->  installer\StellarInsight_Setup.exe" -ForegroundColor White
+}
+if ($Release) {
+    Write-Host "  GitHub Release  ->  https://github.com/wangdeep/StellarInsight/releases" -ForegroundColor White
 }
 Write-Host "========================================================" -ForegroundColor Green
 Write-Host ""

@@ -497,6 +497,72 @@ def create_app() -> FastAPI:
     def health():
         return {"ok": True, "ts": time.time()}
 
+    # ── Update check ─────────────────────────────────────────────────────────────
+
+    @app.get(f"{API_PREFIX}/update/check")
+    async def update_check():
+        """
+        Poll GitHub Releases for the latest version and compare against the
+        local VERSION file.  Returns:
+          { "update_available": bool, "latest": "x.y.z", "current": "x.y.z",
+            "release_url": "https://..." }
+        Cached for 1 hour so we only hit GitHub once per session on average.
+        """
+        CACHE_KEY = "__update_check__"
+        TTL = 3600  # 1 hour
+
+        cached = _resp_cache_get(CACHE_KEY, TTL)
+        if cached:
+            return cached
+
+        # Read the current version from the VERSION file next to app.py
+        try:
+            ver_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION")
+            current = open(ver_file).read().strip()
+        except Exception:
+            current = "0.0.0"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    "https://api.github.com/repos/wangdeep/StellarInsight/releases/latest",
+                    headers={"Accept": "application/vnd.github+json",
+                             "X-GitHub-Api-Version": "2022-11-28"},
+                    timeout=aiohttp.ClientTimeout(total=8),
+                ) as resp:
+                    if resp.status != 200:
+                        raise ValueError(f"GitHub API returned {resp.status}")
+                    data = await resp.json()
+
+            latest_tag = data.get("tag_name", "v0.0.0").lstrip("v")
+            release_url = data.get("html_url", "https://github.com/wangdeep/StellarInsight/releases")
+
+            def _ver_tuple(v: str):
+                try:
+                    return tuple(int(x) for x in v.split("."))
+                except Exception:
+                    return (0, 0, 0)
+
+            update_available = _ver_tuple(latest_tag) > _ver_tuple(current)
+            result = {
+                "update_available": update_available,
+                "latest": latest_tag,
+                "current": current,
+                "release_url": release_url,
+            }
+        except Exception as exc:
+            logger.warning("Update check failed: %s", exc)
+            result = {
+                "update_available": False,
+                "latest": current,
+                "current": current,
+                "release_url": "https://github.com/wangdeep/StellarInsight/releases",
+                "error": str(exc),
+            }
+
+        _resp_cache_set(CACHE_KEY, result, TTL)
+        return result
+
     # ── Root redirects ──────────────────────────────────────────────────────────
 
     @app.get("/", include_in_schema=False)

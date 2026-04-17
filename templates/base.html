@@ -446,6 +446,47 @@
       </div>
     </div>
 
+    <!-- Update available banner — hidden until update check returns true -->
+    <div id="update-banner" style="
+        display:none;
+        position:fixed;
+        top:calc(var(--ticker-h) + var(--topbar-h));
+        left:0; right:0;
+        z-index:4000;
+        background:linear-gradient(90deg,#1a3a1a,#0f2a0f);
+        border-bottom:1px solid rgba(50,200,80,.35);
+        color:#a8f0b0;
+        font-size:13px;
+        padding:7px 18px;
+        align-items:center;
+        gap:12px;
+      " role="status">
+      <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" style="flex-shrink:0;color:#4ade80"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm.75 4.25a.75.75 0 00-1.5 0v4.5l-1.72-1.72a.75.75 0 00-1.06 1.06l3 3a.75.75 0 001.06 0l3-3a.75.75 0 10-1.06-1.06L10.75 10.75v-4.5z"/></svg>
+      <span id="update-banner-text">A new version of Stellar Insight is available.</span>
+      <a id="update-banner-link" href="#" target="_blank" style="color:#4ade80;font-weight:700;text-decoration:underline;margin-left:4px;">Download</a>
+      <button onclick="document.getElementById('update-banner').style.display='none';" style="margin-left:auto;background:none;border:none;color:#a8f0b0;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;" aria-label="Dismiss">&times;</button>
+    </div>
+    <script>
+    (function(){
+      // Check for updates ~5 s after page load (avoid blocking startup)
+      setTimeout(function(){
+        fetch('/app/api/update/check')
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if(!d.update_available) return;
+            var banner = document.getElementById('update-banner');
+            var txt    = document.getElementById('update-banner-text');
+            var link   = document.getElementById('update-banner-link');
+            if(!banner) return;
+            txt.textContent = 'Stellar Insight v' + d.latest + ' is available  (you have v' + d.current + ')';
+            link.href = d.release_url || 'https://github.com/wangdeep/StellarInsight/releases';
+            banner.style.display = 'flex';
+          })
+          .catch(function(){/* silently ignore network errors */});
+      }, 5000);
+    })();
+    </script>
+
     <header class="topbar">
       <div class="topbar-inner" style="padding:0 18px; justify-content:flex-start; width:100%; box-sizing:border-box;">
         <button id="sidebar-toggle" aria-label="Toggle navigation" onclick="xylonSidebarToggle()">
