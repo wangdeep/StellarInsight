@@ -524,7 +524,12 @@ def create_app() -> FastAPI:
     def health():
         return {"ok": True, "ts": time.time()}
 
-    # ── Update check ─────────────────────────────────────────────────────────────
+    # ── Update check + in-app installer download ─────────────────────────────────
+
+    # Shared state for the background download thread.
+    # Keys: status ("idle"|"downloading"|"ready"|"launching"|"error"),
+    #       received (bytes), total (bytes), path (local .exe path), error (str)
+    _upd: dict = {"status": "idle", "received": 0, "total": 0, "path": None, "error": None}
 
     @app.get(f"{API_PREFIX}/update/check")
     async def update_check():
@@ -532,7 +537,7 @@ def create_app() -> FastAPI:
         Poll GitHub Releases for the latest version and compare against the
         local VERSION file.  Returns:
           { "update_available": bool, "latest": "x.y.z", "current": "x.y.z",
-            "release_url": "https://..." }
+            "release_url": "https://...", "installer_url": "https://..." }
         Cached for 1 hour so we only hit GitHub once per session on average.
         """
         CACHE_KEY = "__update_check__"
@@ -573,6 +578,14 @@ def create_app() -> FastAPI:
             latest_tag = data.get("tag_name", "v0.0.0").lstrip("v")
             release_url = data.get("html_url", "https://github.com/wangdeep/StellarInsight/releases")
 
+            # Pick the first .exe asset — that's the Inno Setup installer
+            installer_url = None
+            for asset in data.get("assets", []):
+                name = asset.get("name", "")
+                if name.lower().endswith(".exe"):
+                    installer_url = asset.get("browser_download_url")
+                    break
+
             def _ver_tuple(v: str):
                 try:
                     return tuple(int(x) for x in v.split("."))
@@ -585,6 +598,7 @@ def create_app() -> FastAPI:
                 "latest": latest_tag,
                 "current": current,
                 "release_url": release_url,
+                "installer_url": installer_url,
             }
         except Exception as exc:
             logger.warning("Update check failed: %s", exc)
@@ -593,11 +607,104 @@ def create_app() -> FastAPI:
                 "latest": current,
                 "current": current,
                 "release_url": "https://github.com/wangdeep/StellarInsight/releases",
+                "installer_url": None,
                 "error": str(exc),
             }
 
         _resp_cache_set(CACHE_KEY, result, TTL)
         return result
+
+    @app.get(f"{API_PREFIX}/update/progress")
+    def update_progress():
+        """Return the current download state so the frontend can poll it."""
+        return dict(_upd)
+
+    @app.post(f"{API_PREFIX}/update/start")
+    async def update_start():
+        """
+        Kick off a background download of the latest installer, then launch it.
+        Safe to call multiple times — ignored if already downloading.
+        """
+        import threading, tempfile, urllib.request
+
+        if _upd["status"] == "downloading":
+            return {"ok": True, "status": "already_downloading"}
+
+        # Re-use the cached update-check result to get the installer URL
+        cached = _resp_cache_get("__update_check__", 3600)
+        installer_url = cached.get("installer_url") if cached else None
+
+        if not installer_url:
+            # Cache may have expired — do a quick re-fetch synchronously
+            try:
+                async with aiohttp.ClientSession() as sess:
+                    async with sess.get(
+                        "https://api.github.com/repos/wangdeep/StellarInsight/releases/latest",
+                        headers={"Accept": "application/vnd.github+json",
+                                 "X-GitHub-Api-Version": "2022-11-28"},
+                        timeout=aiohttp.ClientTimeout(total=8),
+                    ) as resp:
+                        data = await resp.json()
+                for asset in data.get("assets", []):
+                    if asset.get("name", "").lower().endswith(".exe"):
+                        installer_url = asset["browser_download_url"]
+                        break
+            except Exception as exc:
+                return {"error": f"Could not fetch installer URL: {exc}"}
+
+        if not installer_url:
+            return {"error": "No installer asset found in latest release"}
+
+        # Reset state and start the background thread
+        _upd.update({"status": "downloading", "received": 0, "total": 0,
+                     "path": None, "error": None})
+
+        def _download_and_run():
+            import sys, subprocess
+            try:
+                dest = os.path.join(tempfile.gettempdir(), "StellarInsight_Update.exe")
+
+                # Stream download with progress tracking
+                req = urllib.request.Request(
+                    installer_url,
+                    headers={"User-Agent": "StellarInsight-Updater/1.0"},
+                )
+                with urllib.request.urlopen(req, timeout=120) as response:
+                    total = int(response.headers.get("Content-Length", 0))
+                    _upd["total"] = total
+                    received = 0
+                    chunk = 65536  # 64 KB chunks
+                    with open(dest, "wb") as f:
+                        while True:
+                            buf = response.read(chunk)
+                            if not buf:
+                                break
+                            f.write(buf)
+                            received += len(buf)
+                            _upd["received"] = received
+
+                _upd["path"] = dest
+                _upd["status"] = "ready"
+
+                # Launch the installer — Inno Setup will:
+                #   /SILENT          — no wizard UI, shows progress window
+                #   /CLOSEAPPLICATIONS — close running StellarInsight.exe before replacing
+                #   /RESTARTAPPLICATIONS — relaunch it afterwards
+                _upd["status"] = "launching"
+                if sys.platform == "win32":
+                    subprocess.Popen(
+                        [dest, "/SILENT", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"],
+                        shell=False,
+                    )
+                _upd["status"] = "done"
+
+            except Exception as exc:
+                logger.error("Update download failed: %s", exc)
+                _upd["status"] = "error"
+                _upd["error"] = str(exc)
+
+        threading.Thread(target=_download_and_run, daemon=True).start()
+        return {"ok": True}
 
     # ── Root redirects ──────────────────────────────────────────────────────────
 
@@ -812,8 +919,9 @@ def create_app() -> FastAPI:
         return templates.TemplateResponse(request, "navigator.html", {"user": user, "theme": get_theme_vars()})
 
     @app.get(f"{APP_PREFIX}/wormholes", response_class=HTMLResponse)
-    def wormholes_page(request: Request, user=Depends(require_user)):
-        return templates.TemplateResponse(request, "wormholes.html", {"user": user, "theme": get_theme_vars()})
+    def wormholes_page(request: Request):
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url=f"{APP_PREFIX}/navigator", status_code=302)
 
     # ── Chain Mapper API ────────────────────────────────────────────────────────
     from eve.chain_mapper import (

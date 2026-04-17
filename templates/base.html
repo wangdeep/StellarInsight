@@ -453,37 +453,140 @@
         top:calc(var(--ticker-h) + var(--topbar-h));
         left:0; right:0;
         z-index:4000;
-        background:linear-gradient(90deg,#1a3a1a,#0f2a0f);
+        background:linear-gradient(90deg,#0f2a1a,#0a1f12);
         border-bottom:1px solid rgba(50,200,80,.35);
         color:#a8f0b0;
         font-size:13px;
         padding:7px 18px;
         align-items:center;
         gap:12px;
+        flex-direction:column;
       " role="status">
-      <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" style="flex-shrink:0;color:#4ade80"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm.75 4.25a.75.75 0 00-1.5 0v4.5l-1.72-1.72a.75.75 0 00-1.06 1.06l3 3a.75.75 0 001.06 0l3-3a.75.75 0 10-1.06-1.06L10.75 10.75v-4.5z"/></svg>
-      <span id="update-banner-text">A new version of Stellar Insight is available.</span>
-      <a id="update-banner-link" href="#" target="_blank" style="color:#4ade80;font-weight:700;text-decoration:underline;margin-left:4px;">Download</a>
-      <button onclick="document.getElementById('update-banner').style.display='none';" style="margin-left:auto;background:none;border:none;color:#a8f0b0;cursor:pointer;font-size:18px;line-height:1;padding:0 4px;" aria-label="Dismiss">&times;</button>
+      <!-- Row 1: text + buttons -->
+      <div style="display:flex;align-items:center;gap:12px;width:100%;">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="currentColor" style="flex-shrink:0;color:#4ade80"><path d="M10 2a8 8 0 100 16A8 8 0 0010 2zm.75 4.25a.75.75 0 00-1.5 0v4.5l-1.72-1.72a.75.75 0 00-1.06 1.06l3 3a.75.75 0 001.06 0l3-3a.75.75 0 10-1.06-1.06L10.75 10.75v-4.5z"/></svg>
+        <span id="upd-text">A new version is available.</span>
+        <button id="upd-btn" onclick="startUpdate()"
+          style="padding:3px 14px;background:rgba(74,222,128,.18);border:1px solid rgba(74,222,128,.5);
+            border-radius:5px;color:#4ade80;font-size:12px;font-weight:700;cursor:pointer;
+            white-space:nowrap;transition:background .15s;"
+          onmouseover="this.style.background='rgba(74,222,128,.3)'"
+          onmouseout="this.style.background='rgba(74,222,128,.18)'">
+          Update Now
+        </button>
+        <a id="upd-link" href="#" target="_blank"
+          style="color:#4ade80;font-size:11px;opacity:.65;text-decoration:underline;white-space:nowrap;">
+          Release notes
+        </a>
+        <button onclick="dismissUpdate()"
+          style="margin-left:auto;background:none;border:none;color:#a8f0b0;cursor:pointer;
+            font-size:18px;line-height:1;padding:0 4px;" aria-label="Dismiss">&times;</button>
+      </div>
+      <!-- Row 2: progress bar (hidden until download starts) -->
+      <div id="upd-progress-wrap" style="display:none;width:100%;padding-bottom:4px;">
+        <div style="font-size:10px;color:#6ee7b7;margin-bottom:4px;" id="upd-progress-label">Downloading…</div>
+        <div style="height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;">
+          <div id="upd-progress-bar" style="height:100%;width:0%;background:#4ade80;border-radius:2px;transition:width .3s;"></div>
+        </div>
+      </div>
     </div>
     <script>
     (function(){
-      // Check for updates ~5 s after page load (avoid blocking startup)
+      var _updTimer = null;
+      var _dismissed = false;
+
+      // ── Show banner when update is available ──────────────────────────────
       setTimeout(function(){
         fetch('/app/api/update/check')
           .then(function(r){ return r.json(); })
           .then(function(d){
-            if(!d.update_available) return;
+            if(!d.update_available || _dismissed) return;
             var banner = document.getElementById('update-banner');
-            var txt    = document.getElementById('update-banner-text');
-            var link   = document.getElementById('update-banner-link');
             if(!banner) return;
-            txt.textContent = 'Stellar Insight v' + d.latest + ' is available  (you have v' + d.current + ')';
-            link.href = d.release_url || 'https://github.com/wangdeep/StellarInsight/releases';
+            document.getElementById('upd-text').textContent =
+              'Stellar Insight v' + d.latest + ' is available  (you have v' + d.current + ')';
+            document.getElementById('upd-link').href =
+              d.release_url || 'https://github.com/wangdeep/StellarInsight/releases';
+            // Stash installer URL for the start call
+            banner.dataset.installerUrl = d.installer_url || '';
             banner.style.display = 'flex';
           })
-          .catch(function(){/* silently ignore network errors */});
+          .catch(function(){});
       }, 5000);
+
+      // ── Kick off the download ─────────────────────────────────────────────
+      window.startUpdate = function(){
+        var btn  = document.getElementById('upd-btn');
+        var wrap = document.getElementById('upd-progress-wrap');
+        if(!btn) return;
+        btn.disabled = true;
+        btn.textContent = 'Starting…';
+        wrap.style.display = 'block';
+
+        fetch('/app/api/update/start', {method:'POST', credentials:'include'})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            if(d.error){
+              document.getElementById('upd-progress-label').textContent = '⚠ ' + d.error;
+              btn.disabled = false; btn.textContent = 'Retry';
+              return;
+            }
+            // Start polling
+            _updTimer = setInterval(_pollProgress, 500);
+          })
+          .catch(function(e){
+            document.getElementById('upd-progress-label').textContent = '⚠ Network error';
+            btn.disabled = false; btn.textContent = 'Retry';
+          });
+      };
+
+      // ── Poll download progress ────────────────────────────────────────────
+      function _pollProgress(){
+        fetch('/app/api/update/progress', {credentials:'include'})
+          .then(function(r){ return r.json(); })
+          .then(function(d){
+            var label = document.getElementById('upd-progress-label');
+            var bar   = document.getElementById('upd-progress-bar');
+            var btn   = document.getElementById('upd-btn');
+
+            if(d.status === 'downloading'){
+              if(d.total > 0){
+                var pct = Math.round(d.received / d.total * 100);
+                bar.style.width = pct + '%';
+                label.textContent = 'Downloading… ' + _fmt(d.received) + ' / ' + _fmt(d.total) + '  (' + pct + '%)';
+              } else {
+                label.textContent = 'Downloading… ' + _fmt(d.received);
+              }
+            } else if(d.status === 'ready' || d.status === 'launching'){
+              bar.style.width = '100%';
+              label.textContent = '⬇ Download complete — launching installer…';
+              if(btn){ btn.textContent = 'Installing…'; }
+            } else if(d.status === 'done'){
+              clearInterval(_updTimer);
+              bar.style.width = '100%';
+              label.textContent = '✓ Installer launched — the app will restart shortly.';
+              if(btn){ btn.style.display = 'none'; }
+            } else if(d.status === 'error'){
+              clearInterval(_updTimer);
+              label.textContent = '⚠ ' + (d.error || 'Download failed');
+              if(btn){ btn.disabled = false; btn.textContent = 'Retry'; }
+            }
+          })
+          .catch(function(){});
+      }
+
+      function _fmt(bytes){
+        if(!bytes) return '0 B';
+        if(bytes < 1048576) return (bytes/1024).toFixed(0) + ' KB';
+        return (bytes/1048576).toFixed(1) + ' MB';
+      }
+
+      window.dismissUpdate = function(){
+        _dismissed = true;
+        if(_updTimer) clearInterval(_updTimer);
+        var b = document.getElementById('update-banner');
+        if(b) b.style.display = 'none';
+      };
     })();
     </script>
 
@@ -533,18 +636,9 @@
         <span class="snav-tip">EVE Overview</span>
       </a>
 
-      <a href="/app/navigator" class="snav-item {{ 'active' if p.startswith('/app/navigator') else '' }}" title="Navigator">
+      <a href="/app/navigator" class="snav-item {{ 'active' if p.startswith('/app/navigator') or p.startswith('/app/wormholes') else '' }}" title="Navigator">
         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polygon points="12,3 14.5,12 12,10 9.5,12"/><polygon points="12,21 9.5,12 12,14 14.5,12" style="opacity:.35"/></svg>
         <span class="snav-tip">Navigator</span>
-      </a>
-
-      <a href="/app/wormholes" class="snav-item {{ 'active' if p.startswith('/app/wormholes') else '' }}" title="WH Tools">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="4 2"/>
-          <line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/>
-          <line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/>
-        </svg>
-        <span class="snav-tip">WH Tools</span>
       </a>
 
       <a href="/app/structures" class="snav-item {{ 'active' if p.startswith('/app/structures') else '' }}" title="Structures">

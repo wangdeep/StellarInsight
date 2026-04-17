@@ -118,9 +118,90 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
 .nav-hop-via{font-size:9px;color:var(--muted);}
 .nav-hop-first{background:rgba(50,182,255,.06);}
 .nav-hop-last{background:rgba(168,85,247,.06);}
+
+/* ── Top-level mode tab bar ──────────────────────────────────── */
+#navRoot{flex-direction:column!important;}
+#navMainTabs{display:flex;gap:0;background:rgba(0,0,0,.65);
+  border-bottom:1px solid rgba(50,182,255,.14);flex-shrink:0;padding:0 14px;z-index:10;}
+.nmt{padding:8px 16px;font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;cursor:pointer;color:var(--muted);border:none;
+  background:none;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap;}
+.nmt:hover{color:var(--text);}
+.nmt.active{color:var(--accent);border-bottom-color:var(--accent);}
+#navContent{display:flex;flex:1;min-height:0;overflow:hidden;}
+.nav-mpane{display:none;flex:1;min-height:0;overflow:hidden;}
+.nav-mpane.active{display:flex;}
+
+/* ── Full-width Route Finder pane ───────────────────────────── */
+#rfRoot{display:flex;flex:1;min-height:0;overflow:hidden;}
+#rfPanel{width:320px;flex-shrink:0;display:flex;flex-direction:column;
+  padding:16px;gap:10px;border-right:1px solid rgba(50,182,255,.1);
+  background:rgba(0,0,0,.4);backdrop-filter:blur(10px);overflow-y:auto;}
+#rfResults{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:6px;}
+.hop-row{display:flex;align-items:center;gap:10px;padding:6px 10px;
+  background:rgba(255,255,255,.03);border-radius:6px;border:1px solid rgba(50,182,255,.06);}
+.hop-idx{font-size:10px;color:var(--muted);width:22px;text-align:right;flex-shrink:0;}
+.hop-icon{font-size:14px;flex-shrink:0;}
+.hop-name{flex:1;font-size:13px;font-weight:600;color:var(--text);}
+.hop-via{font-size:10px;color:var(--muted);}
+.hop-sec{font-size:11px;font-weight:700;flex-shrink:0;}
+.hop-first{border-color:rgba(50,182,255,.3);background:rgba(50,182,255,.06);}
+.hop-last{border-color:rgba(168,85,247,.3);background:rgba(168,85,247,.06);}
+
+/* ── Intel Monitor pane ─────────────────────────────────────── */
+#intelRoot{display:flex;flex:1;min-height:0;overflow:hidden;}
+#intelConfig{width:300px;flex-shrink:0;padding:14px;display:flex;flex-direction:column;
+  gap:10px;border-right:1px solid rgba(50,182,255,.1);
+  background:rgba(0,0,0,.4);backdrop-filter:blur(10px);overflow-y:auto;}
+#intelFeed{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+#intelFeedHeader{padding:10px 14px;border-bottom:1px solid rgba(50,182,255,.08);
+  display:flex;align-items:center;gap:8px;flex-shrink:0;background:rgba(0,0,0,.3);}
+#intelMessages{flex:1;overflow-y:auto;padding:6px;display:flex;flex-direction:column-reverse;}
+.intel-msg{padding:5px 10px;border-radius:5px;font-size:11px;margin-bottom:3px;
+  border:1px solid rgba(50,182,255,.05);background:rgba(255,255,255,.02);}
+.intel-msg.alert{background:rgba(248,113,113,.08);border-color:rgba(248,113,113,.25);}
+.intel-ts{color:var(--muted);font-size:10px;margin-right:6px;}
+.intel-pilot{color:var(--accent);font-weight:700;margin-right:6px;}
+.intel-sys{display:inline-block;background:rgba(50,182,255,.12);color:var(--accent);
+  padding:0 4px;border-radius:3px;font-weight:700;font-size:10px;}
+.intel-sys.alert-sys{background:rgba(248,113,113,.18);color:#f87171;}
+
+/* ── WH Types pane ──────────────────────────────────────────── */
+#histRoot{flex:1;overflow-y:auto;padding:16px;}
+
+/* ── Shared helpers ─────────────────────────────────────────── */
+.field-label{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.tag-list{display:flex;flex-wrap:wrap;gap:4px;}
+.tag{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;
+  background:rgba(50,182,255,.1);border:1px solid rgba(50,182,255,.2);
+  border-radius:4px;font-size:11px;color:var(--accent);cursor:pointer;}
+.tag:hover{background:rgba(248,113,113,.12);border-color:#f87171;color:#f87171;}
+
+/* ── Chain Mapper pane ──────────────────────────────────────── */
+#cmRoot{display:flex;flex:1;min-height:0;overflow:hidden;}
+#cmCanvas{flex:1;position:relative;overflow:hidden;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);}
+#cmSvg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;user-select:none;}
+#cmPanel{width:280px;flex-shrink:0;border-left:1px solid rgba(50,182,255,.12);
+  background:rgba(0,0,0,.55);backdrop-filter:blur(14px);display:flex;flex-direction:column;overflow:hidden;}
+#cmPanelContent{flex:1;overflow-y:auto;}
+#cmToolbar{position:absolute;top:10px;left:10px;z-index:20;display:flex;flex-direction:column;gap:5px;}
 </style>
 
 <div id="navRoot">
+
+  <!-- ── Top-level mode tab bar ── -->
+  <div id="navMainTabs">
+    <button class="nmt active" onclick="navMode('map',this)">🗺 Map</button>
+    <button class="nmt" onclick="navMode('route',this)">🔍 Route Finder</button>
+    <button class="nmt" onclick="navMode('intel',this)">📡 Intel</button>
+    <button class="nmt" onclick="navMode('types',this)">📖 WH Types</button>
+    <button class="nmt" onclick="navMode('chain',this)">⛓ Chain Map</button>
+  </div>
+
+  <div id="navContent">
+
+  <!-- ══════════════════════════ MAP PANE ═══════════════════════════ -->
+  <div class="nav-mpane active" id="mpane-map">
 
   <!-- ── Canvas area ── -->
   <div id="mapCanvas">
@@ -236,13 +317,148 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
     <div class="side-pane" id="pane-pilots">
       <div id="pilotList" style="flex:1;overflow-y:auto;padding:4px 0;"></div>
     </div>
-  </div>
-</div>
+  </div><!-- /sidePanel -->
+  </div><!-- /mpane-map -->
+
+  <!-- ══════════════════════════ ROUTE FINDER PANE ═════════════════ -->
+  <div class="nav-mpane" id="mpane-route">
+    <div id="rfRoot">
+      <div id="rfPanel">
+        <div style="font-size:14px;font-weight:700;color:var(--text);">Route Finder</div>
+        <div>
+          <div class="field-label">From</div>
+          <input id="rfFrom" class="input" style="width:100%;" placeholder="e.g. Jita"/>
+        </div>
+        <div>
+          <div class="field-label">To</div>
+          <input id="rfTo" class="input" style="width:100%;" placeholder="e.g. J123456"/>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" id="rfChain" checked> Use mapped chain
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+            <input type="checkbox" id="rfThera" checked> Include Thera connections
+          </label>
+        </div>
+        <button class="btn" onclick="findRoute()" style="width:100%;">Find Route</button>
+        <div id="routeStatus" style="font-size:11px;color:var(--muted);min-height:18px;"></div>
+        <div style="font-size:10px;color:var(--muted);opacity:.6;margin-top:4px;line-height:1.5;">
+          Uses k-space stargates + your Navigator chain + live Thera connections from EVE-Scout.
+        </div>
+      </div>
+      <div id="rfResults">
+        <div id="rfPlaceholder" style="color:var(--muted);font-size:13px;padding:20px;opacity:.5;">
+          Enter origin and destination to find a route.
+        </div>
+      </div>
+    </div>
+  </div><!-- /mpane-route -->
+
+  <!-- ══════════════════════════ INTEL PANE ════════════════════════ -->
+  <div class="nav-mpane" id="mpane-intel">
+    <div id="intelRoot">
+      <div id="intelConfig">
+        <div style="font-size:13px;font-weight:700;color:var(--text);">Intel Monitor</div>
+        <div>
+          <div class="field-label">EVE Chat Logs Folder</div>
+          <input id="intelDir" class="input" style="width:100%;font-size:10px;" placeholder="C:\Users\...\EVE\logs\Chatlogs"/>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px;">Paste the path to your EVE Chatlogs folder.</div>
+        </div>
+        <div>
+          <div class="field-label">Intel Channels <span style="font-weight:400;">(Enter to add)</span></div>
+          <div style="display:flex;gap:6px;">
+            <input id="intelChIn" class="input" style="flex:1;font-size:11px;" placeholder="e.g. Delve.Intel" onkeydown="if(event.key==='Enter')addIntelChannel()"/>
+            <button class="btn" style="padding:4px 10px;" onclick="addIntelChannel()">+</button>
+          </div>
+          <div id="intelChTags" class="tag-list" style="margin-top:6px;"></div>
+        </div>
+        <div>
+          <div class="field-label">Alert Systems <span style="font-weight:400;">(highlight when mentioned)</span></div>
+          <div style="display:flex;gap:6px;">
+            <input id="intelSysIn" class="input" style="flex:1;font-size:11px;" placeholder="e.g. 1DQ1-A" onkeydown="if(event.key==='Enter')addWatchSystem()"/>
+            <button class="btn" style="padding:4px 10px;" onclick="addWatchSystem()">+</button>
+          </div>
+          <div id="intelSysTags" class="tag-list" style="margin-top:6px;"></div>
+        </div>
+        <button class="btn" style="width:100%;" onclick="saveIntelConfig()">Save &amp; Start Watching</button>
+        <div id="intelConfigStatus" style="font-size:11px;color:var(--muted);min-height:18px;"></div>
+        <div style="margin-top:8px;">
+          <div class="field-label">Available Log Files</div>
+          <div id="intelLogList" style="font-size:10px;color:var(--muted);max-height:140px;overflow-y:auto;"></div>
+          <button class="btn" style="font-size:10px;padding:3px 10px;margin-top:5px;" onclick="loadLogList()">Scan Folder</button>
+        </div>
+      </div>
+      <div id="intelFeed">
+        <div id="intelFeedHeader">
+          <span style="font-size:12px;font-weight:700;color:var(--text);">Live Intel Feed</span>
+          <span id="intelLiveIndicator" style="width:8px;height:8px;border-radius:50%;background:#4ade80;opacity:0;transition:opacity .3s;margin-left:4px;"></span>
+          <span id="intelMsgCount" style="font-size:10px;color:var(--muted);margin-left:auto;">0 messages</span>
+          <button class="btn" style="font-size:10px;padding:3px 10px;margin-left:8px;" onclick="clearFeed()">Clear</button>
+        </div>
+        <div id="intelMessages"></div>
+      </div>
+    </div>
+  </div><!-- /mpane-intel -->
+
+  <!-- ══════════════════════════ WH TYPES PANE ═════════════════════ -->
+  <div class="nav-mpane" id="mpane-types" style="overflow-y:auto;">
+    <div id="histRoot">
+      <div class="card" style="max-width:700px;">
+        <div class="card-h">Wormhole Type Reference</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input id="whTypeLookup" class="input" placeholder="WH type (e.g. B274)…" style="flex:1;" oninput="filterWhTypes(this.value)"/>
+        </div>
+        <div id="whTypeTable" style="font-size:12px;"></div>
+      </div>
+    </div>
+  </div><!-- /mpane-types -->
+
+  <!-- ══════════════════════════ CHAIN MAP PANE ════════════════════ -->
+  <div class="nav-mpane" id="mpane-chain">
+    <div id="cmRoot">
+      <div id="cmCanvas">
+        <div id="cmToolbar">
+          <button class="tb-btn" title="Fit all" onclick="cmFitAll()">⊡</button>
+          <button class="tb-btn" title="Add system" onclick="cmFocusAdd()">＋</button>
+          <button class="tb-btn" title="Refresh" onclick="loadChain()">⟳</button>
+        </div>
+        <svg id="cmSvg">
+          <defs>
+            <pattern id="cmGrid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <circle cx="20" cy="20" r=".6" fill="rgba(50,182,255,.05)"/>
+            </pattern>
+            <filter id="cmGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="2.5" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <rect width="19999" height="19999" x="-9999" y="-9999" fill="url(#cmGrid)"/>
+          <g id="cmMapG">
+            <g id="cmConnsG"></g>
+            <g id="cmNodesG"></g>
+          </g>
+        </svg>
+        <div id="cmStatus" style="position:absolute;bottom:8px;left:8px;z-index:20;
+          background:rgba(0,0,0,.6);border:1px solid rgba(50,182,255,.1);
+          backdrop-filter:blur(8px);border-radius:5px;padding:3px 10px;
+          font-size:9px;color:var(--muted);pointer-events:none;">0 systems · 0 connections</div>
+      </div>
+      <div id="cmPanel">
+        <div style="padding:10px 12px;border-bottom:1px solid rgba(50,182,255,.1);
+          font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;">
+          Chain Mapper
+        </div>
+        <div id="cmPanelContent" style="flex:1;overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div><!-- /mpane-chain -->
+
+  </div><!-- /navContent -->
+</div><!-- /navRoot -->
 
 <!-- Context menu -->
 <div id="ctxMenu"></div>
-<!-- Tooltip -->
-<div id="mapTip"></div>
 
 <!-- Paste modal -->
 <div class="modal-overlay" id="pasteModal">
@@ -1589,5 +1805,526 @@ switchMap = function(id, btn){
     }
   }catch(e){}
 })();
+
+// ═══════════════════════════════════════════════════════════════
+//  TOP-LEVEL MODE SWITCHING
+// ═══════════════════════════════════════════════════════════════
+function navMode(name, btn){
+  document.querySelectorAll('.nav-mpane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nmt').forEach(b=>b.classList.remove('active'));
+  const p=document.getElementById('mpane-'+name);
+  if(p) p.classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='types') renderWhTypes();
+  if(name==='chain'){ loadChain(); }
+  if(name==='intel') loadIntelConfig();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FULL-WIDTH ROUTE FINDER
+// ═══════════════════════════════════════════════════════════════
+function secColor(sec){
+  if(sec>=0.45) return '#4ade80';
+  if(sec>0.0)   return '#fbbf24';
+  return '#f87171';
+}
+function hopIcon(via){
+  if(via==='wormhole') return '🕳️';
+  if(via==='thera')    return '🌀';
+  if(via==='start')    return '📍';
+  if(via==='gate')     return '⬡';
+  return '→';
+}
+async function findRoute(){
+  const origin=document.getElementById('rfFrom').value.trim();
+  const dest  =document.getElementById('rfTo').value.trim();
+  if(!origin||!dest){ document.getElementById('routeStatus').textContent='Enter both systems.'; return; }
+  const useChain=document.getElementById('rfChain').checked;
+  const useThera=document.getElementById('rfThera').checked;
+  document.getElementById('routeStatus').textContent='⏳ Calculating…';
+  document.getElementById('rfResults').innerHTML='';
+  try{
+    const r=await fetch(
+      `${API}/chain/route?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&use_chain=${useChain}&use_thera=${useThera}`,
+      {credentials:'include'}
+    );
+    const d=await r.json();
+    if(d.error){ document.getElementById('routeStatus').textContent='⚠️ '+d.error; return; }
+    const hops=d.hops||[];
+    document.getElementById('routeStatus').textContent=
+      `${d.jumps} jump${d.jumps!==1?'s':''}` +
+      (d.used_chain&&d.used_thera?' · chain + Thera':d.used_chain?' · chain':d.used_thera?' · Thera':'');
+    const res=document.getElementById('rfResults');
+    res.innerHTML='';
+    document.getElementById('rfPlaceholder').style.display='none';
+    hops.forEach((h,i)=>{
+      const row=document.createElement('div');
+      row.className='hop-row'+(i===0?' hop-first':i===hops.length-1?' hop-last':'');
+      const isWH=h.via==='wormhole'||h.via==='thera';
+      row.innerHTML=`
+        <span class="hop-idx">${i}</span>
+        <span class="hop-icon">${hopIcon(h.via)}</span>
+        <span class="hop-name">${esc(h.system)}</span>
+        <span class="hop-via">${h.via!=='start'?h.via:''}</span>
+        <span class="hop-sec" style="color:${isWH?'var(--muted)':secColor(h.security)}">${isWH?'J-space':h.security.toFixed(1)}</span>`;
+      res.appendChild(row);
+    });
+  }catch(e){ document.getElementById('routeStatus').textContent='Request failed.'; }
+}
+document.getElementById('rfFrom').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('rfTo').focus(); });
+document.getElementById('rfTo').addEventListener('keydown',e=>{ if(e.key==='Enter') findRoute(); });
+
+// ═══════════════════════════════════════════════════════════════
+//  INTEL MONITOR
+// ═══════════════════════════════════════════════════════════════
+let _intelChannels=[], _intelSystems=[], _intelSince=0, _intelTimer=null, _intelMsgs=[];
+
+async function loadIntelConfig(){
+  try{
+    const d=await fetch('/app/api/intel/config',{credentials:'include'}).then(r=>r.json());
+    document.getElementById('intelDir').value=d.log_dir||'';
+    _intelChannels=d.channels||[];
+    _intelSystems=d.watch_systems||[];
+    renderIntelTags();
+    if(_intelChannels.length) startIntelPoll();
+  }catch(e){}
+}
+function renderIntelTags(){
+  document.getElementById('intelChTags').innerHTML=_intelChannels.map(c=>
+    `<span class="tag" onclick="removeIntelChannel('${c}')">${c} ✕</span>`).join('');
+  document.getElementById('intelSysTags').innerHTML=_intelSystems.map(s=>
+    `<span class="tag" onclick="removeWatchSystem('${s}')">${s} ✕</span>`).join('');
+}
+function addIntelChannel(){
+  const v=document.getElementById('intelChIn').value.trim();
+  if(!v||_intelChannels.includes(v))return;
+  _intelChannels.push(v);document.getElementById('intelChIn').value='';renderIntelTags();
+}
+function removeIntelChannel(c){ _intelChannels=_intelChannels.filter(x=>x!==c);renderIntelTags(); }
+function addWatchSystem(){
+  const v=document.getElementById('intelSysIn').value.trim().toUpperCase();
+  if(!v||_intelSystems.includes(v))return;
+  _intelSystems.push(v);document.getElementById('intelSysIn').value='';renderIntelTags();
+}
+function removeWatchSystem(s){ _intelSystems=_intelSystems.filter(x=>x!==s);renderIntelTags(); }
+async function saveIntelConfig(){
+  const dir=document.getElementById('intelDir').value.trim();
+  await fetch('/app/api/intel/config',{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({log_dir:dir,channels:_intelChannels,watch_systems:_intelSystems})});
+  document.getElementById('intelConfigStatus').textContent='✓ Saved. Watching for new messages…';
+  startIntelPoll();
+}
+function startIntelPoll(){
+  if(_intelTimer)clearInterval(_intelTimer);
+  _intelSince=0;_intelMsgs=[];renderFeed();pollIntel();
+  _intelTimer=setInterval(pollIntel,4000);
+}
+async function pollIntel(){
+  try{
+    const d=await fetch(`/app/api/intel/feed?since=${_intelSince}`,{credentials:'include'}).then(r=>r.json());
+    const msgs=d.messages||[];
+    if(msgs.length){
+      _intelSince=Math.max(...msgs.map(m=>m.ts));
+      _intelMsgs=[..._intelMsgs,...msgs].slice(-500);
+      renderFeed();flashLive();
+    }
+    document.getElementById('intelMsgCount').textContent=`${_intelMsgs.length} messages`;
+  }catch(e){}
+}
+function flashLive(){
+  const el=document.getElementById('intelLiveIndicator');
+  el.style.opacity='1';setTimeout(()=>el.style.opacity='0',800);
+}
+function renderFeed(){
+  const el=document.getElementById('intelMessages');
+  const watchUpper=new Set(_intelSystems.map(s=>s.toUpperCase()));
+  el.innerHTML=[..._intelMsgs].reverse().map(m=>{
+    const sysHtml=(m.systems||[]).map(s=>{
+      const isAlert=watchUpper.has(s);
+      return `<span class="intel-sys${isAlert?' alert-sys':''}">${s}</span>`;
+    }).join(' ');
+    return `<div class="intel-msg${m.alert?' alert':''}">
+      <span class="intel-ts">${m.ts_str||''}</span>
+      <span class="intel-pilot">${m.pilot||''}</span>
+      <span>${esc(m.msg||'')}</span>
+      ${sysHtml?'<span style="margin-left:6px;">'+sysHtml+'</span>':''}
+    </div>`;
+  }).join('');
+}
+function clearFeed(){ _intelMsgs=[];renderFeed(); }
+async function loadLogList(){
+  const dir=document.getElementById('intelDir').value.trim();
+  const el=document.getElementById('intelLogList');
+  el.textContent='Scanning…';
+  try{
+    const d=await fetch(`/app/api/intel/logs${dir?'?log_dir='+encodeURIComponent(dir):''}`,{credentials:'include'}).then(r=>r.json());
+    const files=d.files||[];
+    if(!files.length){el.textContent='No .txt files found.';return;}
+    el.innerHTML=files.slice(0,30).map(f=>`
+      <div style="padding:2px 0;border-bottom:1px solid rgba(50,182,255,.04);">
+        <span style="color:var(--text);">${f.name}</span>
+        <span style="margin-left:6px;opacity:.5;">${(f.size/1024).toFixed(0)}KB</span>
+      </div>`).join('');
+  }catch(e){el.textContent='Error reading folder.';}
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  WH TYPE REFERENCE
+// ═══════════════════════════════════════════════════════════════
+const WH_TYPES=[
+  {type:'B274',dest:'HS',from:'C2'},{type:'N110',dest:'HS',from:'C1'},
+  {type:'R051',dest:'HS',from:'C3'},{type:'X702',dest:'HS',from:'C4'},
+  {type:'A982',dest:'HS',from:'C5'},{type:'V283',dest:'HS',from:'C6'},
+  {type:'J244',dest:'LS',from:'C1'},{type:'A239',dest:'LS',from:'C2'},
+  {type:'U210',dest:'LS',from:'C3'},{type:'S047',dest:'LS',from:'C4'},
+  {type:'N432',dest:'LS',from:'C5'},{type:'W237',dest:'LS',from:'C6'},
+  {type:'Z971',dest:'C1',from:'C1'},{type:'D382',dest:'C2',from:'C2'},
+  {type:'O477',dest:'C3',from:'C3'},{type:'Y683',dest:'C4',from:'C4'},
+  {type:'H296',dest:'C5',from:'C5'},{type:'V753',dest:'C6',from:'C6'},
+  {type:'C247',dest:'C3',from:'C4'},{type:'X877',dest:'C4',from:'C4'},
+  {type:'H900',dest:'C5',from:'C4'},{type:'U574',dest:'C5',from:'C4'},
+  {type:'D364',dest:'C5',from:'C5'},{type:'M267',dest:'C3',from:'C5'},
+  {type:'T405',dest:'C4',from:'C3'},{type:'E175',dest:'NS',from:'C1'},
+  {type:'Z060',dest:'NS',from:'C2'},{type:'V911',dest:'NS',from:'C3'},
+  {type:'B520',dest:'NS',from:'C4'},{type:'F353',dest:'Thera',from:'*'},
+  {type:'K162',dest:'Any',from:'Exit'},{type:'Q003',dest:'C1',from:'C2'},
+  {type:'G024',dest:'C4',from:'C3'},{type:'L477',dest:'C5',from:'C3'},
+  {type:'Z647',dest:'NS',from:'NS'},{type:'R943',dest:'Thera',from:'C2'},
+  {type:'V928',dest:'C5',from:'C6'},{type:'C140',dest:'HS',from:'NS'},
+];
+function renderWhTypes(filter=''){
+  const f=(filter||'').trim().toUpperCase();
+  const rows=WH_TYPES.filter(w=>!f||w.type.includes(f)||w.dest.toUpperCase().includes(f)||w.from.toUpperCase().includes(f));
+  document.getElementById('whTypeTable').innerHTML=`
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="color:var(--muted);font-size:10px;text-transform:uppercase;">
+        <th style="padding:5px 8px;text-align:left;">Type</th>
+        <th style="padding:5px 8px;text-align:left;">Leads To</th>
+        <th style="padding:5px 8px;text-align:left;">Found In</th>
+      </tr></thead>
+      <tbody>${rows.map(w=>`
+        <tr style="border-top:1px solid rgba(50,182,255,.05);">
+          <td style="padding:5px 8px;font-family:monospace;font-weight:700;color:var(--accent);">${w.type}</td>
+          <td style="padding:5px 8px;">${w.dest}</td>
+          <td style="padding:5px 8px;color:var(--muted);">${w.from}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+function filterWhTypes(v){ renderWhTypes(v); }
+
+// ═══════════════════════════════════════════════════════════════
+//  CHAIN MAPPER
+// ═══════════════════════════════════════════════════════════════
+const CW=140, CH=56;
+let _cm={systems:[],connections:[]};
+let _cmSel=null, _cmSelConn=null;
+let _cmCx=0, _cmCy=0, _cmCz=1;
+let _cmDragging=false, _cmDsx=0, _cmDsy=0;
+let _cmDragNode=null, _cmDnx0=0, _cmDny0=0, _cmDnox=0, _cmDnoy=0;
+let _cmConnFrom=null;
+
+const cmSvg   = document.getElementById('cmSvg');
+const cmMapG  = document.getElementById('cmMapG');
+const cmNodesG= document.getElementById('cmNodesG');
+const cmConnsG= document.getElementById('cmConnsG');
+
+function cmApplyT(){ cmMapG.setAttribute('transform',`translate(${_cmCx},${_cmCy}) scale(${_cmCz})`); }
+
+function cmSecCol(cls){
+  const c={HS:'#22c55e',LS:'#fbbf24',NS:'#f87171',
+    C1:'#a78bfa',C2:'#a78bfa',C3:'#818cf8',C4:'#c084fc',C5:'#c084fc',C6:'#d946ef',
+    Thera:'#60a5fa'};
+  return c[cls]||'#64748b';
+}
+function cmMassCol(mass){ return{stable:'#22c55e',destab:'#f97316',crit:'#ef4444'}[mass]||'#6b7280'; }
+
+async function loadChain(){
+  try{
+    const r=await fetch(`${API}/chain/state`,{credentials:'include'});
+    _cm=await r.json();
+  }catch(e){ _cm={systems:[],connections:[]}; }
+  renderChain();
+}
+
+function renderChain(){
+  cmNodesG.innerHTML=''; cmConnsG.innerHTML='';
+  const byId={};for(const s of _cm.systems)byId[s.id]=s;
+  for(const c of _cm.connections)drawChainConn(c,byId);
+  for(const s of _cm.systems)drawChainNode(s);
+  const st=document.getElementById('cmStatus');
+  if(st) st.textContent=`${_cm.systems.length} systems · ${_cm.connections.length} connections`;
+  renderChainPanel();
+}
+
+function drawChainConn(c,byId){
+  const a=byId[c.from_id],b=byId[c.to_id]; if(!a||!b)return;
+  const x1=a.x+CW/2,y1=a.y+CH/2,x2=b.x+CW/2,y2=b.y+CH/2;
+  const mx=(x1+x2)/2,my=(y1+y2)/2;
+  const mc=cmMassCol(c.mass);
+  const isEol=c.eol==='eol', isSel=c.id===_cmSelConn;
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.dataset.cid=c.id;
+  g.innerHTML=`
+    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="14" style="cursor:pointer;"/>
+    <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+      stroke="${mc}" stroke-width="${isSel?2.5:1.5}"
+      stroke-dasharray="${isEol?'6,4':'none'}" opacity="${isEol?0.55:1}"/>
+    ${c.wh_type?`<rect x="${mx-16}" y="${my-8}" width="32" height="13" rx="3"
+        fill="rgba(6,8,22,.88)" stroke="${mc}" stroke-width=".8"/>
+      <text x="${mx}" y="${my+1}" text-anchor="middle" font-size="8" font-weight="700"
+        fill="${mc}" style="pointer-events:none;">${esc(c.wh_type)}</text>`:''}
+  `;
+  g.addEventListener('click',e=>{ e.stopPropagation(); _cmSelConn=c.id;_cmSel=null; renderChain(); });
+  cmConnsG.appendChild(g);
+}
+
+function drawChainNode(s){
+  const isSel=s.id===_cmSel, col=cmSecCol(s.class||''), bc=isSel?'#32b6ff':'rgba(50,182,255,.2)';
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('transform',`translate(${s.x},${s.y})`);
+  g.dataset.nid=s.id;
+  g.innerHTML=`
+    <rect x="0" y="0" width="${CW}" height="${CH}" rx="6"
+      fill="rgba(0,0,0,.82)" stroke="${bc}" stroke-width="${isSel?1.5:.7}"
+      ${isSel?'filter="url(#cmGlow)"':''}/>
+    <rect x="0" y="0" width="4" height="${CH}" rx="4" fill="${col}"/>
+    ${s.is_home?'<rect x="0" y="0" width="'+CW+'" height="'+CH+'" rx="6" fill="rgba(50,182,255,.05)"/>'  :''}
+    <text x="12" y="20" font-size="11" font-weight="700" fill="#e8eeff"
+      font-family="monospace" style="pointer-events:none;">${esc(s.name)}</text>
+    ${s.class?`<rect x="${CW-28}" y="5" width="22" height="13" rx="3"
+        fill="rgba(120,60,210,.2)" stroke="${col}" stroke-width=".8"/>
+      <text x="${CW-17}" y="14.5" text-anchor="middle" font-size="8" font-weight="700"
+        fill="${col}" style="pointer-events:none;">${esc(s.class)}</text>`:''}
+    ${s.security!=null?`<text x="12" y="34" font-size="9" fill="${col}" opacity=".65"
+        style="pointer-events:none;">${Number(s.security).toFixed(1)}</text>`:''}
+    ${s.notes?`<text x="12" y="48" font-size="8" fill="rgba(200,210,255,.35)"
+        style="pointer-events:none;">${esc(s.notes.slice(0,20))}</text>`:''}
+    ${s.is_home?`<text x="${CW-8}" y="${CH-6}" text-anchor="end" font-size="9"
+        fill="var(--accent)" style="pointer-events:none;">🏠</text>`:''}
+    ${[0,1,2,3].map(i=>{const ax=[CW/2,CW/2,0,CW][i],ay=[0,CH,CH/2,CH/2][i];
+      return`<circle cx="${ax}" cy="${ay}" r="5" fill="rgba(0,0,0,0)" stroke="rgba(0,0,0,0)"
+        data-nid="${s.id}" class="cm-anc" style="cursor:crosshair;"/>`;}).join('')}
+    <rect x="0" y="0" width="${CW}" height="${CH}" rx="6"
+      fill="rgba(50,182,255,.07)" stroke="rgba(50,182,255,.5)" stroke-width="1" opacity="0"
+      class="cm-hvr" style="transition:opacity .15s;pointer-events:none;"/>
+  `;
+  const hvr=g.querySelector('.cm-hvr');
+  g.addEventListener('mouseenter',()=>hvr.setAttribute('opacity','1'));
+  g.addEventListener('mouseleave',()=>hvr.setAttribute('opacity','0'));
+  g.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    if(e.target.classList.contains('cm-anc')){
+      e.stopPropagation();_cmConnFrom=s.id;cmSvg.style.cursor='crosshair';return;
+    }
+    e.stopPropagation();
+    _cmDragNode=s.id;_cmDnx0=e.clientX;_cmDny0=e.clientY;_cmDnox=s.x;_cmDnoy=s.y;
+    cmSvg.style.cursor='grabbing';
+  });
+  g.addEventListener('click',e=>{
+    if(e.target.classList.contains('cm-anc'))return;
+    if(_cmDragNode)return;
+    _cmSel=s.id;_cmSelConn=null;renderChain();
+  });
+  cmNodesG.appendChild(g);
+}
+
+function renderChainPanel(){
+  const panel=document.getElementById('cmPanelContent');
+  const s=_cmSel!=null?_cm.systems.find(x=>x.id===_cmSel):null;
+  const c=_cmSelConn!=null?_cm.connections.find(x=>x.id===_cmSelConn):null;
+  if(s){
+    const conns=_cm.connections.filter(x=>x.from_id===s.id||x.to_id===s.id);
+    panel.innerHTML=`
+      <div style="padding:10px 12px;border-bottom:1px solid rgba(50,182,255,.08);">
+        <div style="font-size:13px;font-weight:700;color:var(--accent);">${esc(s.name)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">${s.class||'Unknown'} · Sec ${s.security!=null?Number(s.security).toFixed(1):'?'}</div>
+      </div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+        ${s.is_home?'<div style="font-size:10px;color:var(--accent);">🏠 Home system</div>':''}
+        ${s.notes?`<div style="font-size:10px;color:var(--muted);">${esc(s.notes)}</div>`:''}
+        <div style="font-size:10px;color:var(--muted);">${conns.length} connection(s)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
+          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmSetHome(${s.id})">${s.is_home?'★ Home':'Set Home'}</button>
+          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmEditSys(${s.id})">✏ Edit</button>
+          <button class="btn" style="font-size:10px;padding:3px 8px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#f87171;" onclick="cmDelSys(${s.id})">🗑 Remove</button>
+        </div>
+      </div>`;
+    return;
+  }
+  if(c){
+    const byId={};for(const x of _cm.systems)byId[x.id]=x;
+    const fs=byId[c.from_id],ts=byId[c.to_id];
+    panel.innerHTML=`
+      <div style="padding:10px 12px;border-bottom:1px solid rgba(50,182,255,.08);">
+        <div style="font-size:12px;font-weight:700;color:var(--accent);">${c.wh_type||'Connection'}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px;">${fs?.name||'?'} ↔ ${ts?.name||'?'}</div>
+      </div>
+      <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted);">Mass</span>
+          <span style="color:${cmMassCol(c.mass)};font-weight:600;">${{stable:'🟢 Stable',destab:'🟡 Destab',crit:'🔴 Critical'}[c.mass]||c.mass}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span style="color:var(--muted);">Time</span>
+          <span style="font-weight:600;">${{fresh:'🕐 Fresh',eol:'💀 EOL'}[c.eol]||c.eol}</span></div>
+        ${c.is_frig?'<div style="font-size:10px;color:#fbbf24;">⚡ Frig hole</div>':''}
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
+          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmCycMass(${c.id})">⚖ Mass</button>
+          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmToggleEol(${c.id})">${c.eol==='eol'?'↺ Fresh':'💀 EOL'}</button>
+          <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmSetType(${c.id})">✏ Type</button>
+          <button class="btn" style="font-size:10px;padding:3px 8px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#f87171;" onclick="cmDelConn(${c.id})">🗑</button>
+        </div>
+      </div>`;
+    return;
+  }
+  // Default: add system form + clear
+  panel.innerHTML=`
+    <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
+      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">Add System</div>
+      <input id="cmAddName" class="input" style="width:100%;font-size:11px;" placeholder="Name (e.g. J123456, Jita)…"
+        onkeydown="if(event.key==='Enter')cmAddSys()"/>
+      <select id="cmAddClass" class="input" style="width:100%;font-size:11px;">
+        <option value="">— Class (optional) —</option>
+        <option>C1</option><option>C2</option><option>C3</option>
+        <option>C4</option><option>C5</option><option>C6</option>
+        <option>HS</option><option>LS</option><option>NS</option><option>Thera</option>
+      </select>
+      <input id="cmAddSec" class="input" style="width:100%;font-size:11px;" placeholder="Security (e.g. -1.0)"/>
+      <button class="btn" style="width:100%;" onclick="cmAddSys()">＋ Add System</button>
+      <div id="cmAddStatus" style="font-size:10px;color:var(--muted);min-height:14px;"></div>
+    </div>
+    <div style="padding:8px 12px;border-top:1px solid rgba(50,182,255,.08);margin-top:4px;">
+      <div style="font-size:9px;color:var(--muted);margin-bottom:6px;">Drag node anchor points to connect systems. Right-click nodes for options.</div>
+    </div>
+    <div style="padding:8px 12px;border-top:1px solid rgba(50,182,255,.08);">
+      <button class="btn" style="width:100%;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#f87171;font-size:10px;" onclick="cmClear()">⚠ Clear All</button>
+    </div>`;
+}
+
+async function cmAddSys(){
+  const name=document.getElementById('cmAddName')?.value.trim();
+  if(!name){ const el=document.getElementById('cmAddStatus');if(el)el.textContent='Enter a name.';return; }
+  const cls=document.getElementById('cmAddClass')?.value||'';
+  const sec=parseFloat(document.getElementById('cmAddSec')?.value||'')||0;
+  const r2=cmSvg.getBoundingClientRect();
+  const cx=(r2.width/2-_cmCx)/_cmCz, cy=(r2.height/2-_cmCy)/_cmCz;
+  const x=cx-CW/2+(Math.random()*80-40), y=cy-CH/2+(Math.random()*80-40);
+  const res=await fetch(`${API}/chain/system`,{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name,sys_class:cls,security:sec,x,y})});
+  const d=await res.json();
+  if(d.error){const el=document.getElementById('cmAddStatus');if(el)el.textContent=d.error;return;}
+  await loadChain();
+  _cmSel=d.id; renderChain();
+}
+function cmFocusAdd(){ document.getElementById('cmAddName')?.focus(); }
+async function cmDelSys(id){
+  if(!confirm('Remove this system and its connections?'))return;
+  await fetch(`${API}/chain/system/${id}`,{method:'DELETE',credentials:'include'});
+  if(_cmSel===id)_cmSel=null; await loadChain();
+}
+async function cmSetHome(id){
+  await fetch(`${API}/chain/system/${id}/home`,{method:'POST',credentials:'include'});
+  await loadChain();
+}
+async function cmEditSys(id){
+  const s=_cm.systems.find(x=>x.id===id);if(!s)return;
+  const name=prompt('System name:',s.name);if(name===null)return;
+  const cls=prompt('Class (C1-C6/HS/LS/NS/Thera):',s.class||'');
+  await fetch(`${API}/chain/system/${id}`,{method:'PATCH',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name.trim()||s.name,class:(cls||'').trim()})});
+  await loadChain();
+}
+async function cmDelConn(id){
+  await fetch(`${API}/chain/connection/${id}`,{method:'DELETE',credentials:'include'});
+  if(_cmSelConn===id)_cmSelConn=null; await loadChain();
+}
+async function cmCycMass(id){
+  const c=_cm.connections.find(x=>x.id===id);if(!c)return;
+  const next={stable:'destab',destab:'crit',crit:'stable'}[c.mass]||'stable';
+  await fetch(`${API}/chain/connection/${id}`,{method:'PATCH',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({mass:next})});
+  await loadChain();
+}
+async function cmToggleEol(id){
+  const c=_cm.connections.find(x=>x.id===id);if(!c)return;
+  const next=c.eol==='eol'?'fresh':'eol';
+  await fetch(`${API}/chain/connection/${id}`,{method:'PATCH',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({eol:next})});
+  await loadChain();
+}
+async function cmSetType(id){
+  const v=prompt('WH type (e.g. B274, K162):','');if(!v)return;
+  await fetch(`${API}/chain/connection/${id}`,{method:'PATCH',credentials:'include',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({wh_type:v.toUpperCase().trim()})});
+  await loadChain();
+}
+async function cmAddConn(fromId,toId){
+  const wt=prompt('WH type (blank = unknown):','');
+  await fetch(`${API}/chain/connection`,{method:'POST',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({from_id:fromId,to_id:toId,wh_type:wt||null})});
+  await loadChain();
+}
+async function cmClear(){
+  if(!confirm('Clear the entire chain? Cannot be undone.'))return;
+  await fetch(`${API}/chain/clear`,{method:'POST',credentials:'include'});
+  _cmSel=null;_cmSelConn=null; await loadChain();
+}
+function cmFitAll(){
+  if(!_cm.systems.length){_cmCx=0;_cmCy=0;_cmCz=1;cmApplyT();return;}
+  const r=cmSvg.getBoundingClientRect();
+  const xs=_cm.systems.map(s=>s.x),ys=_cm.systems.map(s=>s.y);
+  const xn=Math.min(...xs),xx=Math.max(...xs)+CW,yn=Math.min(...ys),yx=Math.max(...ys)+CH;
+  const pad=60,sx=(r.width-pad*2)/(xx-xn||1),sy=(r.height-pad*2)/(yx-yn||1);
+  _cmCz=Math.min(sx,sy,2.5);_cmCx=pad-xn*_cmCz;_cmCy=pad-yn*_cmCz;cmApplyT();
+}
+
+// Chain SVG pan/zoom/drag
+cmSvg.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=cmSvg.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+  const f=e.deltaY<0?1.15:.87,nz=Math.max(.1,Math.min(4,_cmCz*f));
+  _cmCx=mx-(mx-_cmCx)*(nz/_cmCz);_cmCy=my-(my-_cmCy)*(nz/_cmCz);_cmCz=nz;cmApplyT();
+},{passive:false});
+cmSvg.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  if(e.target===cmSvg||e.target.getAttribute&&e.target.getAttribute('fill')==='url(#cmGrid)'){
+    _cmDragging=true;_cmDsx=e.clientX-_cmCx;_cmDsy=e.clientY-_cmCy;cmSvg.style.cursor='grabbing';
+    _cmSel=null;_cmSelConn=null;renderChainPanel();
+  }
+});
+window.addEventListener('mousemove',e=>{
+  if(_cmDragNode){
+    const s=_cm.systems.find(x=>x.id===_cmDragNode);
+    if(s){
+      s.x=_cmDnox+(e.clientX-_cmDnx0)/_cmCz;
+      s.y=_cmDnoy+(e.clientY-_cmDny0)/_cmCz;
+      const g=cmNodesG.querySelector(`[data-nid="${_cmDragNode}"]`);
+      if(g)g.setAttribute('transform',`translate(${s.x},${s.y})`);
+      const byId={};for(const x of _cm.systems)byId[x.id]=x;
+      cmConnsG.innerHTML='';for(const c of _cm.connections)drawChainConn(c,byId);
+    }
+    return;
+  }
+  if(_cmDragging){_cmCx=e.clientX-_cmDsx;_cmCy=e.clientY-_cmDsy;cmApplyT();}
+});
+window.addEventListener('mouseup',e=>{
+  if(_cmDragNode){
+    const s=_cm.systems.find(x=>x.id===_cmDragNode);
+    if(s) fetch(`${API}/chain/system/${s.id}`,{method:'PATCH',credentials:'include',
+      headers:{'Content-Type':'application/json'},body:JSON.stringify({x:s.x,y:s.y})});
+    _cmDragNode=null;cmSvg.style.cursor='';return;
+  }
+  if(_cmConnFrom){
+    const tg=e.target.closest('[data-nid]');
+    if(tg){const tid=parseInt(tg.dataset.nid);if(tid&&tid!==_cmConnFrom)cmAddConn(_cmConnFrom,tid);}
+    _cmConnFrom=null;cmSvg.style.cursor='';return;
+  }
+  _cmDragging=false;cmSvg.style.cursor='';
+});
+cmApplyT();
 </script>
 {% endblock %}
