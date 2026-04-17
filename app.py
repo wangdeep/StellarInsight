@@ -485,6 +485,17 @@ def create_app() -> FastAPI:
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
     templates = Jinja2Templates(directory=os.path.join(base_dir, "templates"))
+
+    # Nebulae live in the persistent user data directory so they survive across
+    # restarts and PyInstaller _MEIPASS temp-dir wipes.
+    # Mount BEFORE the main /static mount so requests to /app/static/nebulae/*
+    # are handled here rather than looking inside the bundle.
+    _neb_dir = _nebula_out_dir()
+    app.mount(
+        f"{APP_PREFIX}/static/nebulae",
+        StaticFiles(directory=_neb_dir),
+        name="nebulae",
+    )
     app.mount(
         f"{APP_PREFIX}/static",
         StaticFiles(directory=os.path.join(base_dir, "static")),
@@ -515,10 +526,19 @@ def create_app() -> FastAPI:
         if cached:
             return cached
 
-        # Read the current version from the VERSION file next to app.py
+        # Read the current version: installer drops VERSION into XYLON_EVE_DATA;
+        # fall back to the file next to app.py when running from source.
         try:
-            ver_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION")
-            current = open(ver_file).read().strip()
+            data_dir = os.environ.get("XYLON_EVE_DATA", "")
+            ver_candidates = []
+            if data_dir:
+                ver_candidates.append(os.path.join(data_dir, "VERSION"))
+            ver_candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "VERSION"))
+            current = "0.0.0"
+            for vc in ver_candidates:
+                if os.path.exists(vc):
+                    current = open(vc).read().strip()
+                    break
         except Exception:
             current = "0.0.0"
 
@@ -778,6 +798,140 @@ def create_app() -> FastAPI:
     @app.get(f"{APP_PREFIX}/wormholes", response_class=HTMLResponse)
     def wormholes_page(request: Request, user=Depends(require_user)):
         return templates.TemplateResponse(request, "wormholes.html", {"user": user, "theme": get_theme_vars()})
+
+    # ── Chain Mapper API ────────────────────────────────────────────────────────
+    from eve.chain_mapper import (
+        chain_state as _chain_state,
+        add_system as _chain_add_sys,
+        move_system as _chain_move_sys,
+        update_system as _chain_update_sys,
+        remove_system as _chain_remove_sys,
+        set_home as _chain_set_home,
+        add_connection as _chain_add_conn,
+        update_connection as _chain_update_conn,
+        remove_connection as _chain_remove_conn,
+        clear_chain as _chain_clear,
+        find_route as _chain_find_route,
+        get_intel_config as _intel_config,
+        save_intel_config as _intel_save_config,
+        list_chat_logs as _intel_list_logs,
+        read_intel_feed as _intel_read_feed,
+        default_log_dir as _intel_default_dir,
+    )
+
+    @app.get(f"{API_PREFIX}/chain/state")
+    def api_chain_state():
+        return _chain_state()
+
+    @app.post(f"{API_PREFIX}/chain/system")
+    async def api_chain_add_system(payload: dict = Body(...)):
+        return _chain_add_sys(
+            name=payload.get("name", ""),
+            sys_class=payload.get("class", ""),
+            security=float(payload.get("security", 0)),
+            x=float(payload.get("x", 0)),
+            y=float(payload.get("y", 0)),
+            is_home=bool(payload.get("is_home", False)),
+            notes=payload.get("notes", ""),
+        )
+
+    @app.patch(f"{API_PREFIX}/chain/system/{{sys_id}}")
+    async def api_chain_update_system(sys_id: int, payload: dict = Body(...)):
+        if "x" in payload or "y" in payload:
+            return _chain_move_sys(sys_id, float(payload.get("x", 0)), float(payload.get("y", 0)))
+        return _chain_update_sys(sys_id, **payload)
+
+    @app.post(f"{API_PREFIX}/chain/system/{{sys_id}}/home")
+    async def api_chain_set_home(sys_id: int):
+        return _chain_set_home(sys_id)
+
+    @app.delete(f"{API_PREFIX}/chain/system/{{sys_id}}")
+    async def api_chain_remove_system(sys_id: int):
+        return _chain_remove_sys(sys_id)
+
+    @app.post(f"{API_PREFIX}/chain/connection")
+    async def api_chain_add_connection(payload: dict = Body(...)):
+        return _chain_add_conn(
+            from_id=int(payload.get("from_id", 0)),
+            to_id=int(payload.get("to_id", 0)),
+            wh_type=payload.get("wh_type", ""),
+            mass=payload.get("mass", "stable"),
+            eol=payload.get("eol", "fresh"),
+            is_frig=bool(payload.get("is_frig", False)),
+            notes=payload.get("notes", ""),
+        )
+
+    @app.patch(f"{API_PREFIX}/chain/connection/{{conn_id}}")
+    async def api_chain_update_connection(conn_id: int, payload: dict = Body(...)):
+        return _chain_update_conn(conn_id, **payload)
+
+    @app.delete(f"{API_PREFIX}/chain/connection/{{conn_id}}")
+    async def api_chain_remove_connection(conn_id: int):
+        return _chain_remove_conn(conn_id)
+
+    @app.post(f"{API_PREFIX}/chain/clear")
+    async def api_chain_clear():
+        return _chain_clear()
+
+    @app.get(f"{API_PREFIX}/chain/route")
+    async def api_chain_route(
+        origin: str = Query(...),
+        destination: str = Query(...),
+        use_chain: bool = Query(True),
+        use_thera: bool = Query(True),
+    ):
+        thera_data = None
+        if use_thera:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        "https://www.eve-scout.com/api/wormholes",
+                        timeout=aiohttp.ClientTimeout(total=8),
+                    ) as resp:
+                        if resp.status == 200:
+                            thera_data = await resp.json()
+            except Exception as e:
+                logger.warning("Thera fetch failed: %s", e)
+        return _chain_find_route(
+            origin=origin,
+            destination=destination,
+            use_chain=use_chain,
+            use_thera=use_thera,
+            thera_connections=thera_data,
+        )
+
+    # ── Intel API ───────────────────────────────────────────────────────────────
+    @app.get(f"{API_PREFIX}/intel/config")
+    def api_intel_config():
+        return _intel_config()
+
+    @app.post(f"{API_PREFIX}/intel/config")
+    async def api_intel_save_config(payload: dict = Body(...)):
+        return _intel_save_config(
+            log_dir=payload.get("log_dir", _intel_default_dir()),
+            channels=payload.get("channels", []),
+            watch_systems=payload.get("watch_systems", []),
+        )
+
+    @app.get(f"{API_PREFIX}/intel/logs")
+    def api_intel_logs(log_dir: str = Query("")):
+        if not log_dir:
+            cfg = _intel_config()
+            log_dir = cfg.get("log_dir", _intel_default_dir())
+        return {"files": _intel_list_logs(log_dir), "log_dir": log_dir}
+
+    @app.get(f"{API_PREFIX}/intel/feed")
+    def api_intel_feed(since: float = Query(0)):
+        cfg = _intel_config()
+        return {
+            "messages": _intel_read_feed(
+                log_dir=cfg.get("log_dir", _intel_default_dir()),
+                channels=cfg.get("channels", []),
+                since=since,
+                watch_systems=cfg.get("watch_systems", []),
+            ),
+            "ts": time.time(),
+        }
 
     @app.get(f"{APP_PREFIX}/eve_console", response_class=HTMLResponse)
     def eve_console_page(request: Request, user=Depends(require_user)):
@@ -2090,8 +2244,19 @@ _NEBULA_SOURCES = [
 
 
 def _nebula_out_dir() -> str:
-    """Absolute path to static/nebulae inside the app bundle."""
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "nebulae")
+    """Persistent nebulae directory in the user data folder.
+
+    Stored under %APPDATA%\\StellarInsight\\nebulae\\ (set by main.py via
+    XYLON_EVE_DATA) so images survive across app restarts.  Falls back to
+    static/nebulae next to the script when running from source.
+    """
+    data_dir = os.environ.get("XYLON_EVE_DATA", "")
+    if data_dir:
+        p = os.path.join(data_dir, "nebulae")
+    else:
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "nebulae")
+    os.makedirs(p, exist_ok=True)
+    return p
 
 
 def _dxt1_decompress_block(block: bytes, x: int, y: int, img_w: int, pixels: bytearray) -> None:

@@ -55,9 +55,19 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon";    Description: "{cm:CreateDesktopIcon}";    GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 Name: "startupicon";    Description: "Launch {#AppName} at Windows startup"; GroupDescription: "Startup:"; Flags: unchecked
 
+[Dirs]
+; Pre-create the user data directory and subfolders so the app can write
+; to them immediately on first launch without needing elevated rights.
+; {userappdata} resolves to C:\Users\<user>\AppData\Roaming
+Name: "{userappdata}\{#AppName}";           Flags: uninsneveruninstall
+Name: "{userappdata}\{#AppName}\nebulae";   Flags: uninsneveruninstall
+
 [Files]
 ; The compiled single-file executable from PyInstaller
 Source: "dist\{#AppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; Drop the VERSION file into the user data dir so the app and update
+; checker can always find it, regardless of the install path.
+Source: "VERSION"; DestDir: "{userappdata}\{#AppName}"; Flags: ignoreversion
 
 [Icons]
 ; Start Menu shortcut

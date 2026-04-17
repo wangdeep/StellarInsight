@@ -26,16 +26,22 @@ logger = logging.getLogger("xylon.sde_local")
 
 
 def _default_sde_path() -> str:
-    """Return the path to sde.sqlite next to the executable (or next to this file
-    when running from source). Respects SDE_SQLITE_PATH env override."""
+    """Return the path to sde.sqlite in the user data directory.
+
+    Priority order:
+      1. SDE_SQLITE_PATH  env var  (explicit override)
+      2. XYLON_EVE_DATA   env var  (set by main.py to %APPDATA%\\StellarInsight)
+      3. Dev fallback: data/ folder next to the project root
+    """
     if "SDE_SQLITE_PATH" in os.environ:
         return os.environ["SDE_SQLITE_PATH"]
-    # PyInstaller sets sys.frozen and sys.executable to the bundle path.
-    if getattr(sys, "frozen", False):
-        base = os.path.dirname(sys.executable)
-    else:
-        # Running from source: place data/ next to the eve/ package's parent dir.
-        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    # main.py sets this before the server thread imports us, so in the
+    # installed build this always points to %APPDATA%\StellarInsight\sde.sqlite
+    data_dir = os.environ.get("XYLON_EVE_DATA", "")
+    if data_dir:
+        return os.path.join(data_dir, "sde.sqlite")
+    # Running from source (no env var): place data/ next to the project root.
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base, "data", "sde.sqlite")
 
 

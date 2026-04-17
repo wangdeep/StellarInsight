@@ -325,9 +325,13 @@ def main() -> None:
 
     data = _data_dir()   # ensure data dir exists
 
-    # Tell app.py where to find its persistent DB and session secret.
-    # Must be set before the server thread imports app.py.
-    os.environ["XYLON_EVE_DATA"] = str(data)
+    # Tell app.py and sde_local.py where all persistent data lives.
+    # MUST be set before the server thread imports app.py / sde_local.py.
+    os.environ["XYLON_EVE_DATA"]   = str(data)
+    os.environ["SDE_SQLITE_PATH"]  = str(data / "sde.sqlite")
+    # Also create the nebulae sub-directory now so the static mount never
+    # fails on first launch (FastAPI raises on missing StaticFiles dir).
+    (data / "nebulae").mkdir(parents=True, exist_ok=True)
     logger.info("Data dir: %s", data)
 
     app_url = f"http://127.0.0.1:{port}/"
