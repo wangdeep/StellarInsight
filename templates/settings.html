@@ -6,7 +6,7 @@
     <p class="muted" style="margin-top:6px;">EVE character management and app configuration.</p>
   </div>
   {% if is_premium %}
-  <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:rgba(34,197,94,.10);border:1px solid rgba(34,197,94,.25);">
+  <div style="display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:20px;background:rgba(0,30,10,.8);border:1px solid rgba(34,197,94,.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);">
     <svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:none;stroke:#22c55e;stroke-width:2.5;flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
     <span style="font-size:13px;font-weight:600;color:#22c55e;">Premium Active</span>
   </div>
@@ -15,7 +15,7 @@
 
 {% if is_premium and reinstall_key %}
 <!-- ── Reinstall key card ─────────────────────────────────────────────────── -->
-<div style="margin-top:16px;padding:16px 18px;border-radius:14px;background:rgba(255,140,0,.06);border:1px solid rgba(255,140,0,.25);display:flex;flex-direction:column;gap:10px;">
+<div style="margin-top:16px;padding:16px 18px;border-radius:14px;background:rgba(30,12,0,.6);border:1px solid rgba(255,140,0,.35);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;flex-direction:column;gap:10px;">
   <div style="display:flex;align-items:flex-start;gap:10px;">
     <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#ff8c00;stroke-width:2.2;flex-shrink:0;margin-top:1px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     <div>

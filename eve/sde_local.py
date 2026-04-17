@@ -302,8 +302,8 @@ def get_type_dogma(type_id: int) -> Dict:
 
 # ── Type Search ───────────────────────────────────────────────────────────
 
-def type_search(query: str, limit: int = 80) -> List[Dict]:
-    """Search types by name. Returns [{typeID, typeName, groupName}]."""
+def type_search(query: str, limit: int = 100) -> List[Dict]:
+    """Search market-tradeable types by name. Returns [{typeID, typeName, groupName}]."""
     if not query or len(query) < 2:
         return []
     con = _get_sde()
@@ -311,7 +311,7 @@ def type_search(query: str, limit: int = 80) -> List[Dict]:
         "SELECT t.typeID, t.typeName, g.groupName "
         "FROM invTypes t "
         "JOIN invGroups g ON t.groupID = g.groupID "
-        "WHERE t.typeName LIKE ? AND t.published = 1 "
+        "WHERE t.typeName LIKE ? AND t.published = 1 AND t.marketGroupID IS NOT NULL "
         "ORDER BY t.typeName LIMIT ?",
         (f"%{query}%", limit)
     ).fetchall()

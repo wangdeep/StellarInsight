@@ -107,6 +107,17 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
   backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
   border-radius:5px;padding:3px 10px;font-size:9px;color:var(--muted);
   display:flex;gap:12px;pointer-events:none;}
+
+/* ── Route Finder hops (Routes tab) ─────────────────────────────── */
+.nav-hop{display:flex;align-items:center;gap:7px;padding:5px 10px;font-size:11px;
+  border-bottom:1px solid rgba(50,182,255,.05);}
+.nav-hop:last-child{border-bottom:none;}
+.nav-hop-idx{font-size:9px;color:var(--muted);width:18px;text-align:right;flex-shrink:0;}
+.nav-hop-icon{font-size:12px;flex-shrink:0;}
+.nav-hop-name{flex:1;font-weight:600;color:var(--text);}
+.nav-hop-via{font-size:9px;color:var(--muted);}
+.nav-hop-first{background:rgba(50,182,255,.06);}
+.nav-hop-last{background:rgba(168,85,247,.06);}
 </style>
 
 <div id="navRoot">
@@ -194,12 +205,32 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
       </div>
     </div>
 
-    <div class="side-pane" id="pane-routes">
-      <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;">
-        <input id="routeInp" class="input" placeholder="System name…" style="flex:1;font-size:11px;"/>
-        <button class="btn" style="padding:3px 10px;font-size:10px;" onclick="addRoute()">＋</button>
+    <div class="side-pane" id="pane-routes" style="overflow:hidden;">
+      <!-- Route Finder section -->
+      <div style="padding:8px 10px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;background:rgba(0,0,0,.2);">
+        <div style="font-size:9px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Route Finder</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <input id="navRfFrom" class="input" placeholder="From…" style="font-size:11px;width:100%;"/>
+          <input id="navRfTo"   class="input" placeholder="To…"   style="font-size:11px;width:100%;"/>
+          <div style="display:flex;gap:12px;font-size:11px;margin-top:2px;">
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="navRfChain" checked> Chain</label>
+            <label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="navRfThera" checked> Thera</label>
+          </div>
+          <button class="btn" style="font-size:10px;padding:3px 0;width:100%;margin-top:2px;" onclick="navFindRoute()">Find Route</button>
+          <div id="navRfStatus" style="font-size:10px;color:var(--muted);min-height:14px;"></div>
+        </div>
       </div>
-      <div id="routeList" style="flex:1;overflow-y:auto;"></div>
+      <!-- Hop results -->
+      <div id="navRfResults" style="flex:1;overflow-y:auto;min-height:0;">
+        <div style="padding:12px;color:var(--muted);font-size:11px;opacity:.5;text-align:center;">Enter systems above to find a route</div>
+      </div>
+      <!-- Saved destinations (bookmarks) -->
+      <div style="padding:6px 8px;display:flex;gap:5px;align-items:center;border-top:1px solid rgba(50,182,255,.08);flex-shrink:0;background:rgba(0,0,0,.2);">
+        <span style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;">Bookmarks</span>
+        <input id="routeInp" class="input" placeholder="Save destination…" style="flex:1;font-size:10px;"/>
+        <button class="btn" style="padding:2px 8px;font-size:10px;" onclick="addRoute()">＋</button>
+      </div>
+      <div id="routeList" style="max-height:110px;overflow-y:auto;border-top:1px solid rgba(50,182,255,.05);flex-shrink:0;"></div>
     </div>
 
     <div class="side-pane" id="pane-pilots">
@@ -725,6 +756,10 @@ async function showSysDet(s){
   const np = (_data.pilots[sid]||[]);
   const el = document.getElementById('sysDetail');
 
+  // Auto-fill Route Finder "From" with selected system name
+  const _rfFrom = document.getElementById('navRfFrom');
+  if(_rfFrom) _rfFrom.value = s.system_name || '';
+
   // Nebula — computed immediately from s.region_name (no fetch needed)
   const _nebF0 = regionNebulaFile(s.region_name||'', isWH);
   const _nebPos = _nebF0==='kador' ? '30% 25%' : 'center';
@@ -1194,6 +1229,57 @@ async function applyPaste(){
   }
   closePaste();loadMap();
 }
+
+// ── Route Finder (Routes tab) ─────────────────────────────
+function _navSecCol(sec){
+  if(sec>=0.45) return '#4ade80';
+  if(sec>0.0)   return '#fbbf24';
+  return '#f87171';
+}
+function _navHopIcon(via){
+  if(via==='wormhole') return '🕳️';
+  if(via==='thera')    return '🌀';
+  if(via==='start')    return '📍';
+  return '⬡';
+}
+async function navFindRoute(){
+  const origin = document.getElementById('navRfFrom').value.trim();
+  const dest   = document.getElementById('navRfTo').value.trim();
+  const status = document.getElementById('navRfStatus');
+  const res    = document.getElementById('navRfResults');
+  if(!origin||!dest){ status.textContent='Enter both systems.'; return; }
+  const useChain = document.getElementById('navRfChain').checked;
+  const useThera = document.getElementById('navRfThera').checked;
+  status.textContent = '⏳ Calculating…';
+  res.innerHTML = '';
+  try{
+    const r = await fetch(
+      `${API}/chain/route?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&use_chain=${useChain}&use_thera=${useThera}`,
+      {credentials:'include'}
+    );
+    const d = await r.json();
+    if(d.error){ status.textContent = '⚠️ '+d.error; return; }
+    const hops = d.hops||[];
+    status.textContent = `${d.jumps} jump${d.jumps!==1?'s':''}` +
+      (d.used_chain&&d.used_thera?' · chain+Thera':d.used_chain?' · chain':d.used_thera?' · Thera':'');
+    res.innerHTML = hops.map((h,i)=>{
+      const isWH = h.via==='wormhole'||h.via==='thera';
+      const secHtml = isWH
+        ? `<span style="font-size:9px;color:var(--muted);">J-space</span>`
+        : `<span style="font-size:10px;font-weight:700;color:${_navSecCol(h.security)}">${h.security.toFixed(1)}</span>`;
+      const cls = 'nav-hop'+(i===0?' nav-hop-first':i===hops.length-1?' nav-hop-last':'');
+      return `<div class="${cls}">
+        <span class="nav-hop-idx">${i}</span>
+        <span class="nav-hop-icon">${_navHopIcon(h.via)}</span>
+        <span class="nav-hop-name">${esc(h.system)}</span>
+        <span class="nav-hop-via">${h.via!=='start'?h.via:''}</span>
+        ${secHtml}
+      </div>`;
+    }).join('');
+  }catch(e){ status.textContent = 'Request failed.'; }
+}
+document.getElementById('navRfFrom').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('navRfTo').focus(); });
+document.getElementById('navRfTo').addEventListener('keydown',e=>{ if(e.key==='Enter') navFindRoute(); });
 
 // ── Routes ────────────────────────────────────────────────
 async function renderRoutes(){

@@ -10,6 +10,7 @@
   .mkt-left{border-right:1px solid rgba(60,80,110,0.22);display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
   .mkt-right{display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
   .mkt-tree-scroll{flex:1 1 0;overflow-y:auto;font-size:clamp(11px,1vw,13px);min-height:80px;}
+  .mkt-tree-scroll.hidden{display:none;}
   .mkt-item-list{overflow-y:auto;flex:1;}
   .mkt-item-row{display:flex;align-items:center;gap:5px;padding:3px 7px;cursor:pointer;transition:background 0.08s;border-bottom:1px solid rgba(46,51,59,0.3);font-size:clamp(11px,1vw,13px);}
   .mkt-item-row:hover{background:rgba(50,160,220,0.06);}
@@ -63,9 +64,9 @@
       <div class="mkt-left">
         <div style="padding:4px;"><input id="mktSearch" class="eve-input" placeholder="Search items…" style="width:100%;font-size:12px;padding:4px 7px;" oninput="searchItems()"/></div>
         <div id="catTree" class="mkt-tree-scroll eve-scroll"><div style="padding:12px;color:#6b7280;font-size:10px;">Loading market tree…</div></div>
-        <div id="itemResultsWrap" style="display:none;flex:0 1 38%;min-height:60px;overflow:hidden;display:none;flex-direction:column;border-top:1px solid rgba(60,80,110,0.22);">
+        <div id="itemResultsWrap" style="display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column;border-top:1px solid rgba(60,80,110,0.22);">
           <div id="itemResultsHdr" style="padding:3px 8px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(60,80,110,0.18);flex-shrink:0;">ITEMS</div>
-          <div id="itemResults" class="mkt-item-list eve-scroll" style="flex:1;overflow-y:auto;max-height:none;"></div>
+          <div id="itemResults" class="mkt-item-list eve-scroll" style="flex:1;overflow-y:auto;"></div>
         </div>
       </div>
       <div class="mkt-right">
@@ -181,7 +182,16 @@ function togCat(el,gid){
 }
 
 async function loadCatItems(groupID,groupName,evt){
-  const wrap=document.getElementById('itemResultsWrap');wrap.style.display='flex';const el=document.getElementById('itemResults');document.getElementById('itemResultsHdr').textContent=groupName||'ITEMS';
+  // If user clicks a category while searching, clear the search and restore the tree
+  const searchInp=document.getElementById('mktSearch');
+  if(searchInp.value.trim().length>=2){ searchInp.value=''; _searchToggle(false); }
+  const wrap=document.getElementById('itemResultsWrap');
+  // Show items panel below tree (not full-height search mode)
+  document.getElementById('catTree').classList.remove('hidden');
+  wrap.style.display='flex';
+  wrap.style.flex='0 1 38%';
+  const el=document.getElementById('itemResults');
+  document.getElementById('itemResultsHdr').textContent=groupName||'ITEMS';
   el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">Loading…</div>';
   document.querySelectorAll('.tl').forEach(l=>l.classList.remove('active'));
   evt?.target?.closest('.tl')?.classList.add('active');
@@ -196,16 +206,32 @@ async function loadCatItems(groupID,groupName,evt){
 
 function searchItems(){clearTimeout(_searchTimer);_searchTimer=setTimeout(doSearch,350);}
 
+function _searchToggle(searching){
+  const tree = document.getElementById('catTree');
+  const wrap = document.getElementById('itemResultsWrap');
+  if(searching){
+    tree.classList.add('hidden');
+    wrap.style.flex = '1';      // take full height when tree is hidden
+    wrap.style.display = 'flex';
+    document.getElementById('itemResultsHdr').textContent='SEARCH RESULTS';
+  } else {
+    tree.classList.remove('hidden');
+    wrap.style.display = 'none';
+    wrap.style.flex = '0 1 38%'; // restore partial height for category browse
+  }
+}
+
 async function doSearch(){
-  const q=document.getElementById('mktSearch').value.trim();const el=document.getElementById('itemResults');
-  const wrap=document.getElementById('itemResultsWrap');
-  if(!q||q.length<2){wrap.style.display='none';return;}
-  wrap.style.display='flex';el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">Searching…</div>';
+  const q=document.getElementById('mktSearch').value.trim();
+  const el=document.getElementById('itemResults');
+  if(!q||q.length<2){_searchToggle(false);return;}
+  _searchToggle(true);
+  el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">Searching…</div>';
   try{
     const r=await fetch(SDE+'/type_search?q='+encodeURIComponent(q),{credentials:'include'});
     let items=await r.json();if(!Array.isArray(items))items=[];
-    if(!items.length){el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">No results.</div>';return;}
-    el.innerHTML=items.map(i=>`<div class="mkt-item-row" onclick="selectItem(${i.typeID},'${_esc(i.typeName||'').replace(/'/g,"\\'")}')" data-tid="${i.typeID}">${typeImg(i.typeID,32)}<div style="flex:1;"><div>${_esc(i.typeName||'?')}</div>${i.groupName ? "<div style=\"font-size:8px;color:#4a5060;\">" + _esc(i.groupName) + "</div>" : ""}</div></div>`).join('');
+    if(!items.length){el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">No results for "'+_esc(q)+'".</div>';return;}
+    el.innerHTML=items.map(i=>`<div class="mkt-item-row" onclick="selectItem(${i.typeID},'${_esc(i.typeName||'').replace(/'/g,"\\'")}')" data-tid="${i.typeID}">${typeImg(i.typeID,32)}<div style="flex:1;"><div>${_esc(i.typeName||'?')}</div>${i.groupName?'<div style="font-size:8px;color:#4a5060;">'+_esc(i.groupName)+'</div>':''}</div></div>`).join('');
   }catch(e){el.innerHTML=`<div style="padding:6px;color:#ef2f2f;font-size:10px;">${e.message}</div>`;}
 }
 
@@ -227,11 +253,19 @@ async function selectItem(typeID,name){
     const srcBadge=priceSource==='esi_fallback'?`<div style="font-size:9px;color:#f59e0b;margin-bottom:4px;">⚠ Fuzzwork unavailable — ESI regional prices</div>`:'';
     let html=`${srcBadge}<div class="best-prices"><div class="best-stat"><div class="best-label">Best Sell</div><div class="best-val sell">${fmtISK(bestSell===Infinity?0:bestSell)} ISK</div><div class="best-hub">${_esc(bestSellHub)}</div></div><div class="best-stat"><div class="best-label">Best Buy</div><div class="best-val buy">${fmtISK(bestBuy)} ISK</div><div class="best-hub">${_esc(bestBuyHub)}</div></div>${bestSell<Infinity&&bestBuy>0?`<div class="best-stat"><div class="best-label">Margin</div><div class="best-val" style="color:#4aa8e8;">${((bestSell-bestBuy)/bestSell*100).toFixed(1)}%</div></div>`:''}</div>`;
     Object.entries(hubs).forEach(([hub,d])=>{
-      if(!d)return;const sell=d.sell||{},buy=d.buy||{};
-      html+=`<div class="order-hdr">${_esc(hub)}</div><table class="order-table"><thead><tr><th>Type</th><th>Volume</th><th>Price</th></tr></thead><tbody>`;
-      if(parseFloat(sell.min)>0)html+=`<tr><td class="sell">Sell Min</td><td>${fmtNum(sell.volume||0)}</td><td class="sell">${fmtFullISK(sell.min)}</td></tr>`;
-      if(parseFloat(buy.max)>0)html+=`<tr><td class="buy">Buy Max</td><td>${fmtNum(buy.volume||0)}</td><td class="buy">${fmtFullISK(buy.max)}</td></tr>`;
-      html+=`</tbody></table>`;
+      const sell = d?.sell || {};
+      const buy  = d?.buy  || {};
+      const hasSell = parseFloat(sell.min) > 0;
+      const hasBuy  = parseFloat(buy.max)  > 0;
+      html += `<div class="order-hdr">${_esc(hub)}</div>`;
+      if(!hasSell && !hasBuy){
+        html += `<div style="padding:4px 8px 6px;font-size:9px;color:#4a5060;font-style:italic;">No active orders in this hub</div>`;
+        return;
+      }
+      html += `<table class="order-table"><thead><tr><th>Type</th><th>Volume</th><th>Price</th></tr></thead><tbody>`;
+      if(hasSell) html += `<tr><td class="sell">Sell Min</td><td>${fmtNum(sell.volume||0)}</td><td class="sell">${fmtFullISK(sell.min)}</td></tr>`;
+      if(hasBuy)  html += `<tr><td class="buy">Buy Max</td><td>${fmtNum(buy.volume||0)}</td><td class="buy">${fmtFullISK(buy.max)}</td></tr>`;
+      html += `</tbody></table>`;
     });
     if(history.length){const maxAvg=Math.max(...history.map(h=>h.average||0));html+=`<div class="hist-wrap"><div class="hist-title">Price History (The Forge, ${history.length}d)</div><div class="hist-bar">${history.map(h=>{const pct=maxAvg>0?(h.average/maxAvg*100):0;return `<div class="hist-col"><div class="hist-fill" style="height:${pct}%;"></div><div class="hist-lbl">${(h.date||'').slice(5,10)}</div></div>`;}).join('')}</div><div style="font-size:9px;color:#6b7280;margin-top:4px;">Latest: ${fmtISK(history[history.length-1]?.average||0)} avg · ${fmtNum(history[history.length-1]?.volume||0)} vol</div></div>`;}
     det.innerHTML=html||'<div style="padding:12px;color:#6b7280;">No market data available.</div>';

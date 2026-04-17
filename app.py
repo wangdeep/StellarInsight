@@ -464,6 +464,22 @@ def get_theme_vars() -> Dict[str, str]:
     }
 
 
+def _nebula_out_dir() -> str:
+    """Persistent nebulae directory in the user data folder.
+
+    Stored under %APPDATA%\\StellarInsight\\nebulae\\ (set by main.py via
+    XYLON_EVE_DATA) so images survive across app restarts.  Falls back to
+    static/nebulae next to the script when running from source.
+    """
+    data_dir = os.environ.get("XYLON_EVE_DATA", "")
+    if data_dir:
+        p = os.path.join(data_dir, "nebulae")
+    else:
+        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "nebulae")
+    os.makedirs(p, exist_ok=True)
+    return p
+
+
 # ── App factory ────────────────────────────────────────────────────────────────
 
 def create_app() -> FastAPI:
@@ -2243,22 +2259,6 @@ _NEBULA_SOURCES = [
 ]
 
 
-def _nebula_out_dir() -> str:
-    """Persistent nebulae directory in the user data folder.
-
-    Stored under %APPDATA%\\StellarInsight\\nebulae\\ (set by main.py via
-    XYLON_EVE_DATA) so images survive across app restarts.  Falls back to
-    static/nebulae next to the script when running from source.
-    """
-    data_dir = os.environ.get("XYLON_EVE_DATA", "")
-    if data_dir:
-        p = os.path.join(data_dir, "nebulae")
-    else:
-        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "nebulae")
-    os.makedirs(p, exist_ok=True)
-    return p
-
-
 def _dxt1_decompress_block(block: bytes, x: int, y: int, img_w: int, pixels: bytearray) -> None:
     """Decode one 4×4 DXT1 (BC1) block into `pixels` (RGBA flat array)."""
     c0 = int.from_bytes(block[0:2], "little")
@@ -3948,7 +3948,7 @@ async def api_sde_drone_search(q: str = "", limit: int = 100):
 
 @app.get("/app/api/sde/market_prices/{type_id}")
 async def api_sde_market_prices(type_id: int):
-    """Fetch live prices from trade hubs. Fuzzwork primary, ESI fallback."""
+    """Fetch live prices from trade hubs. Fuzzwork primary, ESI fallback. All hubs fetched in parallel."""
     ck = f"sde:mkt_price:{type_id}"
     cached = _sde_cache_get(ck)
     if cached:
@@ -3963,13 +3963,14 @@ async def api_sde_market_prices(type_id: int):
     }
 
     async def _esi_regional_price(session, region_id: int, tid: int) -> dict:
+        """Fetch orders for a type in a region from ESI. Returns {} if no orders."""
         try:
             orders = []
             page = 1
             while True:
                 url = (f"https://esi.evetech.net/latest/markets/{region_id}/orders/"
                        f"?type_id={tid}&order_type=all&page={page}")
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as r:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=12)) as r:
                     if r.status != 200:
                         break
                     batch = await r.json()
@@ -3982,53 +3983,65 @@ async def api_sde_market_prices(type_id: int):
             if not orders:
                 return {}
             sells = [o["price"] for o in orders if not o["is_buy_order"]]
-            buys = [o["price"] for o in orders if o["is_buy_order"]]
+            buys  = [o["price"] for o in orders if o["is_buy_order"]]
             return {
-                "sell": {"min": min(sells) if sells else None, "volume": sum(o["volume_remain"] for o in orders if not o["is_buy_order"])},
-                "buy": {"max": max(buys) if buys else None, "volume": sum(o["volume_remain"] for o in orders if o["is_buy_order"])},
+                "sell": {
+                    "min": min(sells) if sells else None,
+                    "volume": sum(o["volume_remain"] for o in orders if not o["is_buy_order"]),
+                },
+                "buy": {
+                    "max": max(buys) if buys else None,
+                    "volume": sum(o["volume_remain"] for o in orders if o["is_buy_order"]),
+                },
                 "_source": "esi_fallback",
             }
         except Exception:
             return {}
 
+    async def _fetch_hub(session, hub_name: str, station_id: int, region_id: int, tid: int):
+        """Fetch one hub — Fuzzwork first, ESI fallback. Returns (hub_name, data, fuzzwork_ok)."""
+        try:
+            url = f"{_SDE_MKT}/aggregates/?station={station_id}&types={tid}"
+            async with session.get(url, timeout=aiohttp.ClientTimeout(total=8)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    item = data.get(str(tid)) or data.get(tid) or {}
+                    if item:
+                        return hub_name, item, True
+                # Fuzzwork returned nothing useful — fall through to ESI
+        except Exception:
+            pass
+        # ESI fallback
+        data = await _esi_regional_price(session, region_id, tid)
+        return hub_name, data, False
+
     results = {}
     fuzzwork_ok = True
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
-            for hub_name, (station_id, region_id) in HUBS.items():
-                try:
-                    url = f"{_SDE_MKT}/aggregates/?station={station_id}&types={type_id}"
-                    async with session.get(url) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            item = data.get(str(type_id)) or data.get(type_id) or {}
-                            if item:
-                                results[hub_name] = item
-                            else:
-                                results[hub_name] = await _esi_regional_price(session, region_id, type_id)
-                        else:
-                            fuzzwork_ok = False
-                            results[hub_name] = await _esi_regional_price(session, region_id, type_id)
-                except Exception:
+        async with aiohttp.ClientSession() as session:
+            tasks = [
+                _fetch_hub(session, hub_name, station_id, region_id, type_id)
+                for hub_name, (station_id, region_id) in HUBS.items()
+            ]
+            hub_results = await asyncio.gather(*tasks, return_exceptions=True)
+            for entry in hub_results:
+                if isinstance(entry, Exception):
+                    continue
+                hub_name, data, fw_ok = entry
+                results[hub_name] = data
+                if not fw_ok:
                     fuzzwork_ok = False
-                    results[hub_name] = None
     except Exception:
         fuzzwork_ok = False
 
-    missing = [h for h, v in results.items() if v is None]
-    if missing:
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
-                for hub_name in missing:
-                    _, region_id = HUBS[hub_name]
-                    results[hub_name] = await _esi_regional_price(session, region_id, type_id)
-        except Exception:
-            pass
-
+    # Fetch Jita price history in parallel with the hub fetches is already done above;
+    # now fetch history separately (The Forge = Jita region).
     history = []
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-            async with session.get(f"https://esi.evetech.net/latest/markets/10000002/history/?type_id={type_id}") as resp:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12)) as session:
+            async with session.get(
+                f"https://esi.evetech.net/latest/markets/10000002/history/?type_id={type_id}"
+            ) as resp:
                 if resp.status == 200:
                     history = await resp.json()
     except Exception:
