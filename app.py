@@ -4823,6 +4823,89 @@ async def api_industry_invention_chain(t2_type_id: int = 0):
         return {"ok": False, "error": str(e)}
 
 
+@app.get("/app/api/industry/pi_chain")
+async def api_industry_pi_chain(type_id: int = 0):
+    """Return PI production chain for a given output typeID using planetSchematics SDE tables."""
+    if not type_id or not sde_available():
+        return {"ok": False, "error": "SDE not available or no type_id"}
+    try:
+        import eve.sde_local as _sde_mod
+        con = _sde_mod._get_sde()
+
+        def get_schematic_for_output(tid):
+            return con.execute(
+                "SELECT s.schematicID, s.schematicName, s.cycleTime, m.quantity as outQty "
+                "FROM planetSchematics s JOIN planetSchematicsTypeMap m "
+                "ON s.schematicID=m.schematicID WHERE m.typeID=? AND m.isInput=0",
+                (tid,)
+            ).fetchone()
+
+        def build_chain(tid, depth=0, visited=None):
+            if visited is None:
+                visited = set()
+            if tid in visited or depth > 8:
+                return {"type_id": tid, "is_raw": True, "inputs": []}
+            visited = visited | {tid}
+            sch = get_schematic_for_output(tid)
+            if not sch:
+                return {"type_id": tid, "is_raw": True, "inputs": []}
+            inputs_rows = con.execute(
+                "SELECT typeID, quantity FROM planetSchematicsTypeMap WHERE schematicID=? AND isInput=1",
+                (sch["schematicID"],)
+            ).fetchall()
+            return {
+                "type_id": tid,
+                "is_raw": False,
+                "schematic_id": sch["schematicID"],
+                "schematic_name": sch["schematicName"],
+                "cycle_time": sch["cycleTime"],
+                "output_qty": sch["outQty"],
+                "inputs": [
+                    {**build_chain(r["typeID"], depth + 1, visited), "required_qty": r["quantity"]}
+                    for r in inputs_rows
+                ],
+            }
+
+        chain = build_chain(type_id)
+
+        all_ids = []
+        def collect_ids(node):
+            if not node: return
+            all_ids.append(node["type_id"])
+            for inp in node.get("inputs", []):
+                collect_ids(inp)
+        collect_ids(chain)
+
+        names = get_type_names(list(set(all_ids)))
+
+        def annotate(node):
+            if not node: return node
+            node["type_name"] = names.get(node["type_id"], f"Type {node['type_id']}")
+            node["inputs"] = [annotate(inp) for inp in node.get("inputs", [])]
+            return node
+
+        return {"ok": True, "chain": annotate(chain)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.get("/app/api/sde/pi_products")
+async def api_sde_pi_products():
+    """Return all PI output types (items produced by schematics)."""
+    if not sde_available():
+        return []
+    try:
+        import eve.sde_local as _sde_mod
+        con = _sde_mod._get_sde()
+        rows = con.execute(
+            "SELECT DISTINCT m.typeID, t.typeName FROM planetSchematicsTypeMap m "
+            "JOIN invTypes t ON t.typeID=m.typeID WHERE m.isInput=0 ORDER BY t.typeName"
+        ).fetchall()
+        return [{"typeID": r["typeID"], "typeName": r["typeName"]} for r in rows]
+    except Exception as e:
+        return []
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CANVAS MAP ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
