@@ -4,8 +4,69 @@
   main.wrap{max-width:100% !important;padding-top:calc(var(--topbar-h,72px) + var(--ticker-h,32px) + 4px) !important;padding-right:8px !important;padding-bottom:0 !important;}
   body:not(.sidebar-open) main.wrap{padding-left:8px !important;}
 
+  /* ── Page-level tab bar ── */
+  .pg-tabs{display:flex;gap:3px;padding:4px 8px 0;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;}
+  .pg-tab{padding:6px 14px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-radius:6px 6px 0 0;cursor:pointer;color:var(--muted);border:1px solid transparent;border-bottom:none;transition:all .12s;}
+  .pg-tab:hover{color:var(--text);background:rgba(50,182,255,.07);}
+  .pg-tab.active{color:var(--accent);background:rgba(50,182,255,.13);border-color:rgba(50,182,255,.2);}
+  .pg-panel{display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden;}
+  .pg-panel.active{display:flex;}
+  /* outer shell that holds tabs + panels */
+  .ind-shell{display:flex;flex-direction:column;height:calc(100vh - var(--topbar-h,72px) - var(--ticker-h,32px) - 4px);}
+
+  /* ── T2 Chain tab ── */
+  .chain-card{background:rgba(0,0,0,.4);border:1px solid rgba(50,182,255,.15);border-radius:8px;padding:14px 16px;max-width:640px;width:100%;}
+  .chain-card-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px;}
+  .chain-item-row{display:flex;align-items:center;gap:8px;padding:4px 0;}
+  .chain-item-row img{width:28px;height:28px;border:1px solid rgba(50,182,255,.15);border-radius:4px;background:rgba(0,0,0,.6);flex-shrink:0;}
+  .chain-arrow{display:flex;align-items:center;justify-content:center;padding:6px 0;color:rgba(50,182,255,.5);font-size:18px;max-width:640px;width:100%;}
+  .chain-stat-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(50,182,255,.08);border:1px solid rgba(50,182,255,.18);border-radius:20px;font-size:10px;font-weight:600;color:var(--accent);}
+  .chain-prob-pill{background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.25);color:#c084fc;}
+  .chain-run-box{background:rgba(0,0,0,.6);border:1px solid rgba(50,182,255,.12);border-radius:6px;padding:8px 12px;font-size:11px;margin-top:10px;}
+  #t2Dropdown div{padding:6px 10px;font-size:11px;cursor:pointer;color:var(--text);}
+  #t2Dropdown div:hover{background:rgba(50,182,255,.1);}
+
+  /* ── PI Chain tab ── */
+  .pi-node{border-radius:7px;border:1px solid rgba(50,182,255,.14);background:rgba(0,0,0,.4);padding:9px 12px;display:flex;align-items:center;gap:8px;min-width:200px;max-width:320px;}
+  .pi-node.raw{border-color:rgba(100,100,100,.2);background:rgba(255,255,255,.02);}
+  .pi-node img{width:28px;height:28px;border:1px solid rgba(50,182,255,.15);border-radius:4px;background:rgba(0,0,0,.6);flex-shrink:0;}
+  .pi-node.p4{border-color:rgba(168,85,247,.3);background:rgba(168,85,247,.06);}
+  .pi-node.p3{border-color:rgba(234,179,8,.25);background:rgba(234,179,8,.05);}
+  .pi-node.p2{border-color:rgba(50,182,255,.25);background:rgba(50,182,255,.05);}
+  .pi-node.p1{border-color:rgba(34,197,94,.2);background:rgba(34,197,94,.04);}
+  .pi-tier-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .pi-children{display:flex;gap:12px;justify-content:center;}
+  .pi-connector{width:1px;height:14px;background:rgba(50,182,255,.25);}
+  .pi-hline{height:1px;background:rgba(50,182,255,.2);align-self:stretch;}
+  .pi-badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:8px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;}
+  .pi-badge.p0{background:rgba(100,100,100,.2);color:var(--muted);}
+  .pi-badge.p1{background:rgba(34,197,94,.15);color:#22c55e;}
+  .pi-badge.p2{background:rgba(50,182,255,.15);color:var(--accent);}
+  .pi-badge.p3{background:rgba(234,179,8,.15);color:#eab308;}
+  .pi-badge.p4{background:rgba(168,85,247,.15);color:#c084fc;}
+  #piDropdown div{padding:6px 10px;font-size:11px;cursor:pointer;color:var(--text);}
+  #piDropdown div:hover{background:rgba(50,182,255,.1);}
+
+  /* ── Jobs tab ── */
+  .jobs-filter{padding:3px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:4px;cursor:pointer;border:1px solid rgba(50,182,255,.15);background:rgba(0,0,0,.4);color:var(--muted);}
+  .jobs-filter.active{background:rgba(50,182,255,.15);color:var(--accent);border-color:var(--accent);}
+  .jobs-row{display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(46,51,59,.35);font-size:11px;transition:background .08s;}
+  .jobs-row:hover{background:rgba(50,182,255,.05);}
+  .job-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+  .job-badge.active{background:rgba(50,182,255,.15);color:var(--accent);border:1px solid rgba(50,182,255,.25);}
+  .job-badge.ready{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
+  .job-badge.delivered{background:rgba(100,100,100,.15);color:var(--muted);border:1px solid rgba(100,100,100,.2);}
+  .job-badge.cancelled{background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.2);}
+  .job-badge.paused{background:rgba(249,115,22,.12);color:#f97316;border:1px solid rgba(249,115,22,.2);}
+  .act-badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;white-space:nowrap;}
+  .act-mfg{background:rgba(50,182,255,.1);color:var(--accent);}
+  .act-inv{background:rgba(168,85,247,.12);color:#c084fc;}
+  .act-res{background:rgba(249,115,22,.1);color:#f97316;}
+  .act-cpy{background:rgba(34,197,94,.1);color:#22c55e;}
+  .act-rea{background:rgba(234,179,8,.1);color:#eab308;}
+
   /* ── Layout ── */
-  .mfg-wrap{display:grid;grid-template-columns:320px 1fr;gap:0;height:calc(100vh - var(--topbar-h,72px) - var(--ticker-h,32px) - 8px);min-height:600px;}
+  .mfg-wrap{display:grid;grid-template-columns:320px 1fr;gap:0;flex:1;min-height:0;}
   @media(max-width:900px){.mfg-wrap{grid-template-columns:1fr;height:auto;}}
 
   /* ── Left panel: blueprint list ── */
@@ -99,6 +160,20 @@
   .mfg-bp-list::-webkit-scrollbar-thumb,.mfg-mat-scroll::-webkit-scrollbar-thumb,.mfg-job-panel::-webkit-scrollbar-thumb{background:rgba(50,182,255,.2);border-radius:2px;}
 </style>
 
+<div class="ind-shell">
+
+<!-- ── Page-level tabs ── -->
+<div class="pg-tabs">
+  <div class="pg-tab active" onclick="pgTab('calculator')">🏭 Calculator</div>
+  <div class="pg-tab" onclick="pgTab('scanner')">📊 Scanner</div>
+  <div class="pg-tab" onclick="pgTab('queue')">📋 Queue</div>
+  <div class="pg-tab" onclick="pgTab('jobs')">⚙️ Active Jobs</div>
+  <div class="pg-tab" onclick="pgTab('t2chain')">🔬 T2 Chain</div>
+  <div class="pg-tab" onclick="pgTab('pi')">🌍 PI</div>
+</div>
+
+<!-- ── Calculator panel (existing) ── -->
+<div class="pg-panel active" id="pg-calculator">
 <div class="mfg-wrap">
 
   <!-- LEFT: Blueprint search + presets -->
@@ -308,7 +383,193 @@
       </div><!-- .mfg-lower -->
     </div><!-- #mfgCalc -->
   </div><!-- .mfg-right -->
+</div><!-- .mfg-wrap -->
+</div><!-- #pg-calculator -->
+
+<!-- ── Scanner panel ── -->
+<div class="pg-panel" id="pg-scanner">
+  <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">📊 Scanner — coming soon</div>
 </div>
+
+<!-- ── Queue Builder panel ── -->
+<div class="pg-panel" id="pg-queue">
+  <!-- toolbar -->
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;flex-wrap:wrap;">
+    <select class="mfg-inp" id="qChar" style="min-width:120px;">
+      {% for c in chars %}<option value="{{ c.alias or c.character_name }}">{{ c.character_name }}</option>{% endfor %}
+    </select>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl" style="white-space:nowrap;">Default ME%</span>
+      <input class="mfg-inp" id="qME" type="number" min="0" max="10" value="0" style="width:48px;">
+    </div>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl" style="white-space:nowrap;">TE%</span>
+      <input class="mfg-inp" id="qTE" type="number" min="0" max="20" value="0" style="width:48px;">
+    </div>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl">Hub</span>
+      <select class="mfg-inp" id="qHub"><option>Jita</option><option>Amarr</option><option>Dodixie</option></select>
+    </div>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl" style="white-space:nowrap;">Cost Index%</span>
+      <input class="mfg-inp" id="qCostIdx" type="number" min="0" step="0.01" value="0" style="width:64px;">
+    </div>
+    <button class="mfg-calc-btn" onclick="calcQueue()" style="padding:5px 14px;font-size:11px;">⟳ Calculate All</button>
+    <button onclick="clearQueue()" style="padding:5px 10px;font-size:11px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:6px;cursor:pointer;">✕ Clear</button>
+    <span id="qStatus" style="font-size:10px;color:var(--muted);margin-left:4px;"></span>
+  </div>
+  <!-- body: queue list left, results right -->
+  <div style="flex:1;display:flex;min-height:0;overflow:hidden;">
+
+    <!-- Left: queue list + add -->
+    <div style="width:320px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid rgba(50,182,255,.1);background:rgba(0,0,0,.4);">
+      <!-- add search -->
+      <div style="padding:8px;border-bottom:1px solid rgba(50,182,255,.08);">
+        <div style="position:relative;">
+          <input class="mfg-search" id="qSearch" placeholder="Add blueprint to queue…" autocomplete="off" oninput="qSearchDebounce()" style="width:100%;">
+          <div id="qDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:rgba(10,16,28,.97);border:1px solid rgba(50,182,255,.25);border-top:none;border-radius:0 0 6px 6px;max-height:200px;overflow-y:auto;"></div>
+        </div>
+      </div>
+      <!-- queue items -->
+      <div style="flex:1;overflow-y:auto;" id="qList">
+        <div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">Search above to add blueprints</div>
+      </div>
+      <!-- queue totals footer -->
+      <div id="qFooter" style="display:none;padding:8px 10px;border-top:1px solid rgba(50,182,255,.1);font-size:10px;color:var(--muted);background:rgba(0,0,0,.4);">
+        <span id="qFooterText"></span>
+      </div>
+    </div>
+
+    <!-- Right: results -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+      <!-- per-job table header -->
+      <div style="display:flex;align-items:center;padding:4px 10px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(50,182,255,.1);flex-shrink:0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);" id="qResHeader" style="display:none;">
+        <span style="flex:1.5;">Blueprint</span>
+        <span style="width:45px;text-align:center;">Runs</span>
+        <span style="width:95px;text-align:right;">Mat Cost</span>
+        <span style="width:95px;text-align:right;">Install</span>
+        <span style="width:95px;text-align:right;">Total Cost</span>
+        <span style="width:95px;text-align:right;">Sell Value</span>
+        <span style="width:80px;text-align:right;">Profit</span>
+        <span style="width:65px;text-align:right;">Margin</span>
+      </div>
+      <div style="flex:1;overflow-y:auto;" id="qResults">
+        <div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;">Add blueprints and click Calculate All</div>
+      </div>
+      <!-- aggregate materials -->
+      <div id="qAggPanel" style="display:none;max-height:220px;border-top:1px solid rgba(50,182,255,.12);overflow-y:auto;background:rgba(0,0,0,.4);">
+        <div style="padding:4px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-bottom:1px solid rgba(50,182,255,.08);position:sticky;top:0;background:rgba(0,0,0,.6);">📦 Aggregate Shopping List</div>
+        <div id="qAggList" style="display:flex;flex-wrap:wrap;gap:4px;padding:8px 10px;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Active Jobs panel ── -->
+<div class="pg-panel" id="pg-jobs">
+  <!-- toolbar -->
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Character</span>
+    <select class="mfg-inp" id="jobsChar" style="min-width:130px;" onchange="loadJobs()">
+      {% for c in chars %}<option value="{{ c.alias or c.character_name }}">{{ c.character_name }}</option>{% endfor %}
+    </select>
+    <button class="mfg-calc-btn" onclick="loadJobs()" style="padding:5px 12px;font-size:11px;">⟳ Refresh</button>
+    <div style="display:flex;gap:3px;margin-left:8px;" id="jobsFilterBtns">
+      <button class="jobs-filter active" onclick="jobsFilter('all')">All</button>
+      <button class="jobs-filter" onclick="jobsFilter('active')">Active</button>
+      <button class="jobs-filter" onclick="jobsFilter('ready')">Ready</button>
+      <button class="jobs-filter" onclick="jobsFilter('delivered')">Delivered</button>
+    </div>
+    <span id="jobsCount" style="margin-left:auto;font-size:10px;color:var(--muted);"></span>
+  </div>
+  <!-- stats bar -->
+  <div id="jobsStats" style="display:none;flex-shrink:0;display:flex;gap:0;border-bottom:1px solid rgba(50,182,255,.08);background:rgba(0,0,0,.4);">
+    <div class="mfg-stat"><div class="mfg-stat-lbl">Manufacturing</div><div class="mfg-stat-val" id="jsMfg">—</div></div>
+    <div class="mfg-stat"><div class="mfg-stat-lbl">Invention</div><div class="mfg-stat-val" id="jsInv">—</div></div>
+    <div class="mfg-stat"><div class="mfg-stat-lbl">Research</div><div class="mfg-stat-val" id="jsRes">—</div></div>
+    <div class="mfg-stat"><div class="mfg-stat-lbl">Reactions</div><div class="mfg-stat-val" id="jsRea">—</div></div>
+    <div class="mfg-stat"><div class="mfg-stat-lbl">Ready</div><div class="mfg-stat-val" id="jsRdy" style="color:#22c55e;">—</div></div>
+    <div class="mfg-stat"><div class="mfg-stat-lbl">Delivered</div><div class="mfg-stat-val" id="jsDel" style="color:var(--muted);">—</div></div>
+  </div>
+  <!-- table header -->
+  <div style="display:flex;align-items:center;padding:4px 10px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(50,182,255,.1);flex-shrink:0;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">
+    <span style="width:90px;">Activity</span>
+    <span style="flex:1;">Blueprint</span>
+    <span style="flex:1;">Product</span>
+    <span style="width:50px;text-align:center;">Runs</span>
+    <span style="flex:1.2;">Facility</span>
+    <span style="width:110px;text-align:right;">Ends</span>
+    <span style="width:90px;text-align:right;">Time Left</span>
+    <span style="width:80px;text-align:center;">Status</span>
+  </div>
+  <!-- rows -->
+  <div style="flex:1;overflow-y:auto;" id="jobsTable">
+    <div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;">Select a character and click Refresh</div>
+  </div>
+</div>
+
+<!-- ── T2 Chain panel ── -->
+<div class="pg-panel" id="pg-t2chain">
+  <!-- search bar -->
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">T2 Item</span>
+    <div style="position:relative;flex:1;max-width:360px;">
+      <input class="mfg-search" id="t2Search" placeholder="Search T2 item… (e.g. Breacher, Hail M)" autocomplete="off"
+             oninput="t2SearchDebounce()" style="width:100%;padding-right:28px;">
+      <div id="t2Dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:rgba(10,16,28,.97);border:1px solid rgba(50,182,255,.25);border-top:none;border-radius:0 0 6px 6px;max-height:220px;overflow-y:auto;"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <span style="font-size:10px;color:var(--muted);">Target runs:</span>
+      <input class="mfg-inp" id="t2TargetRuns" type="number" min="1" value="10" style="width:55px;" oninput="recalcT2Runs()">
+    </div>
+    <button class="mfg-calc-btn" id="t2LoadBtn" onclick="loadT2Chain()" disabled style="padding:5px 14px;font-size:11px;opacity:.45;">🔬 Load Chain</button>
+  </div>
+  <!-- chain display -->
+  <div style="flex:1;overflow-y:auto;padding:16px 20px;" id="t2ChainBody">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;gap:8px;">
+      <div style="font-size:32px;">🔬</div>
+      <div>Search for a T2 item to see its invention chain</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PI Chain panel ── -->
+<div class="pg-panel" id="pg-pi">
+  <!-- search bar -->
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">PI Product</span>
+    <div style="position:relative;flex:1;max-width:360px;">
+      <input class="mfg-search" id="piSearch" placeholder="Search PI product… (e.g. Robotics, Coolant)" autocomplete="off"
+             oninput="piSearchInput()" style="width:100%;">
+      <div id="piDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:rgba(10,16,28,.97);border:1px solid rgba(50,182,255,.25);border-top:none;border-radius:0 0 6px 6px;max-height:220px;overflow-y:auto;"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;">
+      <span style="font-size:10px;color:var(--muted);">Qty target:</span>
+      <input class="mfg-inp" id="piTargetQty" type="number" min="1" value="1" style="width:60px;" oninput="renderPiChain(_piChain)">
+    </div>
+    <button class="mfg-calc-btn" id="piLoadBtn" onclick="loadPiChain()" disabled style="padding:5px 14px;font-size:11px;opacity:.45;">🌍 Load Chain</button>
+    <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);cursor:pointer;margin-left:4px;">
+      <input type="checkbox" id="piShowRaw" onchange="renderPiChain(_piChain)" style="accent-color:var(--accent);">
+      Show raw materials
+    </label>
+  </div>
+  <!-- two-column layout: tree left, summary right -->
+  <div style="flex:1;display:flex;min-height:0;overflow:hidden;">
+    <div style="flex:1;overflow-y:auto;padding:16px 20px;" id="piChainBody">
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;gap:8px;">
+        <div style="font-size:32px;">🌍</div>
+        <div>Search for a PI product to see its production chain</div>
+        <div style="font-size:11px;opacity:.6;">Works for P1 through P4 products</div>
+      </div>
+    </div>
+    <!-- summary sidebar -->
+    <div id="piSummary" style="display:none;width:260px;flex-shrink:0;border-left:1px solid rgba(50,182,255,.1);overflow-y:auto;padding:12px;background:rgba(0,0,0,.4);">
+    </div>
+  </div>
+</div>
+
+</div><!-- .ind-shell -->
 
 <script>
 const API = '/app/api';
@@ -910,6 +1171,469 @@ function applyStructBonuses(){
   showAutoInfo();
 }
 
+
+// ── Tab stubs (replaced in subsequent steps) ────────────────
+// ═══════════════════════════════════════════════════════════
+// PI CHAIN TAB
+// ═══════════════════════════════════════════════════════════
+let _piProducts = null;   // [{typeID, typeName}] loaded once
+let _piSelectedId = null;
+let _piChain = null;
+let _piSearchTimer = null;
+
+async function initPiTab(){
+  if(_piProducts) return;  // already loaded
+  try{
+    const r = await fetch(`${API}/sde/pi_products`,{credentials:'include'});
+    _piProducts = await r.json();
+  }catch(e){ _piProducts = []; }
+}
+
+function piSearchInput(){
+  clearTimeout(_piSearchTimer);
+  _piSearchTimer = setTimeout(doPiSearch, 200);
+}
+
+function doPiSearch(){
+  const q = document.getElementById('piSearch').value.trim().toLowerCase();
+  const dd = document.getElementById('piDropdown');
+  if(!q || q.length < 2 || !_piProducts){ dd.style.display='none'; return; }
+  const matches = _piProducts.filter(p=>p.typeName.toLowerCase().includes(q)).slice(0,25);
+  if(!matches.length){ dd.style.display='none'; return; }
+  dd.innerHTML = matches.map(p=>
+    `<div onclick="piSelectItem(${p.typeID},'${esc(p.typeName)}')">${esc(p.typeName)}</div>`
+  ).join('');
+  dd.style.display='block';
+}
+
+function piSelectItem(id, name){
+  _piSelectedId = id;
+  document.getElementById('piSearch').value = name;
+  document.getElementById('piDropdown').style.display='none';
+  const btn = document.getElementById('piLoadBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#piSearch') && !e.target.closest('#piDropdown')){
+    const dd = document.getElementById('piDropdown');
+    if(dd) dd.style.display='none';
+  }
+});
+
+async function loadPiChain(){
+  if(!_piSelectedId) return;
+  const body = document.getElementById('piChainBody');
+  body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Loading chain…</div>';
+  document.getElementById('piSummary').style.display='none';
+  try{
+    const r = await fetch(`${API}/industry/pi_chain?type_id=${_piSelectedId}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){ body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">${esc(d.error||'Chain not found')}</div>`; return; }
+    _piChain = d.chain;
+    renderPiChain(_piChain);
+  }catch(e){
+    body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// Determine PI tier by traversing max depth
+function piMaxDepth(node){
+  if(!node||!node.inputs?.length) return 0;
+  return 1 + Math.max(...node.inputs.map(piMaxDepth));
+}
+
+function piTierClass(depth, maxDepth){
+  const tier = maxDepth - depth;   // 0=output (highest tier), increases toward raw
+  if(tier<=0) return 'p4';
+  if(tier===1) return 'p3';
+  if(tier===2) return 'p2';
+  if(tier===3) return 'p1';
+  return 'p0';
+}
+
+// Flatten chain into a raw-material summary
+function piCollectRaws(node, multiplier, acc){
+  if(!node) return;
+  if(node.is_raw){
+    acc[node.type_id] = acc[node.type_id] || {name: node.type_name, qty: 0};
+    acc[node.type_id].qty += multiplier;
+    return;
+  }
+  const outQty = node.output_qty || 1;
+  for(const inp of (node.inputs||[])){
+    piCollectRaws(inp, multiplier * (inp.required_qty||1) / outQty, acc);
+  }
+}
+
+function piCollectIntermediates(node, multiplier, acc, isTop=false){
+  if(!node || node.is_raw) return;
+  if(!isTop){
+    acc[node.type_id] = acc[node.type_id] || {name: node.type_name, qty: 0, cycle: node.cycle_time||0, schematic: node.schematic_name||''};
+    acc[node.type_id].qty += multiplier;
+  }
+  const outQty = node.output_qty || 1;
+  for(const inp of (node.inputs||[])){
+    piCollectIntermediates(inp, multiplier * (inp.required_qty||1) / outQty, acc);
+  }
+}
+
+function buildPiNodeHtml(node, multiplier, maxDepth, depth=0, showRaw=true){
+  if(!node) return '';
+  if(node.is_raw && !showRaw) return '';
+
+  const tierCls = node.is_raw ? 'raw' : piTierClass(depth, maxDepth);
+  const tierLbl = node.is_raw ? 'p0' : piTierClass(depth, maxDepth);
+  const outQty  = node.output_qty || 1;
+  const displayQty = Math.ceil(multiplier);
+
+  const nodeHtml = `<div class="pi-node ${tierCls}">
+    <img src="https://images.evetech.net/types/${node.type_id}/icon?size=32" loading="lazy" onerror="this.style.display='none'">
+    <div style="min-width:0;">
+      <div style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;" title="${esc(node.type_name)}">${esc(node.type_name)}</div>
+      <div style="display:flex;gap:5px;align-items:center;margin-top:2px;">
+        <span class="pi-badge ${tierLbl}">${tierLbl.toUpperCase()}</span>
+        <span style="font-size:9px;font-family:monospace;color:var(--accent);">× ${fmtNum(displayQty)}</span>
+        ${node.cycle_time ? `<span style="font-size:9px;color:var(--muted);">${fmtDur(node.cycle_time)}/cycle</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+
+  if(!node.inputs?.length || (node.is_raw && !showRaw)){
+    return `<div class="pi-tier-wrap">${nodeHtml}</div>`;
+  }
+
+  const childrenHtml = node.inputs.map(inp => {
+    const childMult = multiplier * (inp.required_qty||1) / outQty;
+    return buildPiNodeHtml(inp, childMult, maxDepth, depth+1, showRaw);
+  }).filter(Boolean).join('');
+
+  if(!childrenHtml) return `<div class="pi-tier-wrap">${nodeHtml}</div>`;
+
+  return `<div class="pi-tier-wrap">
+    ${nodeHtml}
+    <div class="pi-connector"></div>
+    <div class="pi-children">${childrenHtml}</div>
+  </div>`;
+}
+
+function renderPiChain(chain){
+  if(!chain) return;
+  const body    = document.getElementById('piChainBody');
+  const summary = document.getElementById('piSummary');
+  const qty     = Math.max(1, parseInt(document.getElementById('piTargetQty').value)||1);
+  const showRaw = document.getElementById('piShowRaw').checked;
+  const maxDepth = piMaxDepth(chain);
+
+  const treeHtml = buildPiNodeHtml(chain, qty, maxDepth, 0, showRaw);
+  body.innerHTML = `<div style="display:flex;justify-content:center;padding-bottom:24px;overflow-x:auto;">${treeHtml}</div>`;
+
+  // Build summary sidebar
+  const raws = {};
+  piCollectRaws(chain, qty, raws);
+  const intermediates = {};
+  piCollectIntermediates(chain, qty, intermediates, true);
+
+  const rawRows = Object.values(raws).sort((a,b)=>b.qty-a.qty).map(r=>
+    `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:10px;border-bottom:1px solid rgba(46,51,59,.3);">
+      <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">${esc(r.name)}</span>
+      <span style="font-family:monospace;font-weight:600;color:var(--muted);">${fmtNum(Math.ceil(r.qty))}</span>
+    </div>`
+  ).join('');
+
+  const intRows = Object.values(intermediates).sort((a,b)=>b.qty-a.qty).map(r=>
+    `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:10px;border-bottom:1px solid rgba(46,51,59,.3);">
+      <span style="color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;" title="${esc(r.schematic)}">${esc(r.name)}</span>
+      <span style="font-family:monospace;font-weight:600;color:var(--accent);">${fmtNum(Math.ceil(r.qty))}</span>
+    </div>`
+  ).join('');
+
+  summary.innerHTML = `
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:8px;">Raw Inputs (P0)</div>
+    ${rawRows||'<div style="color:var(--muted);font-size:10px;">None</div>'}
+    ${intRows ? `
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:12px 0 8px;">Intermediates Needed</div>
+    ${intRows}` : ''}
+    <div style="font-size:8px;color:var(--muted);margin-top:12px;line-height:1.5;">Quantities are for ${fmtNum(qty)}× ${esc(chain.type_name)}</div>
+  `;
+  summary.style.display='block';
+}
+// ═══════════════════════════════════════════════════════════
+// T2 CHAIN TAB
+// ═══════════════════════════════════════════════════════════
+let _t2SelectedId = null;
+let _t2Chain = null;
+let _t2SearchTimer = null;
+
+function initT2Tab(){ /* nothing to lazy-load, search is on-demand */ }
+
+function t2SearchDebounce(){
+  clearTimeout(_t2SearchTimer);
+  _t2SearchTimer = setTimeout(doT2Search, 280);
+}
+
+async function doT2Search(){
+  const q = document.getElementById('t2Search').value.trim();
+  const dd = document.getElementById('t2Dropdown');
+  if(q.length < 2){ dd.style.display='none'; return; }
+  try{
+    const r = await fetch(`${API}/sde/type_search?q=${encodeURIComponent(q)}`,{credentials:'include'});
+    const items = await r.json();
+    if(!items.length){ dd.style.display='none'; return; }
+    dd.innerHTML = items.slice(0,20).map(it=>
+      `<div onclick="t2SelectItem(${it.typeID},'${esc(it.typeName)}')">${esc(it.typeName)}</div>`
+    ).join('');
+    dd.style.display='block';
+  }catch(e){ dd.style.display='none'; }
+}
+
+function t2SelectItem(id, name){
+  _t2SelectedId = id;
+  document.getElementById('t2Search').value = name;
+  document.getElementById('t2Dropdown').style.display='none';
+  const btn = document.getElementById('t2LoadBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#t2Search') && !e.target.closest('#t2Dropdown')){
+    const dd = document.getElementById('t2Dropdown');
+    if(dd) dd.style.display='none';
+  }
+});
+
+async function loadT2Chain(){
+  if(!_t2SelectedId) return;
+  const body = document.getElementById('t2ChainBody');
+  body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Loading chain…</div>';
+  try{
+    const r = await fetch(`${API}/industry/invention_chain?t2_type_id=${_t2SelectedId}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){ body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">${esc(d.error||'Chain not found')}</div>`; return; }
+    _t2Chain = d;
+    renderT2Chain(d);
+  }catch(e){
+    body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function recalcT2Runs(){
+  if(_t2Chain) renderT2Chain(_t2Chain);
+}
+
+function renderT2Chain(d){
+  const targetRuns = Math.max(1, parseInt(document.getElementById('t2TargetRuns').value)||10);
+  const chance = d.base_chance || 0.26;
+  // Expected invention attempts to get targetRuns BPCs
+  const expectedAttempts = Math.ceil(targetRuns / chance);
+  const successRuns = targetRuns; // T2 runs per BPC
+  const t2Items = targetRuns * (d.t2_bpc_runs || 1);
+
+  const invMatsHtml = (d.invention_materials||[]).map(m=>`
+    <div class="chain-item-row">
+      <img src="https://images.evetech.net/types/${m.typeID}/icon?size=32" loading="lazy" onerror="this.style.display='none'">
+      <span style="flex:1;color:var(--text);">${esc(m.typeName)}</span>
+      <span style="font-family:monospace;font-weight:600;color:var(--accent);">× ${fmtNum(m.quantity)}</span>
+      <span style="font-family:monospace;color:#c084fc;width:80px;text-align:right;" title="for ${targetRuns} attempts">× ${fmtNum(m.quantity * expectedAttempts)} total</span>
+    </div>`).join('');
+
+  const t2MatsHtml = (d.t2_materials||[]).map(m=>`
+    <div class="chain-item-row">
+      <img src="https://images.evetech.net/types/${m.typeID}/icon?size=32" loading="lazy" onerror="this.style.display='none'">
+      <span style="flex:1;color:var(--text);">${esc(m.typeName)}</span>
+      <span style="font-family:monospace;font-weight:600;color:var(--accent);">× ${fmtNum(m.quantity)}</span>
+      <span style="font-family:monospace;color:#22c55e;width:80px;text-align:right;" title="for ${t2Items} items">× ${fmtNum(m.quantity * t2Items)} total</span>
+    </div>`).join('');
+
+  document.getElementById('t2ChainBody').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:0;padding-bottom:24px;">
+
+      <!-- T1 Blueprint -->
+      <div class="chain-card">
+        <div class="chain-card-title">① T1 Blueprint (Invent From)</div>
+        <div class="chain-item-row">
+          <img src="https://images.evetech.net/types/${d.t1_bp_id}/bp?size=32" onerror="this.src='https://images.evetech.net/types/${d.t1_bp_id}/icon?size=32'" loading="lazy">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);">${esc(d.t1_bp_name)}</div>
+            ${d.t1_item_name ? `<div style="font-size:10px;color:var(--muted);">Produces: ${esc(d.t1_item_name)}</div>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="chain-arrow">↓ INVENTION</div>
+
+      <!-- Invention step -->
+      <div class="chain-card">
+        <div class="chain-card-title">② Invention — Datacores &amp; Chance</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+          <span class="chain-stat-pill chain-prob-pill">Base Chance: ${(chance*100).toFixed(1)}%</span>
+          <span class="chain-stat-pill chain-prob-pill">Runs per BPC: ${d.t2_bpc_runs||1}</span>
+        </div>
+        ${invMatsHtml}
+        <div class="chain-run-box" style="margin-top:12px;">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">For ${targetRuns} successful BPC${targetRuns!==1?'s':''}</div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div><span style="color:var(--muted);font-size:10px;">Expected attempts: </span><span style="font-family:monospace;font-weight:700;color:#c084fc;">${fmtNum(expectedAttempts)}</span></div>
+            <div><span style="color:var(--muted);font-size:10px;">T2 items produced: </span><span style="font-family:monospace;font-weight:700;color:#22c55e;">${fmtNum(t2Items)}</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chain-arrow">↓ PRODUCES</div>
+
+      <!-- T2 Blueprint Copy -->
+      <div class="chain-card">
+        <div class="chain-card-title">③ T2 Blueprint Copy</div>
+        <div class="chain-item-row">
+          <img src="https://images.evetech.net/types/${d.t2_bp_id}/bp?size=32" onerror="this.src='https://images.evetech.net/types/${d.t2_bp_id}/icon?size=32'" loading="lazy">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);">${esc(d.t2_bp_name)}</div>
+            <div style="font-size:10px;color:var(--muted);">${d.t2_bpc_runs||1} run${(d.t2_bpc_runs||1)!==1?'s':''} per BPC</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chain-arrow">↓ MANUFACTURING (${fmtDur(d.t2_time||0)} per run)</div>
+
+      <!-- T2 Manufacturing materials -->
+      <div class="chain-card">
+        <div class="chain-card-title">④ Manufacturing Materials <span style="font-weight:400;color:var(--muted);">(per run · right col = ${t2Items} items total)</span></div>
+        ${t2MatsHtml||'<div style="color:var(--muted);font-size:11px;">No material data in SDE</div>'}
+      </div>
+
+      <div class="chain-arrow">↓ PRODUCES</div>
+
+      <!-- T2 Item -->
+      <div class="chain-card" style="border-color:rgba(34,197,94,.3);">
+        <div class="chain-card-title" style="color:#22c55e;">⑤ T2 Output</div>
+        <div class="chain-item-row">
+          <img src="https://images.evetech.net/types/${d.t2_type_id}/icon?size=32" loading="lazy" onerror="this.style.display='none'">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#22c55e;">${esc(d.t2_name)}</div>
+            <div style="font-size:10px;color:var(--muted);">× ${fmtNum(t2Items)} items from ${targetRuns} BPC${targetRuns!==1?'s':''}</div>
+          </div>
+        </div>
+      </div>
+
+    </div>`;
+}
+function initScannerTab(){}
+function initQueueTab(){}
+
+// ═══════════════════════════════════════════════════════════
+// ACTIVE JOBS TAB
+// ═══════════════════════════════════════════════════════════
+const ACT_LABELS = {1:'Manufacturing',3:'TE Research',4:'ME Research',5:'Copying',8:'Invention',11:'Reactions'};
+const ACT_CLASS  = {1:'act-mfg',3:'act-res',4:'act-res',5:'act-cpy',8:'act-inv',11:'act-rea'};
+let _jobsData = [];
+let _jobsActiveFilter = 'all';
+
+function jobsFilter(f){
+  _jobsActiveFilter = f;
+  document.querySelectorAll('.jobs-filter').forEach(b=>b.classList.toggle('active', b.textContent.toLowerCase()===f));
+  renderJobsTable();
+}
+
+function fmtTimeLeft(endDateStr){
+  const diff = new Date(endDateStr) - new Date();
+  if(diff <= 0) return '<span style="color:#22c55e;font-weight:700;">Done</span>';
+  const s = Math.floor(diff/1000);
+  const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60);
+  if(d) return `${d}d ${h}h`;
+  if(h) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function fmtEndDate(str){
+  if(!str) return '—';
+  const d = new Date(str);
+  return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) + ' ' +
+         d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderJobsTable(){
+  const table = document.getElementById('jobsTable');
+  let jobs = _jobsData;
+  if(_jobsActiveFilter !== 'all') jobs = jobs.filter(j=>j.status===_jobsActiveFilter);
+
+  if(!jobs.length){
+    table.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;">No jobs match this filter.</div>';
+    return;
+  }
+
+  // sort: ready first, then active by end date, then delivered
+  const order = {ready:0,active:1,paused:2,delivered:3,cancelled:4};
+  jobs = [...jobs].sort((a,b)=>{
+    const od = (order[a.status]??5) - (order[b.status]??5);
+    if(od !== 0) return od;
+    return new Date(a.end_date) - new Date(b.end_date);
+  });
+
+  table.innerHTML = jobs.map(j=>{
+    const actLabel = ACT_LABELS[j.activity_id] || `Act ${j.activity_id}`;
+    const actCls   = ACT_CLASS[j.activity_id]  || 'act-mfg';
+    const bpName   = j.blueprint_type_name || `Type ${j.blueprint_type_id}`;
+    const prodName = j.product_type_name   || (j.product_type_id ? `Type ${j.product_type_id}` : '—');
+    const facName  = j.facility_name       || `Facility ${j.facility_id}`;
+    const isActive = j.status === 'active';
+    return `<div class="jobs-row">
+      <span style="width:90px;"><span class="act-badge ${actCls}">${esc(actLabel)}</span></span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(bpName)}">${esc(bpName.replace(/ Blueprint$/i,'').replace(/ Reaction Formula$/i,''))}</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);" title="${esc(prodName)}">${esc(prodName)}</span>
+      <span style="width:50px;text-align:center;font-family:monospace;font-weight:600;">${j.runs||1}</span>
+      <span style="flex:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px;" title="${esc(facName)}">${esc(facName)}</span>
+      <span style="width:110px;text-align:right;font-size:10px;color:var(--muted);">${fmtEndDate(j.end_date)}</span>
+      <span style="width:90px;text-align:right;font-family:monospace;font-size:11px;">${isActive ? fmtTimeLeft(j.end_date) : '—'}</span>
+      <span style="width:80px;text-align:center;"><span class="job-badge ${j.status||'active'}">${j.status||'active'}</span></span>
+    </div>`;
+  }).join('');
+  document.getElementById('jobsCount').textContent = `${jobs.length} job${jobs.length!==1?'s':''}`;
+}
+
+async function loadJobs(){
+  const alias = document.getElementById('jobsChar')?.value;
+  if(!alias) return;
+  const table = document.getElementById('jobsTable');
+  table.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;">⏳ Loading jobs…</div>';
+  try{
+    const r = await fetch(`${API}/eve/character/industry?alias=${encodeURIComponent(alias)}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){ table.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;font-size:12px;">${esc(d.detail||'Error loading jobs')}</div>`; return; }
+    _jobsData = d.jobs || [];
+
+    // stats
+    const byAct = (act) => _jobsData.filter(j=>j.activity_id===act && j.status==='active').length;
+    document.getElementById('jsMfg').textContent = byAct(1);
+    document.getElementById('jsInv').textContent = byAct(8);
+    document.getElementById('jsRes').textContent = byAct(3)+byAct(4)+byAct(5);
+    document.getElementById('jsRea').textContent = byAct(11);
+    document.getElementById('jsRdy').textContent = _jobsData.filter(j=>j.status==='ready').length;
+    document.getElementById('jsDel').textContent = _jobsData.filter(j=>j.status==='delivered').length;
+    document.getElementById('jobsStats').style.display='flex';
+    renderJobsTable();
+  }catch(e){
+    table.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;font-size:12px;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Page-level tab switcher ──────────────────────────────────
+function pgTab(name){
+  document.querySelectorAll('.pg-tab').forEach((t,i)=>{
+    const ids=['calculator','scanner','queue','jobs','t2chain','pi'];
+    t.classList.toggle('active', ids[i]===name);
+  });
+  document.querySelectorAll('.pg-panel').forEach(p=>{
+    p.classList.toggle('active', p.id==='pg-'+name);
+  });
+  // Lazy-load hooks
+  if(name==='jobs')   loadJobs();
+  if(name==='pi')     initPiTab();
+  if(name==='t2chain')initT2Tab();
+  if(name==='scanner')initScannerTab();
+  if(name==='queue')  initQueueTab();
+}
 
 // ── Init ─────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', ()=>{
