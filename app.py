@@ -2091,19 +2091,6 @@ def create_app() -> FastAPI:
         """Delegate to the full multi-hub market prices implementation."""
         return await api_sde_market_prices(type_id)
 
-    @app.get("/app/api/sde/type_search")
-    async def api_sde_type_search(q: str = ""):
-        if not q or len(q) < 2:
-            return {"results": []}
-        try:
-            from eve.eve import esi_search
-            data = esi_search(q, ["inventory_type"])
-            ids = (data.get("inventory_type") or [])[:40]
-            names = await _resolve_entity_names(ids) if ids else {}
-            return {"results": [{"id": i, "name": names.get(i, str(i))} for i in ids]}
-        except Exception as e:
-            return {"results": [], "error": str(e)}
-
     # ── EVE SSO (PKCE flow) ──────────────────────────────────────────────────────
 
     @app.get("/eve/login", include_in_schema=False)
