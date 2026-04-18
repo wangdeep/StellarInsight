@@ -4727,6 +4727,102 @@ async def api_industry_structure_bonuses(alias: str):
     return {"ok": True, "structures": out}
 
 
+@app.get("/app/api/industry/invention_chain")
+async def api_industry_invention_chain(t2_type_id: int = 0):
+    """
+    Given a T2 item type_id, return the full invention chain:
+    - T2 blueprint details (manufacturing materials, time)
+    - T1 blueprint ID (what you invent FROM)
+    - Invention materials (datacores)
+    - Base invention probability
+    Uses SDE tables: industryActivityProducts, industryActivityMaterials, industryActivity, invTypes
+    """
+    if not t2_type_id or not sde_available():
+        return {"ok": False, "error": "SDE not available or no type_id"}
+    try:
+        import eve.sde_local as _sde_mod
+        con = _sde_mod._get_sde()
+
+        # Step 1: find the T2 blueprint that produces this item (activityID=1)
+        t2_bp_row = con.execute(
+            "SELECT typeID FROM industryActivityProducts WHERE productTypeID=? AND activityID=1",
+            (t2_type_id,)
+        ).fetchone()
+        if not t2_bp_row:
+            return {"ok": False, "error": "No blueprint found for this item"}
+        t2_bp_id = t2_bp_row["typeID"]
+
+        # Step 2: find T1 blueprint that can invent the T2 blueprint (activityID=8)
+        t1_inv_row = con.execute(
+            "SELECT typeID, probability, quantity FROM industryActivityProducts WHERE productTypeID=? AND activityID=8",
+            (t2_bp_id,)
+        ).fetchone()
+        if not t1_inv_row:
+            return {"ok": False, "error": "No invention path found"}
+        t1_bp_id = t1_inv_row["typeID"]
+        base_chance = float(t1_inv_row["probability"] or 0.26)
+        t2_bpc_runs = int(t1_inv_row["quantity"] or 1)
+
+        # Step 3: invention materials (datacores etc) from T1 BP, activityID=8
+        inv_mats = con.execute(
+            "SELECT materialTypeID as typeID, quantity FROM industryActivityMaterials WHERE typeID=? AND activityID=8",
+            (t1_bp_id,)
+        ).fetchall()
+
+        # Step 4: T2 manufacturing materials from T2 BP, activityID=1
+        t2_mats = con.execute(
+            "SELECT materialTypeID as typeID, quantity FROM industryActivityMaterials WHERE typeID=? AND activityID=1",
+            (t2_bp_id,)
+        ).fetchall()
+
+        # Step 5: T2 build time
+        t2_time_row = con.execute(
+            "SELECT time FROM industryActivity WHERE typeID=? AND activityID=1",
+            (t2_bp_id,)
+        ).fetchone()
+        t2_time = int(t2_time_row["time"]) if t2_time_row else 0
+
+        # Step 6: get names for all type IDs
+        all_ids = (
+            [t2_type_id, t2_bp_id, t1_bp_id]
+            + [r["typeID"] for r in inv_mats]
+            + [r["typeID"] for r in t2_mats]
+        )
+        names = get_type_names(all_ids)
+
+        # Step 7: find what T1 item the T1 blueprint produces (to identify it)
+        t1_product_row = con.execute(
+            "SELECT productTypeID FROM industryActivityProducts WHERE typeID=? AND activityID=1",
+            (t1_bp_id,)
+        ).fetchone()
+        t1_item_id = t1_product_row["productTypeID"] if t1_product_row else None
+
+        return {
+            "ok": True,
+            "t2_type_id": t2_type_id,
+            "t2_name": names.get(t2_type_id, f"Type {t2_type_id}"),
+            "t2_bp_id": t2_bp_id,
+            "t2_bp_name": names.get(t2_bp_id, f"Type {t2_bp_id}"),
+            "t1_bp_id": t1_bp_id,
+            "t1_bp_name": names.get(t1_bp_id, f"Type {t1_bp_id}"),
+            "t1_item_id": t1_item_id,
+            "t1_item_name": names.get(t1_item_id, "") if t1_item_id else "",
+            "base_chance": base_chance,
+            "t2_bpc_runs": t2_bpc_runs,
+            "invention_materials": [
+                {"typeID": r["typeID"], "typeName": names.get(r["typeID"], f"Type {r['typeID']}"), "quantity": r["quantity"]}
+                for r in inv_mats
+            ],
+            "t2_materials": [
+                {"typeID": r["typeID"], "typeName": names.get(r["typeID"], f"Type {r['typeID']}"), "quantity": r["quantity"]}
+                for r in t2_mats
+            ],
+            "t2_time": t2_time,
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # CANVAS MAP ENDPOINTS
 # ═══════════════════════════════════════════════════════════════════════════════
