@@ -10,7 +10,7 @@
 ; ─────────────────────────────────────────────────────────────────────────────
 
 #define AppName      "Stellar Insight"
-#define AppVersion   "1.0.0"
+#define AppVersion      "1.0.0"
 #define AppPublisher "Stellarforge"
 #define AppURL       "https://insight.stellarforge.nexus"
 #define AppExeName   "StellarInsight.exe"
@@ -127,3 +127,4 @@ begin
       MB_OK
     );
 end;
+
