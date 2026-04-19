@@ -94,8 +94,12 @@ def _show_dialog(title: str, message: str) -> None:
             pass
     if _PLATFORM == "Darwin":
         try:
+            # L-6: escape backslashes and double-quotes so user-controlled
+            # strings can't break out of the AppleScript string literal
+            safe_title   = title.replace("\\", "\\\\").replace('"', '\\"')
+            safe_message = message.replace("\\", "\\\\").replace('"', '\\"')
             subprocess.run(["osascript", "-e",
-                            f'display alert "{title}" message "{message}"'], timeout=30)
+                            f'display alert "{safe_title}" message "{safe_message}"'], timeout=30)
             return
         except Exception:
             pass

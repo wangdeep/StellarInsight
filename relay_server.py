@@ -44,7 +44,7 @@ _RC_ALPHABET      = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I ambiguity
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Stellar Insight Relay Server")
     p.add_argument("--port", type=int, default=777)
-    p.add_argument("--host", default="0.0.0.0")
+    p.add_argument("--host", default="127.0.0.1")  # L-7: localhost-only by default
     p.add_argument(
         "--db",
         default=os.path.join(os.path.expanduser("~"), ".stellar_insight", "relay.db"),

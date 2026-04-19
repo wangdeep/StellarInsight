@@ -136,7 +136,7 @@ def update_system(sys_id: int, **kwargs) -> Dict:
         return {"error": "No valid fields to update"}
     ensure_schema()
     con = _conn()
-    sets = ", ".join(f"{k}=?" for k in updates)
+    sets = ", ".join(f'"{k}"=?' for k in updates)
     con.execute(f"UPDATE chain_systems SET {sets} WHERE id=?",
                 (*updates.values(), sys_id))
     con.commit()
@@ -197,7 +197,7 @@ def update_connection(conn_id: int, **kwargs) -> Dict:
         return {"error": "No valid fields to update"}
     ensure_schema()
     con = _conn()
-    sets = ", ".join(f"{k}=?" for k in updates)
+    sets = ", ".join(f'"{k}"=?' for k in updates)
     con.execute(f"UPDATE chain_connections SET {sets} WHERE id=?",
                 (*updates.values(), conn_id))
     con.commit()

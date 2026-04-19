@@ -25,9 +25,24 @@ except Exception:  # pragma: no cover
     Fernet = None
 
 
-EVE_AUTH_URL = "https://login.eveonline.com/v2/oauth/authorize/"
-EVE_TOKEN_URL = "https://login.eveonline.com/v2/oauth/token"
-EVE_VERIFY_URL = "https://login.eveonline.com/oauth/verify"
+EVE_AUTH_URL    = "https://login.eveonline.com/v2/oauth/authorize/"
+EVE_TOKEN_URL   = "https://login.eveonline.com/v2/oauth/token"
+EVE_VERIFY_URL  = "https://login.eveonline.com/oauth/verify"   # deprecated — kept for fallback
+EVE_JWKS_URL    = "https://login.eveonline.com/oauth/jwks"
+EVE_ISSUER      = "login.eveonline.com"
+
+# M-7: db path for auto-generating / persisting the Fernet key.
+# Set via set_token_key_db() called from app startup.
+_token_key_db_path: Optional[str] = None
+
+def set_token_key_db(db_path: str) -> None:
+    """Tell eve_sso where to persist the auto-generated Fernet key (M-7)."""
+    global _token_key_db_path
+    _token_key_db_path = db_path
+
+# L-4: in-memory JWKS cache  {keys: [...], fetched_at: float}
+_jwks_cache: Dict[str, Any] = {}
+_JWKS_CACHE_TTL = 86400  # 24 hours
 
 
 """EVE SSO helpers.
@@ -314,19 +329,52 @@ def get_sso_scopes(*, mode: str = "max_corp") -> str:
     return normalize_scopes((os.getenv("EVE_SSO_SCOPES") or DEFAULT_SCOPES_MIN).strip())
 
 
-def _get_fernet() -> Optional["Fernet"]:
-    """Return a Fernet instance if EVE_TOKEN_KEY is configured.
-
-    EVE_TOKEN_KEY should be a urlsafe base64-encoded 32-byte key.
-    Generate one with:
-      python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+def _get_or_create_key_in_db() -> Optional[str]:
     """
-    # Backwards/ops-friendly key resolution:
-    #   - Primary: EVE_TOKEN_KEY
-    #   - Fallback: XYLON_EVE_TOKEN_KEY (older deployments)
-    #   - Last resort: WEB_SESSION_SECRET (prevents silent breakage if only that
-    #     secret was configured; still recommended to set EVE_TOKEN_KEY explicitly)
+    M-7: Load the Fernet key from SQLite, or auto-generate + persist a new one.
+    Returns the key as a base64 string, or None if no DB path is configured.
+    """
+    if not _token_key_db_path or Fernet is None:
+        return None
+    try:
+        import sqlite3
+        con = sqlite3.connect(_token_key_db_path)
+        con.row_factory = sqlite3.Row
+        with con:
+            con.execute(
+                "CREATE TABLE IF NOT EXISTS kv_secrets ("
+                "  key   TEXT PRIMARY KEY,"
+                "  value TEXT NOT NULL"
+                ")"
+            )
+            row = con.execute(
+                "SELECT value FROM kv_secrets WHERE key='fernet_token_key'"
+            ).fetchone()
+            if row:
+                return row["value"]
+            # Auto-generate a new key and persist it
+            new_key = Fernet.generate_key().decode()
+            con.execute(
+                "INSERT INTO kv_secrets(key, value) VALUES('fernet_token_key', ?)",
+                (new_key,),
+            )
+        return new_key
+    except Exception:
+        return None
+
+
+def _get_fernet() -> Optional["Fernet"]:
+    """Return a Fernet instance for refresh-token encryption.
+
+    Key resolution order (M-7):
+      1. EVE_TOKEN_KEY env var (explicit operator config)
+      2. XYLON_EVE_TOKEN_KEY env var (older deployments)
+      3. SQLite kv_secrets table — auto-generated on first run
+      4. WEB_SESSION_SECRET env var (legacy fallback; not recommended)
+    """
     key = (os.getenv("EVE_TOKEN_KEY") or "").strip() or (os.getenv("XYLON_EVE_TOKEN_KEY") or "").strip()
+    if not key:
+        key = _get_or_create_key_in_db() or ""
     if not key:
         key = (os.getenv("WEB_SESSION_SECRET") or "").strip()
     if not key or Fernet is None:
@@ -514,17 +562,114 @@ async def refresh_access_token(*, refresh_token: str) -> TokenSet:
     )
 
 
-async def verify_access_token(access_token: str) -> Dict[str, Any]:
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "User-Agent": (os.getenv("EVE_SSO_USER_AGENT") or "xylon-bot").strip(),
-    }
+async def _fetch_jwks() -> Dict[str, Any]:
+    """
+    L-4: Fetch EVE's JWKS from the well-known endpoint and cache it locally.
+    Cache TTL is 24 hours; a fresh fetch is forced on cache miss or expiry.
+    """
+    now = time.time()
+    if _jwks_cache.get("keys") and now - _jwks_cache.get("fetched_at", 0) < _JWKS_CACHE_TTL:
+        return _jwks_cache
+
     async with aiohttp.ClientSession() as session:
-        async with session.get(EVE_VERIFY_URL, headers=headers, timeout=20) as resp:
-            txt = await resp.text()
-            if resp.status >= 400:
-                raise RuntimeError(f"Token verify failed ({resp.status}): {txt[:300]}")
-            return json.loads(txt)
+        async with session.get(EVE_JWKS_URL, timeout=15) as resp:
+            if resp.status != 200:
+                raise RuntimeError(f"Failed to fetch JWKS ({resp.status})")
+            data = await resp.json(content_type=None)
+
+    _jwks_cache.clear()
+    _jwks_cache.update(data)
+    _jwks_cache["fetched_at"] = now
+    return _jwks_cache
+
+
+async def verify_access_token(access_token: str) -> Dict[str, Any]:
+    """
+    L-4: Validate an EVE SSO access token locally using CCP's published JWKS.
+    Falls back to the deprecated remote-verify endpoint if PyJWT is not available.
+
+    Returns the decoded JWT claims dict, matching the legacy verify endpoint shape:
+      CharacterID, CharacterName, CharacterOwnerHash, Scopes, ExpiresOn, ...
+    """
+    try:
+        import jwt as _jwt
+        from jwt import PyJWKClient as _PyJWKClient
+    except ImportError:
+        _jwt = None
+
+    if _jwt is None:
+        # Fallback: deprecated remote verify (L-4 partially mitigated)
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "User-Agent": (os.getenv("EVE_SSO_USER_AGENT") or "xylon-bot").strip(),
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(EVE_VERIFY_URL, headers=headers, timeout=20) as resp:
+                txt = await resp.text()
+                if resp.status >= 400:
+                    raise RuntimeError(f"Token verify failed ({resp.status}): {txt[:300]}")
+                return json.loads(txt)
+
+    # ── Local JWKS validation ──────────────────────────────────────────────────
+    # Fetch JWKS (cached)
+    jwks = await _fetch_jwks()
+
+    # Build a temporary JWK set for PyJWT
+    import json as _json
+    jwks_str = _json.dumps({"keys": jwks.get("keys", [])})
+
+    def _decode_local(tok: str, jwks_s: str) -> Dict[str, Any]:
+        from jwt import PyJWKClient
+        client = PyJWKClient.__new__(PyJWKClient)
+        # Use the in-memory JWKS rather than fetching from a URL
+        client.jwk_set_data = _json.loads(jwks_s)
+        client.jwks_uri = EVE_JWKS_URL
+        client.cache_jwk_set = False
+        client.cache_keys = True
+        client.jwk_set_cache = None
+        # Actually easier: construct using the URI but override the data directly
+        signing_key = PyJWKClient(EVE_JWKS_URL)
+        # This fetches from URL — use the simpler dict approach instead
+        raise NotImplementedError
+
+    # Simpler approach: use jwt.decode with a JWK key fetched via PyJWKClient
+    # PyJWKClient will call the URI (once per TTL), but we also keep our own cache.
+    client = _PyJWKClient(EVE_JWKS_URL, cache_jwk_set=True, lifespan=_JWKS_CACHE_TTL)
+    try:
+        signing_key = client.get_signing_key_from_jwt(access_token)
+        payload = _jwt.decode(
+            access_token,
+            signing_key.key,
+            algorithms=["RS256", "ES256"],
+            issuer=EVE_ISSUER,
+            options={"verify_aud": False},  # EVE tokens don't set aud for public clients
+        )
+    except Exception as exc:
+        raise RuntimeError(f"JWT validation failed: {exc}") from exc
+
+    # Map claim names to the legacy verify-endpoint shape for backward compatibility
+    sub = payload.get("sub", "")   # "CHARACTER:EVE:12345678"
+    char_id = 0
+    if sub.startswith("CHARACTER:EVE:"):
+        try:
+            char_id = int(sub.split(":")[-1])
+        except ValueError:
+            pass
+
+    scopes = payload.get("scp", [])
+    if isinstance(scopes, str):
+        scopes = scopes.split()
+
+    return {
+        "CharacterID":        char_id,
+        "CharacterName":      payload.get("name", ""),
+        "CharacterOwnerHash": payload.get("owner", ""),
+        "Scopes":             " ".join(scopes),
+        "ExpiresOn":          payload.get("exp", 0),
+        "TokenType":          "Character",
+        # Also expose raw claims for callers that want them
+        "_jwt_payload":       payload,
+    }
 
 # ── PKCE helpers (for native/desktop app distribution) ────────────────────────
 

@@ -35,6 +35,7 @@ from eve.eve_sso import (
     encrypt_refresh_token,
     decrypt_refresh_token,
     get_sso_scopes,
+    set_token_key_db,  # M-7: auto-generate + persist Fernet key
 )
 from eve.memory_sqlite import MemoryStore
 from eve.relay_client import relay as _relay
@@ -427,7 +428,9 @@ def require_user(request: Request) -> Dict[str, Any]:
 PREMIUM_PAYMENT_CHAR_ID: int = 2123356839        # ISK receiver character ID
 PREMIUM_PAYMENT_MEMO:    str = "SNEK"            # Required substring in wallet memo
 PREMIUM_PRICE_ISK:       float = 5_000_000_000   # 5 billion ISK
-PREMIUM_DEV_CODE:        str   = "teacup"        # Rotating secret dev code
+# C-1: bcrypt hash of dev bypass code — never store plaintext.
+# To rotate: python3 -c "import bcrypt; print(bcrypt.hashpw(b'NEW_CODE', bcrypt.gensalt()).decode())"
+PREMIUM_DEV_CODE_HASH: bytes = b"$2b$12$ZrNeSZMjgCK5bn16r4J8RuAu6HjOcVX2JgPYWwN/vHUK2ksgtgpym"
 
 
 def _get_instance_id() -> str:
@@ -578,13 +581,23 @@ def create_app() -> FastAPI:
             latest_tag = data.get("tag_name", "v0.0.0").lstrip("v")
             release_url = data.get("html_url", "https://github.com/wangdeep/StellarInsight/releases")
 
-            # Pick the first .exe asset — that's the Inno Setup installer
-            installer_url = None
+            # Pick the .exe installer and its companion .sha256 asset (C-3)
+            installer_url  = None
+            sha256_url     = None
             for asset in data.get("assets", []):
                 name = asset.get("name", "")
-                if name.lower().endswith(".exe"):
-                    installer_url = asset.get("browser_download_url")
-                    break
+                url  = asset.get("browser_download_url", "")
+                if name.lower().endswith(".exe") and installer_url is None:
+                    installer_url = url
+                elif name.lower().endswith(".exe.sha256") and sha256_url is None:
+                    sha256_url = url
+            # Fall back: some releases ship a plain .sha256 with the same base name
+            if installer_url and not sha256_url:
+                for asset in data.get("assets", []):
+                    name = asset.get("name", "")
+                    if name.lower().endswith(".sha256"):
+                        sha256_url = asset.get("browser_download_url")
+                        break
 
             def _ver_tuple(v: str):
                 try:
@@ -599,6 +612,7 @@ def create_app() -> FastAPI:
                 "current": current,
                 "release_url": release_url,
                 "installer_url": installer_url,
+                "sha256_url": sha256_url,   # C-3: companion checksum asset
             }
         except Exception as exc:
             logger.warning("Update check failed: %s", exc)
@@ -633,6 +647,7 @@ def create_app() -> FastAPI:
         # Re-use the cached update-check result to get the installer URL
         cached = _resp_cache_get("__update_check__", 3600)
         installer_url = cached.get("installer_url") if cached else None
+        sha256_url    = (cached.get("sha256_url")    if cached else None) or None
 
         if not installer_url:
             # Cache may have expired — do a quick re-fetch synchronously
@@ -646,9 +661,17 @@ def create_app() -> FastAPI:
                     ) as resp:
                         data = await resp.json()
                 for asset in data.get("assets", []):
-                    if asset.get("name", "").lower().endswith(".exe"):
-                        installer_url = asset["browser_download_url"]
-                        break
+                    name = asset.get("name", "").lower()
+                    url  = asset.get("browser_download_url", "")
+                    if name.endswith(".exe") and not installer_url:
+                        installer_url = url
+                    elif name.endswith(".exe.sha256") and not sha256_url:
+                        sha256_url = url
+                if installer_url and not sha256_url:
+                    for asset in data.get("assets", []):
+                        if asset.get("name", "").lower().endswith(".sha256"):
+                            sha256_url = asset.get("browser_download_url")
+                            break
             except Exception as exc:
                 return {"error": f"Could not fetch installer URL: {exc}"}
 
@@ -660,7 +683,7 @@ def create_app() -> FastAPI:
                      "path": None, "error": None})
 
         def _download_and_run():
-            import sys, subprocess
+            import sys, subprocess, hashlib as _hl
             try:
                 dest = os.path.join(tempfile.gettempdir(), "StellarInsight_Update.exe")
 
@@ -669,6 +692,7 @@ def create_app() -> FastAPI:
                     installer_url,
                     headers={"User-Agent": "StellarInsight-Updater/1.0"},
                 )
+                sha256_digest = _hl.sha256()
                 with urllib.request.urlopen(req, timeout=120) as response:
                     total = int(response.headers.get("Content-Length", 0))
                     _upd["total"] = total
@@ -680,8 +704,32 @@ def create_app() -> FastAPI:
                             if not buf:
                                 break
                             f.write(buf)
+                            sha256_digest.update(buf)
                             received += len(buf)
                             _upd["received"] = received
+
+                # C-3: verify SHA-256 checksum before launching
+                if sha256_url:
+                    try:
+                        cs_req = urllib.request.Request(
+                            sha256_url,
+                            headers={"User-Agent": "StellarInsight-Updater/1.0"},
+                        )
+                        with urllib.request.urlopen(cs_req, timeout=30) as cs_resp:
+                            expected_hex = cs_resp.read().decode().split()[0].strip().lower()
+                        actual_hex = sha256_digest.hexdigest()
+                        if actual_hex != expected_hex:
+                            os.remove(dest)
+                            raise ValueError(
+                                f"SHA-256 mismatch! expected={expected_hex[:16]}… got={actual_hex[:16]}…"
+                            )
+                        logger.info("Installer SHA-256 verified OK: %s", actual_hex[:16])
+                    except ValueError:
+                        raise  # re-raise checksum failure
+                    except Exception as cs_exc:
+                        logger.warning("Could not fetch checksum file: %s — skipping verification", cs_exc)
+                else:
+                    logger.warning("No .sha256 asset found for this release — skipping verification (C-3)")
 
                 _upd["path"] = dest
                 _upd["status"] = "ready"
@@ -1046,6 +1094,14 @@ def create_app() -> FastAPI:
         if not log_dir:
             cfg = _intel_config()
             log_dir = cfg.get("log_dir", _intel_default_dir())
+        # M-3: restrict log dir to user's home directory to prevent path traversal
+        home = os.path.realpath(os.path.expanduser("~"))
+        resolved = os.path.realpath(os.path.expanduser(log_dir))
+        if not resolved.startswith(home + os.sep) and resolved != home:
+            raise HTTPException(
+                status_code=400,
+                detail="log_dir must be within your home directory"
+            )
         return {"files": _intel_list_logs(log_dir), "log_dir": log_dir}
 
     @app.get(f"{API_PREFIX}/intel/feed")
@@ -1143,8 +1199,8 @@ def create_app() -> FastAPI:
         cid = int(char["character_id"])
         char_name = char.get("character_name", "")
         mem = MemoryStore(_db_path())
-        # Check dev code first
-        if mem.key_check_dev_code(key_input, cid, current_code=PREMIUM_DEV_CODE):
+        # Check dev code first (C-1: bcrypt comparison, never plaintext)
+        if mem.key_check_dev_code(key_input, cid, code_hash=PREMIUM_DEV_CODE_HASH):
             reinstall_key = mem.generate_reinstall_key(cid, "dev_code")
             return {"ok": True, "method": "dev_code", "character": char_name, "reinstall_key": reinstall_key}
         # Try one-time key
@@ -1535,6 +1591,43 @@ def create_app() -> FastAPI:
             return result
         except Exception as e:
             return {"ok": False, "detail": str(e), "planets": []}
+
+    @app.get(f"{API_PREFIX}/eve/character/pi_planet")
+    @app.get(f"{API_PREFIX}/eo/character/pi_planet")
+    async def api_char_pi_planet(alias: str, planet_id: int, user=Depends(require_user)):
+        """Return pin/schematic detail for a single PI planet."""
+        try:
+            token = await eve_access_token_for(LOCAL_USER_ID, alias)
+            cid = int(token["character"]["character_id"])
+            _ck = f"resp:char_pi_planet:{cid}:{planet_id}"
+            if (cached := _resp_cache_get(_ck, _TTL_MEDIUM)): return cached
+            detail = await esi_get_json(f"/characters/{cid}/planets/{planet_id}/", access_token=token["access_token"]) or {}
+            pins = detail.get("pins") or []
+            # Resolve schematic names from SDE
+            schematic_ids = list({int(p["schematic_id"]) for p in pins if p.get("schematic_id")})
+            schematic_names = {}
+            if schematic_ids and sde_available():
+                try:
+                    import eve.sde_local as _sde_mod
+                    con = _sde_mod._get_sde()
+                    for sid in schematic_ids:
+                        row = con.execute("SELECT schematicName, cycleTime FROM planetSchematics WHERE schematicID=?", (sid,)).fetchone()
+                        if row:
+                            schematic_names[sid] = {"name": row["schematicName"], "cycle_time": row["cycleTime"]}
+                except Exception:
+                    pass
+            for p in pins:
+                sid = p.get("schematic_id")
+                if sid and sid in schematic_names:
+                    p["schematic_name"] = schematic_names[sid]["name"]
+                    p["cycle_time"] = schematic_names[sid]["cycle_time"]
+                else:
+                    p["schematic_name"] = ""
+            result = {"ok": True, "pins": pins, "links": detail.get("links", []), "routes": detail.get("routes", [])}
+            _resp_cache_set(_ck, result, _TTL_MEDIUM)
+            return result
+        except Exception as e:
+            return {"ok": False, "detail": str(e), "pins": []}
 
     @app.get(f"{API_PREFIX}/eve/dashboard")
     @app.get(f"{API_PREFIX}/eo/dashboard")
@@ -2301,60 +2394,60 @@ _nebulae_dl_state: Dict[str, Any] = {"status": "idle", "progress": 0, "done": 0,
 
 _NEBULA_SOURCES = [
     # (filename, CDN URL)  — all from res.eveonline.ccpgames.com
-    ("genesis",              "http://res.eveonline.ccpgames.com/fb/fbdd62f5fe5b4b38_37f3dbbf6e2a48cd006d3fea764ac7c2"),
-    ("kador",                "http://res.eveonline.ccpgames.com/65/65a09a5f64475ef9_89c8a8950be55c6ea546b49d84da5af8"),
-    ("domain",               "http://res.eveonline.ccpgames.com/8e/8e2045b05e9aeb5e_2f4793ec99f6966749fa1c862b82cfb6"),
-    ("the_bleak_lands",      "http://res.eveonline.ccpgames.com/85/85d2a394d335433f_d5cd6cd448c22ff1f8ee2d19c26e1b3e"),
-    ("devoid",               "http://res.eveonline.ccpgames.com/da/daa18f450ef5d304_4df40248edf2e128850bd3260c77603e"),
-    ("tash-murkon",          "http://res.eveonline.ccpgames.com/75/7512f0439de0f945_f7aa6452497fac7a728a9db2552e69cd"),
-    ("kor-azor",             "http://res.eveonline.ccpgames.com/15/15f2c1bf42cd346a_612f7f9bdac2a973c97cb514210e8e2b"),
-    ("aridia",               "http://res.eveonline.ccpgames.com/da/da6f5e3d1b76602b_f3665f521abd7ea7aef2119d9711ff00"),
-    ("khanid",               "http://res.eveonline.ccpgames.com/59/59d09b18e14c0240_b52302b8018f39b36667dd667ae17330"),
-    ("querious",             "http://res.eveonline.ccpgames.com/fe/fec97d13928c6dba_08f8336a39af5fc3dbaacf377fc1292e"),
-    ("delve",                "http://res.eveonline.ccpgames.com/cf/cf6651b9365d6655_1cbc58779d990253411fdf6e38d48878"),
-    ("period_basis",         "http://res.eveonline.ccpgames.com/bf/bf1857b85ad63714_0146c77fee83665c64457b6a9bdf64b6"),
-    ("derelik",              "http://res.eveonline.ccpgames.com/8c/8c4800862d53ec8f_f4535b9c786fc7ba1f667fd87d663a99"),
-    ("providence",           "http://res.eveonline.ccpgames.com/37/373b801a7ace916e_a6a07b53b08d1ca381e46b7a7d7f41f6"),
-    ("catch",                "http://res.eveonline.ccpgames.com/e0/e03b439f6247b0c9_a9a1c6a8227e5032f623c4734e1b8921"),
-    ("stain",                "http://res.eveonline.ccpgames.com/b6/b6e2632e3dd7a348_da0fd8010304da3b2e4d1a4b9be38559"),
-    ("paragon_soul",         "http://res.eveonline.ccpgames.com/29/29b99fe47d9a0c33_0ec5b6347505ddedefaa193142702072"),
-    ("esoteria",             "http://res.eveonline.ccpgames.com/2e/2e8c08c61560dac2_11a244119c06864202fa4ac21d269886"),
-    ("the_citadel",          "http://res.eveonline.ccpgames.com/a7/a74c90e0df6d352e_b2606d300e06f2aa952b1f325773a548"),
-    ("the_forge",            "http://res.eveonline.ccpgames.com/95/95f06e84f4c00ff3_9b88438cf69db5b5225149a266f443d6"),
-    ("lonetrek",             "http://res.eveonline.ccpgames.com/2c/2c476b9e6cb9b608_a9a8fb24754044935878c7e009568c08"),
-    ("black_rise",           "http://res.eveonline.ccpgames.com/2d/2dab17692ad88d15_af630e8afdc564cd0c61cc6f7f15bc92"),
-    ("pure_blind",           "http://res.eveonline.ccpgames.com/b7/b7a3ebf9f4ce1a7a_a8bd67e64dc5cc2dd454f53a51bde589"),
-    ("deklein",              "http://res.eveonline.ccpgames.com/98/98123be44dfdec4f_3685b2a579c29e16f2bcaadda084837a"),
-    ("branch",               "http://res.eveonline.ccpgames.com/c9/c90e9c216dabcdd4_a5386981c5de524dfdbbdc1c00bf9e4c"),
-    ("tenal",                "http://res.eveonline.ccpgames.com/e7/e7d58b1f741c48f1_adec0a03c83f7c68fe9b42b95f72f7a3"),
-    ("tribute",              "http://res.eveonline.ccpgames.com/4d/4d25a2142672bab6_32ba3b9551c8f0a7540c10b98078f7a1"),
-    ("vale_of_the_silent",   "http://res.eveonline.ccpgames.com/99/99208419e98be558_c80cda89d994ad6b48462144217c38e3"),
-    ("geminate",             "http://res.eveonline.ccpgames.com/92/92492da801c6ff03_163ff0a2baffd3d5d59f8bac31baaa4c"),
-    ("venal",                "http://res.eveonline.ccpgames.com/ad/adffe24ed22674fe_bcb5e40b2e77d650dbb4e724e6b69387"),
-    ("the_kalevala_expanse", "http://res.eveonline.ccpgames.com/7a/7af6b262243d61a4_d26052b4c691c02cf5a3339059322461"),
-    ("malpais",              "http://res.eveonline.ccpgames.com/a8/a8c4422c70d7c15f_fea842550fcdb4be0ab6fc64b0474e2d"),
-    ("perrigen_falls",       "http://res.eveonline.ccpgames.com/7f/7faef1ba7692900a_e77de2ce29e8e168660a862ec8fae0f0"),
-    ("oasa",                 "http://res.eveonline.ccpgames.com/15/15671360b326d4e5_413a3b48eef2a04145d3f3b03f5fa3f9"),
-    ("outer_passage",        "http://res.eveonline.ccpgames.com/2f/2f2fe35702f110e0_1f48fcce1a9d95acc937499cedb21342"),
-    ("cobalt_edge",          "http://res.eveonline.ccpgames.com/ca/ca2e09b2da79d54b_bf80cf4d0802052eeda629aeb5fc9e83"),
-    ("sinq_laison",          "http://res.eveonline.ccpgames.com/9d/9d15140ca81eea3a_eb99a76d700678069715a4a24ac11755"),
-    ("everyshore",           "http://res.eveonline.ccpgames.com/2a/2a93977f42e6690f_88a7655012b231404f0eaa9a5b9af9b8"),
-    ("essence",              "http://res.eveonline.ccpgames.com/5d/5d63eeb17068b394_1d7eeab15e6cd20d8902d65fac14bc25"),
-    ("verge_vendor",         "http://res.eveonline.ccpgames.com/7e/7e86da9877da2d49_2774a3d3d6ebe017f57ac541bd32c65f"),
-    ("placid",               "http://res.eveonline.ccpgames.com/d5/d587171390610dee_b3571d309642405c712e47f97dbb63f9"),
-    ("syndicate",            "http://res.eveonline.ccpgames.com/c8/c80536dd932c88b3_6651dc4d6044954db3904ad714b1f08c"),
-    ("cloud_ring",           "http://res.eveonline.ccpgames.com/55/552dfa27536a1fc8_71d619c9a677a6d4549e6d87577c425e"),
-    ("outer_ring",           "http://res.eveonline.ccpgames.com/9b/9bbc27b126083c7d_e2c108f2978d4d00aec0cf9db5ccb131"),
-    ("solitude",             "http://res.eveonline.ccpgames.com/cc/ccd79fbf2af35742_b2c528e85b29473358faecce9519a90a"),
-    ("fade",                 "http://res.eveonline.ccpgames.com/a3/a3dc40eb0aec1864_efac28d6ab6b28c3118a8359449dd7a8"),
-    ("fountain",             "http://res.eveonline.ccpgames.com/36/3681e8f83fa18a1f_2550059bfef1b79b22a0be1587129759"),
-    ("heimatar",             "http://res.eveonline.ccpgames.com/7c/7c5fecd06297e9c0_33e7db56df57bf5ece3aa95f00b564db"),
-    ("metropolis",           "http://res.eveonline.ccpgames.com/6f/6fb4f3cba7bea236_69eba5cf1a9878d61619d0ef3e265ad5"),
-    ("molden_heath",         "http://res.eveonline.ccpgames.com/8d/8d3e773064363c72_1cccd9002f13d84b2ca21aa40b5178e4"),
-    ("great_wildlands",      "http://res.eveonline.ccpgames.com/39/39fa2be914ce693d_aa8595cc35a3713fcfd6821794db6270"),
-    ("wh_generic",           "http://res.eveonline.ccpgames.com/f1/f1eeb0300c591529_b0d5553979c2c247d83d796c1fcf67ee"),
-    ("wh_c5c6",              "http://res.eveonline.ccpgames.com/0d/0d950df736ab8da8_7cd9440d71b6bf50ac2bf01984922807"),
-    ("pochven",              "http://res.eveonline.ccpgames.com/aa/aa6c1773b07ab26d_1e0d455d70cccea389c45250d6747677"),
+    ("genesis",              "https://res.eveonline.ccpgames.com/fb/fbdd62f5fe5b4b38_37f3dbbf6e2a48cd006d3fea764ac7c2"),
+    ("kador",                "https://res.eveonline.ccpgames.com/65/65a09a5f64475ef9_89c8a8950be55c6ea546b49d84da5af8"),
+    ("domain",               "https://res.eveonline.ccpgames.com/8e/8e2045b05e9aeb5e_2f4793ec99f6966749fa1c862b82cfb6"),
+    ("the_bleak_lands",      "https://res.eveonline.ccpgames.com/85/85d2a394d335433f_d5cd6cd448c22ff1f8ee2d19c26e1b3e"),
+    ("devoid",               "https://res.eveonline.ccpgames.com/da/daa18f450ef5d304_4df40248edf2e128850bd3260c77603e"),
+    ("tash-murkon",          "https://res.eveonline.ccpgames.com/75/7512f0439de0f945_f7aa6452497fac7a728a9db2552e69cd"),
+    ("kor-azor",             "https://res.eveonline.ccpgames.com/15/15f2c1bf42cd346a_612f7f9bdac2a973c97cb514210e8e2b"),
+    ("aridia",               "https://res.eveonline.ccpgames.com/da/da6f5e3d1b76602b_f3665f521abd7ea7aef2119d9711ff00"),
+    ("khanid",               "https://res.eveonline.ccpgames.com/59/59d09b18e14c0240_b52302b8018f39b36667dd667ae17330"),
+    ("querious",             "https://res.eveonline.ccpgames.com/fe/fec97d13928c6dba_08f8336a39af5fc3dbaacf377fc1292e"),
+    ("delve",                "https://res.eveonline.ccpgames.com/cf/cf6651b9365d6655_1cbc58779d990253411fdf6e38d48878"),
+    ("period_basis",         "https://res.eveonline.ccpgames.com/bf/bf1857b85ad63714_0146c77fee83665c64457b6a9bdf64b6"),
+    ("derelik",              "https://res.eveonline.ccpgames.com/8c/8c4800862d53ec8f_f4535b9c786fc7ba1f667fd87d663a99"),
+    ("providence",           "https://res.eveonline.ccpgames.com/37/373b801a7ace916e_a6a07b53b08d1ca381e46b7a7d7f41f6"),
+    ("catch",                "https://res.eveonline.ccpgames.com/e0/e03b439f6247b0c9_a9a1c6a8227e5032f623c4734e1b8921"),
+    ("stain",                "https://res.eveonline.ccpgames.com/b6/b6e2632e3dd7a348_da0fd8010304da3b2e4d1a4b9be38559"),
+    ("paragon_soul",         "https://res.eveonline.ccpgames.com/29/29b99fe47d9a0c33_0ec5b6347505ddedefaa193142702072"),
+    ("esoteria",             "https://res.eveonline.ccpgames.com/2e/2e8c08c61560dac2_11a244119c06864202fa4ac21d269886"),
+    ("the_citadel",          "https://res.eveonline.ccpgames.com/a7/a74c90e0df6d352e_b2606d300e06f2aa952b1f325773a548"),
+    ("the_forge",            "https://res.eveonline.ccpgames.com/95/95f06e84f4c00ff3_9b88438cf69db5b5225149a266f443d6"),
+    ("lonetrek",             "https://res.eveonline.ccpgames.com/2c/2c476b9e6cb9b608_a9a8fb24754044935878c7e009568c08"),
+    ("black_rise",           "https://res.eveonline.ccpgames.com/2d/2dab17692ad88d15_af630e8afdc564cd0c61cc6f7f15bc92"),
+    ("pure_blind",           "https://res.eveonline.ccpgames.com/b7/b7a3ebf9f4ce1a7a_a8bd67e64dc5cc2dd454f53a51bde589"),
+    ("deklein",              "https://res.eveonline.ccpgames.com/98/98123be44dfdec4f_3685b2a579c29e16f2bcaadda084837a"),
+    ("branch",               "https://res.eveonline.ccpgames.com/c9/c90e9c216dabcdd4_a5386981c5de524dfdbbdc1c00bf9e4c"),
+    ("tenal",                "https://res.eveonline.ccpgames.com/e7/e7d58b1f741c48f1_adec0a03c83f7c68fe9b42b95f72f7a3"),
+    ("tribute",              "https://res.eveonline.ccpgames.com/4d/4d25a2142672bab6_32ba3b9551c8f0a7540c10b98078f7a1"),
+    ("vale_of_the_silent",   "https://res.eveonline.ccpgames.com/99/99208419e98be558_c80cda89d994ad6b48462144217c38e3"),
+    ("geminate",             "https://res.eveonline.ccpgames.com/92/92492da801c6ff03_163ff0a2baffd3d5d59f8bac31baaa4c"),
+    ("venal",                "https://res.eveonline.ccpgames.com/ad/adffe24ed22674fe_bcb5e40b2e77d650dbb4e724e6b69387"),
+    ("the_kalevala_expanse", "https://res.eveonline.ccpgames.com/7a/7af6b262243d61a4_d26052b4c691c02cf5a3339059322461"),
+    ("malpais",              "https://res.eveonline.ccpgames.com/a8/a8c4422c70d7c15f_fea842550fcdb4be0ab6fc64b0474e2d"),
+    ("perrigen_falls",       "https://res.eveonline.ccpgames.com/7f/7faef1ba7692900a_e77de2ce29e8e168660a862ec8fae0f0"),
+    ("oasa",                 "https://res.eveonline.ccpgames.com/15/15671360b326d4e5_413a3b48eef2a04145d3f3b03f5fa3f9"),
+    ("outer_passage",        "https://res.eveonline.ccpgames.com/2f/2f2fe35702f110e0_1f48fcce1a9d95acc937499cedb21342"),
+    ("cobalt_edge",          "https://res.eveonline.ccpgames.com/ca/ca2e09b2da79d54b_bf80cf4d0802052eeda629aeb5fc9e83"),
+    ("sinq_laison",          "https://res.eveonline.ccpgames.com/9d/9d15140ca81eea3a_eb99a76d700678069715a4a24ac11755"),
+    ("everyshore",           "https://res.eveonline.ccpgames.com/2a/2a93977f42e6690f_88a7655012b231404f0eaa9a5b9af9b8"),
+    ("essence",              "https://res.eveonline.ccpgames.com/5d/5d63eeb17068b394_1d7eeab15e6cd20d8902d65fac14bc25"),
+    ("verge_vendor",         "https://res.eveonline.ccpgames.com/7e/7e86da9877da2d49_2774a3d3d6ebe017f57ac541bd32c65f"),
+    ("placid",               "https://res.eveonline.ccpgames.com/d5/d587171390610dee_b3571d309642405c712e47f97dbb63f9"),
+    ("syndicate",            "https://res.eveonline.ccpgames.com/c8/c80536dd932c88b3_6651dc4d6044954db3904ad714b1f08c"),
+    ("cloud_ring",           "https://res.eveonline.ccpgames.com/55/552dfa27536a1fc8_71d619c9a677a6d4549e6d87577c425e"),
+    ("outer_ring",           "https://res.eveonline.ccpgames.com/9b/9bbc27b126083c7d_e2c108f2978d4d00aec0cf9db5ccb131"),
+    ("solitude",             "https://res.eveonline.ccpgames.com/cc/ccd79fbf2af35742_b2c528e85b29473358faecce9519a90a"),
+    ("fade",                 "https://res.eveonline.ccpgames.com/a3/a3dc40eb0aec1864_efac28d6ab6b28c3118a8359449dd7a8"),
+    ("fountain",             "https://res.eveonline.ccpgames.com/36/3681e8f83fa18a1f_2550059bfef1b79b22a0be1587129759"),
+    ("heimatar",             "https://res.eveonline.ccpgames.com/7c/7c5fecd06297e9c0_33e7db56df57bf5ece3aa95f00b564db"),
+    ("metropolis",           "https://res.eveonline.ccpgames.com/6f/6fb4f3cba7bea236_69eba5cf1a9878d61619d0ef3e265ad5"),
+    ("molden_heath",         "https://res.eveonline.ccpgames.com/8d/8d3e773064363c72_1cccd9002f13d84b2ca21aa40b5178e4"),
+    ("great_wildlands",      "https://res.eveonline.ccpgames.com/39/39fa2be914ce693d_aa8595cc35a3713fcfd6821794db6270"),
+    ("wh_generic",           "https://res.eveonline.ccpgames.com/f1/f1eeb0300c591529_b0d5553979c2c247d83d796c1fcf67ee"),
+    ("wh_c5c6",              "https://res.eveonline.ccpgames.com/0d/0d950df736ab8da8_7cd9440d71b6bf50ac2bf01984922807"),
+    ("pochven",              "https://res.eveonline.ccpgames.com/aa/aa6c1773b07ab26d_1e0d455d70cccea389c45250d6747677"),
 ]
 
 
@@ -4891,19 +4984,100 @@ async def api_industry_pi_chain(type_id: int = 0):
 
 @app.get("/app/api/sde/pi_products")
 async def api_sde_pi_products():
-    """Return all PI output types (items produced by schematics)."""
+    """Return all PI output types with tier/groupName, for search."""
     if not sde_available():
         return []
     try:
         import eve.sde_local as _sde_mod
         con = _sde_mod._get_sde()
         rows = con.execute(
-            "SELECT DISTINCT m.typeID, t.typeName FROM planetSchematicsTypeMap m "
-            "JOIN invTypes t ON t.typeID=m.typeID WHERE m.isInput=0 ORDER BY t.typeName"
+            "SELECT DISTINCT m.typeID, t.typeName, g.groupName "
+            "FROM planetSchematicsTypeMap m "
+            "JOIN invTypes t ON t.typeID=m.typeID "
+            "JOIN invGroups g ON g.groupID=t.groupID "
+            "WHERE m.isInput=0 ORDER BY g.groupName, t.typeName"
         ).fetchall()
-        return [{"typeID": r["typeID"], "typeName": r["typeName"]} for r in rows]
+        return [{"typeID": r["typeID"], "typeName": r["typeName"], "groupName": r["groupName"]} for r in rows]
     except Exception as e:
         return []
+
+
+@app.get("/app/api/sde/t2_catalog")
+async def api_sde_t2_catalog():
+    """
+    Return all T2-inventable items grouped by EVE category > group.
+    Structure: {categoryName: {groupName: [{typeID, typeName}]}}
+    """
+    if not sde_available():
+        return {}
+    try:
+        import eve.sde_local as _sde_mod
+        con = _sde_mod._get_sde()
+        rows = con.execute(
+            """
+            SELECT DISTINCT c.categoryName, g.groupName, t.typeID, t.typeName
+            FROM industryActivityProducts p1
+            JOIN industryActivityProducts p2
+              ON p2.productTypeID = p1.typeID AND p2.activityID = 8
+            JOIN invTypes t ON t.typeID = p1.productTypeID
+            JOIN invGroups g ON g.groupID = t.groupID
+            JOIN invCategories c ON c.categoryID = g.categoryID
+            WHERE p1.activityID = 1 AND t.published = 1
+            ORDER BY c.categoryName, g.groupName, t.typeName
+            """
+        ).fetchall()
+        catalog: dict = {}
+        for r in rows:
+            cat   = r["categoryName"]
+            grp   = r["groupName"]
+            item  = {"typeID": r["typeID"], "typeName": r["typeName"]}
+            catalog.setdefault(cat, {}).setdefault(grp, []).append(item)
+        return catalog
+    except Exception as e:
+        return {}
+
+
+@app.get("/app/api/sde/pi_catalog")
+async def api_sde_pi_catalog():
+    """
+    Return PI items grouped by tier label.
+    Structure: {tier_label: [{typeID, typeName}]}
+    """
+    if not sde_available():
+        return {}
+    try:
+        import eve.sde_local as _sde_mod
+        con = _sde_mod._get_sde()
+        out_rows = con.execute(
+            "SELECT DISTINCT m.typeID, t.typeName, g.groupName "
+            "FROM planetSchematicsTypeMap m "
+            "JOIN invTypes t ON t.typeID=m.typeID "
+            "JOIN invGroups g ON g.groupID=t.groupID "
+            "WHERE m.isInput=0 ORDER BY g.groupName, t.typeName"
+        ).fetchall()
+        p0_rows = con.execute(
+            "SELECT DISTINCT t.typeID, t.typeName "
+            "FROM planetSchematicsTypeMap m "
+            "JOIN invTypes t ON t.typeID=m.typeID AND m.isInput=1 "
+            "WHERE t.typeID NOT IN "
+            "(SELECT typeID FROM planetSchematicsTypeMap WHERE isInput=0) "
+            "ORDER BY t.typeName"
+        ).fetchall()
+        _tier_map = {
+            "Basic Commodities - Tier 1":       "P1 — Basic",
+            "Refined Commodities - Tier 2":     "P2 — Refined",
+            "Specialized Commodities - Tier 3": "P3 — Specialized",
+            "Advanced Commodities - Tier 4":    "P4 — Advanced",
+        }
+        catalog: dict = {}
+        for r in p0_rows:
+            catalog.setdefault("P0 — Raw", []).append({"typeID": r["typeID"], "typeName": r["typeName"]})
+        for r in out_rows:
+            label = _tier_map.get(r["groupName"], r["groupName"])
+            catalog.setdefault(label, []).append({"typeID": r["typeID"], "typeName": r["typeName"]})
+        return catalog
+    except Exception as e:
+        return {}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -5354,6 +5528,8 @@ async def _location_track_task():
 
 @app.on_event("startup")
 async def _start_background_tasks():
+    # M-7: wire up Fernet key auto-generation from SQLite
+    set_token_key_db(_db_path())
     asyncio.create_task(_ticker_loop())
     asyncio.create_task(_esi_auto_refresh_task())
     asyncio.create_task(_location_track_task())
@@ -5371,7 +5547,27 @@ _SYNC_CONFIG_KEYS = ("sync_url", "sync_token", "sync_corp_id",
                      "sync_room_code")
 
 # Default relay URL (developer-hosted instance)
-DEFAULT_RELAY_URL = "http://insight.stellarforge.nexus/share"
+DEFAULT_RELAY_URL = "https://insight.stellarforge.nexus/share"  # C-4: HTTPS enforced
+
+
+def _validate_relay_url(url: str) -> str:
+    """
+    C-4: Enforce HTTPS for all relay URLs.
+    Raises HTTPException(400) if the caller tries to use plain HTTP.
+    Returns the url (stripped of trailing slash) if valid.
+    """
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Relay URL must use HTTPS for security. "
+                f"Received scheme: '{parsed.scheme}'. "
+                "Update your relay URL to start with 'https://'."
+            ),
+        )
+    return url.rstrip("/")
 
 
 def _sync_cfg_get(key: str) -> Optional[str]:
@@ -5602,7 +5798,7 @@ async def api_sync_setup(request: Request):
     Body: { relay_url? }  — defaults to DEFAULT_RELAY_URL
     """
     body = await request.json()
-    relay_url = (body.get("relay_url") or DEFAULT_RELAY_URL).rstrip("/")
+    relay_url = _validate_relay_url(body.get("relay_url") or DEFAULT_RELAY_URL)
 
     chars = eve_list_characters(LOCAL_USER_ID)
     if not chars:
@@ -5678,7 +5874,7 @@ async def api_sync_join(request: Request):
     """
     body = await request.json()
     room_code = (body.get("room_code") or "").strip().upper()
-    relay_url = (body.get("relay_url") or DEFAULT_RELAY_URL).rstrip("/")
+    relay_url = _validate_relay_url(body.get("relay_url") or DEFAULT_RELAY_URL)
 
     if not room_code:
         raise HTTPException(status_code=400, detail="room_code is required (format: SNEK-XXXX)")
@@ -5840,6 +6036,344 @@ async def api_sync_events(request: Request):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Share Snippets  — lightweight local share system
+# ════════════════════════════════════════════════════════════════════════════
+
+import string as _string
+
+_SHARE_CHARS = _string.ascii_letters + _string.digits
+_SHARE_MAX_BYTES = 512 * 1024   # 512 KB hard cap on payload
+_SHARE_TTL_SECS  = 30 * 86400   # 30-day expiry
+
+def _share_code(n: int = 8) -> str:
+    # secrets.choice is cryptographically secure (M-1)
+    return "".join(secrets.choice(_SHARE_CHARS) for _ in range(n))
+
+def _ensure_share_table(con) -> None:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS share_snippets ("
+        "  code       TEXT PRIMARY KEY,"
+        "  title      TEXT NOT NULL,"
+        "  type       TEXT NOT NULL,"
+        "  payload    TEXT NOT NULL,"
+        "  created_at INTEGER NOT NULL,"
+        "  expires_at INTEGER NOT NULL"
+        ")"
+    )
+    # Add expires_at to existing tables that pre-date this column
+    try:
+        con.execute("ALTER TABLE share_snippets ADD COLUMN expires_at INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass  # column already exists
+
+
+@app.post(f"{API_PREFIX}/share/create")
+async def api_share_create(request: Request):
+    """
+    Body: { title, type, payload }
+    Returns: { ok, code, url }
+    """
+    body = await request.json()
+    title   = str(body.get("title", "Shared"))[:200]
+    stype   = str(body.get("type",  "generic"))[:50]
+    payload = body.get("payload", {})
+    import json as _json
+    payload_str = _json.dumps(payload, ensure_ascii=False)
+    # L-5: enforce 512 KB payload cap
+    if len(payload_str.encode()) > _SHARE_MAX_BYTES:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=413, detail="Share payload exceeds 512 KB limit")
+    now = int(time.time())
+    expires_at = now + _SHARE_TTL_SECS
+    # generate a unique code
+    with _connect() as con:
+        _ensure_share_table(con)
+        for _ in range(10):
+            code = _share_code(8)
+            exists = con.execute(
+                "SELECT 1 FROM share_snippets WHERE code=?", (code,)
+            ).fetchone()
+            if not exists:
+                break
+        con.execute(
+            "INSERT INTO share_snippets(code,title,type,payload,created_at,expires_at) VALUES(?,?,?,?,?,?)",
+            (code, title, stype, payload_str, now, expires_at),
+        )
+        con.commit()
+    return {"ok": True, "code": code, "url": f"/share/{code}"}
+
+
+@app.get("/share/{code}", response_class=HTMLResponse)
+async def share_view(request: Request, code: str):
+    """Public read-only share view — no auth required."""
+    import json as _json
+    with _connect() as con:
+        _ensure_share_table(con)
+        row = con.execute(
+            "SELECT * FROM share_snippets WHERE code=?", (code,)
+        ).fetchone()
+    if not row:
+        return HTMLResponse("<html><body style='background:#0b0f14;color:#e8eefc;font-family:monospace;padding:40px'>"
+                            "<h2>Share not found</h2><p>This link may have expired or is invalid.</p></body></html>",
+                            status_code=404)
+    # L-5: reject expired snippets
+    expires_at = row["expires_at"] if "expires_at" in row.keys() else 0
+    if expires_at and int(time.time()) > expires_at:
+        return HTMLResponse("<html><body style='background:#0b0f14;color:#e8eefc;font-family:monospace;padding:40px'>"
+                            "<h2>Link expired</h2><p>This share link has expired (30-day limit).</p></body></html>",
+                            status_code=410)
+    payload = _json.loads(row["payload"])
+    stype   = row["type"]
+    title   = row["title"]
+    created = row["created_at"]
+    import datetime as _dt
+    created_str = _dt.datetime.utcfromtimestamp(created).strftime("%Y-%m-%d %H:%M UTC")
+
+    # Build content HTML based on share type
+    content_html = _share_render_html(stype, title, payload)
+
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>{_html_escape(title)} — StellarInsight Share</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#0b0f14;color:#e8eefc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;padding:24px 16px}}
+    .share-wrap{{max-width:820px;margin:0 auto}}
+    .share-header{{display:flex;align-items:center;gap:12px;padding:16px 20px;background:rgba(0,0,0,.6);border:1px solid rgba(50,182,255,.18);border-radius:10px;margin-bottom:20px;backdrop-filter:blur(12px)}}
+    .share-logo{{font-size:18px;font-weight:700;color:#32b6ff;letter-spacing:.04em}}
+    .share-title{{flex:1;font-size:16px;font-weight:600;color:#e8eefc}}
+    .share-meta{{font-size:11px;color:#6b7280}}
+    .share-badge{{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:20px;background:rgba(50,182,255,.15);color:#32b6ff;border:1px solid rgba(50,182,255,.25)}}
+    .share-body{{background:rgba(0,0,0,.5);border:1px solid rgba(50,182,255,.12);border-radius:10px;padding:20px;backdrop-filter:blur(8px)}}
+    table{{width:100%;border-collapse:collapse;font-size:12px}}
+    th{{text-align:left;padding:6px 10px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;border-bottom:1px solid rgba(50,182,255,.12)}}
+    td{{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);color:#c5cdd8}}
+    tr:nth-child(even) td{{background:rgba(0,0,0,.15)}}
+    .section-hdr{{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#32b6ff;margin:16px 0 8px;padding-bottom:4px;border-bottom:1px solid rgba(50,182,255,.2)}}
+    .chain-node{{display:inline-block;background:rgba(50,182,255,.1);border:1px solid rgba(50,182,255,.2);border-radius:6px;padding:4px 10px;font-size:11px;margin:2px}}
+    .arrow{{color:#32b6ff;font-size:14px;margin:0 4px;vertical-align:middle}}
+    .chain-line{{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:4px 0}}
+    pre{{background:rgba(0,0,0,.6);border:1px solid rgba(60,80,110,.3);border-radius:6px;padding:12px;font-size:11px;color:#c5cdd8;white-space:pre-wrap;overflow-wrap:break-word}}
+    .tree-node{{margin-left:20px;padding:2px 0}}
+    .tree-name{{display:inline-block;background:rgba(0,0,0,.4);border:1px solid rgba(50,182,255,.15);border-radius:4px;padding:2px 8px;font-size:11px;margin-bottom:2px}}
+    .pill{{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600;margin-left:4px}}
+    .pill-p0{{background:rgba(100,100,100,.3);color:#9db1d1}}
+    .pill-p1{{background:rgba(50,182,255,.15);color:#32b6ff}}
+    .pill-p2{{background:rgba(100,200,100,.15);color:#4ade80}}
+    .pill-p3{{background:rgba(239,143,47,.15);color:#ef8f2f}}
+    .pill-p4{{background:rgba(168,85,247,.15);color:#a855f7}}
+  </style>
+</head>
+<body>
+  <div class="share-wrap">
+    <div class="share-header">
+      <div class="share-logo">⭐ StellarInsight</div>
+      <div class="share-title">{_html_escape(title)}</div>
+      <div>
+        <span class="share-badge">{_html_escape(stype)}</span>
+        <div class="share-meta" style="margin-top:4px">{created_str}</div>
+      </div>
+    </div>
+    <div class="share-body">
+      {content_html}
+    </div>
+  </div>
+</body>
+</html>"""
+    return HTMLResponse(html)
+
+
+def _html_escape(s: str) -> str:
+    return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
+
+def _he(s) -> str:
+    return _html_escape(str(s))
+
+
+def _share_render_html(stype: str, title: str, payload: dict) -> str:
+    """Render the inner content of a share page based on type."""
+    if stype == "fitting":
+        return _share_fitting(payload)
+    elif stype == "industry_calc":
+        return _share_industry_calc(payload)
+    elif stype == "industry_queue":
+        return _share_industry_queue(payload)
+    elif stype == "t2_chain":
+        return _share_t2_chain(payload)
+    elif stype == "pi_chain":
+        return _share_pi_chain(payload)
+    elif stype == "industry_scanner":
+        return _share_industry_scanner(payload)
+    elif stype == "chain_map":
+        return _share_chain_map(payload)
+    else:
+        import json as _json
+        return f"<pre>{_he(_json.dumps(payload, indent=2))}</pre>"
+
+
+def _share_fitting(p: dict) -> str:
+    eft = p.get("eft", "")
+    ship = p.get("ship", "")
+    stats = p.get("stats", {})
+    out = []
+    if ship:
+        out.append(f'<div class="section-hdr">Ship: {_he(ship)}</div>')
+    if stats:
+        out.append('<table><tr>')
+        for k, v in stats.items():
+            out.append(f'<th>{_he(k)}</th>')
+        out.append('</tr><tr>')
+        for k, v in stats.items():
+            out.append(f'<td>{_he(v)}</td>')
+        out.append('</tr></table><br/>')
+    if eft:
+        out.append(f'<div class="section-hdr">EFT Format</div><pre>{_he(eft)}</pre>')
+    return "".join(out) or "<p style='color:#6b7280'>No fitting data</p>"
+
+
+def _share_industry_calc(p: dict) -> str:
+    out = []
+    item = p.get("item", "")
+    runs = p.get("runs", 1)
+    cost = p.get("total_cost", 0)
+    sell = p.get("sell_price", 0)
+    profit = p.get("profit", 0)
+    if item:
+        out.append(f'<div class="section-hdr">{_he(item)} × {_he(runs)}</div>')
+    out.append('<table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>')
+    if cost:  out.append(f'<tr><td>Total Cost</td><td>{_he(f"{cost:,.0f} ISK")}</td></tr>')
+    if sell:  out.append(f'<tr><td>Sell Price</td><td>{_he(f"{sell:,.0f} ISK")}</td></tr>')
+    if profit: out.append(f'<tr><td>Profit</td><td style="color:{"#4ade80" if profit>0 else "#ff4d6d"}">{_he(f"{profit:,.0f} ISK")}</td></tr>')
+    out.append('</tbody></table>')
+    mats = p.get("materials", [])
+    if mats:
+        out.append('<div class="section-hdr">Materials</div>')
+        out.append('<table><thead><tr><th>Material</th><th>Quantity</th><th>Unit Cost</th></tr></thead><tbody>')
+        for m in mats:
+            out.append(f'<tr><td>{_he(m.get("name",""))}</td><td>{_he(m.get("quantity",""))}</td><td>{_he(m.get("unit_cost",""))}</td></tr>')
+        out.append('</tbody></table>')
+    return "".join(out)
+
+
+def _share_industry_queue(p: dict) -> str:
+    out = []
+    items = p.get("items", [])
+    shopping = p.get("shopping", [])
+    if items:
+        out.append('<div class="section-hdr">Production Queue</div>')
+        out.append('<table><thead><tr><th>Item</th><th>Runs</th><th>Cost</th><th>Profit</th></tr></thead><tbody>')
+        for it in items:
+            pval = it.get("profit", 0)
+            color = "#4ade80" if isinstance(pval, (int,float)) and pval > 0 else "#ff4d6d"
+            prof_str = f'{pval:,.0f} ISK' if isinstance(pval, (int,float)) else str(pval)
+            cost_str = f'{it.get("cost",0):,.0f} ISK' if isinstance(it.get("cost",0),(int,float)) else str(it.get("cost",""))
+            out.append(f'<tr><td>{_he(it.get("name",""))}</td><td>{_he(it.get("runs",""))}</td>'
+                       f'<td>{_he(cost_str)}</td><td style="color:{color}">{_he(prof_str)}</td></tr>')
+        out.append('</tbody></table>')
+    if shopping:
+        out.append('<div class="section-hdr">Shopping List</div>')
+        out.append('<table><thead><tr><th>Material</th><th>Total Quantity</th></tr></thead><tbody>')
+        for m in shopping:
+            out.append(f'<tr><td>{_he(m.get("name",""))}</td><td>{_he(m.get("quantity",""))}</td></tr>')
+        out.append('</tbody></table>')
+    return "".join(out) or "<p style='color:#6b7280'>Empty queue</p>"
+
+
+def _share_t2_chain(p: dict) -> str:
+    out = []
+    item = p.get("item", "")
+    runs = p.get("runs", 1)
+    if item:
+        out.append(f'<div class="section-hdr">T2 Manufacturing Chain: {_he(item)} × {_he(runs)}</div>')
+    steps = p.get("steps", [])
+    if steps:
+        out.append('<div class="chain-line">')
+        for i, step in enumerate(steps):
+            if i > 0: out.append('<span class="arrow">→</span>')
+            out.append(f'<span class="chain-node">{_he(step.get("name",""))}</span>')
+        out.append('</div><br/>')
+    mats = p.get("materials", [])
+    if mats:
+        out.append('<table><thead><tr><th>Material</th><th>Quantity</th></tr></thead><tbody>')
+        for m in mats:
+            out.append(f'<tr><td>{_he(m.get("name",""))}</td><td>{_he(m.get("quantity",""))}</td></tr>')
+        out.append('</tbody></table>')
+    return "".join(out) or "<p style='color:#6b7280'>No chain data</p>"
+
+
+def _share_pi_chain(p: dict) -> str:
+    out = []
+    root = p.get("root", "")
+    if root:
+        out.append(f'<div class="section-hdr">PI Production Chain: {_he(root)}</div>')
+    tree = p.get("tree", None)
+    if tree:
+        out.append(_pi_tree_html(tree, 0))
+    return "".join(out) or "<p style='color:#6b7280'>No PI chain data</p>"
+
+def _pi_tree_html(node: dict, depth: int) -> str:
+    tier = node.get("tier", "")
+    name = node.get("name", node.get("typeName", ""))
+    qty  = node.get("quantity", "")
+    pill_cls = f"pill-{tier.lower()}" if tier else "pill-p0"
+    children = node.get("inputs", [])
+    qty_str = f" ×{qty}" if qty else ""
+    out = [f'<div class="tree-node"><span class="tree-name">{_he(name)}{_he(qty_str)}</span>'
+           f'<span class="pill {pill_cls}">{_he(tier)}</span>']
+    for ch in children:
+        out.append(_pi_tree_html(ch, depth+1))
+    out.append('</div>')
+    return "".join(out)
+
+
+def _share_industry_scanner(p: dict) -> str:
+    out = []
+    rows = p.get("rows", [])
+    if rows:
+        out.append('<table><thead><tr><th>Item</th><th>Runs</th><th>Cost</th><th>Revenue</th><th>Profit</th><th>Margin</th></tr></thead><tbody>')
+        for r in rows:
+            pval = r.get("profit", 0)
+            color = "#4ade80" if isinstance(pval,(int,float)) and pval > 0 else "#ff4d6d"
+            def fmt(v): return f'{v:,.0f}' if isinstance(v,(int,float)) else str(v)
+            out.append(f'<tr><td>{_he(r.get("name",""))}</td><td>{_he(r.get("runs",""))}</td>'
+                       f'<td>{_he(fmt(r.get("cost",0)))}</td><td>{_he(fmt(r.get("revenue",0)))}</td>'
+                       f'<td style="color:{color}">{_he(fmt(pval))}</td>'
+                       f'<td>{_he(r.get("margin",""))}</td></tr>')
+        out.append('</tbody></table>')
+    return "".join(out) or "<p style='color:#6b7280'>No scanner data</p>"
+
+
+def _share_chain_map(p: dict) -> str:
+    out = []
+    systems = p.get("systems", [])
+    connections = p.get("connections", [])
+    home = p.get("home", "")
+    if home:
+        out.append(f'<div class="section-hdr">Home: {_he(home)}</div>')
+    if systems:
+        out.append(f'<div class="section-hdr">Systems ({len(systems)})</div>')
+        out.append('<table><thead><tr><th>#</th><th>System</th><th>Class</th><th>Static</th><th>Notes</th></tr></thead><tbody>')
+        for i, s in enumerate(systems):
+            out.append(f'<tr><td>{i+1}</td><td>{_he(s.get("name",""))}</td>'
+                       f'<td>{_he(s.get("class",""))}</td><td>{_he(s.get("static",""))}</td>'
+                       f'<td>{_he(s.get("notes",""))}</td></tr>')
+        out.append('</tbody></table>')
+    if connections:
+        out.append(f'<div class="section-hdr">Connections ({len(connections)})</div>')
+        out.append('<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px">')
+        for conn in connections:
+            a = conn.get("from","?")
+            b = conn.get("to","?")
+            out.append(f'<div class="chain-line"><span class="chain-node">{_he(a)}</span>'
+                       f'<span class="arrow">⟷</span><span class="chain-node">{_he(b)}</span></div>')
+        out.append('</div>')
+    return "".join(out) or "<p style='color:#6b7280'>Empty chain map</p>"
 
 
 # ── Helper: get all refreshed character tokens ───────────────────────────────

@@ -256,30 +256,9 @@ async def get_ship(character_id: int, *, access_token: str) -> Dict[str, Any]:
     return await esi_get_json(f"/characters/{int(character_id)}/ship/", access_token=access_token)
 
 
-async def get_character_public(character_id: int) -> Dict[str, Any]:
-    """Public character sheet. Used to discover corporation_id for corp endpoints."""
-    return await esi_get_json_public(f"/characters/{int(character_id)}/")
-
-
 # ------------------------
 # Corporation endpoints
 # ------------------------
-
-
-async def get_corp_wallets(corp_id: int, *, access_token: str) -> List[Dict[str, Any]]:
-    return await esi_get_json(f"/corporations/{int(corp_id)}/wallets/", access_token=access_token)
-
-
-async def get_corp_wallet_journal(corp_id: int, division: int = 1, *, access_token: str) -> List[Dict[str, Any]]:
-    return await esi_get_json(
-        f"/corporations/{int(corp_id)}/wallets/{int(division)}/journal/",
-        access_token=access_token,
-    )
-
-
-async def get_corp_orders(corp_id: int, *, access_token: str) -> List[Dict[str, Any]]:
-    # ESI corp orders are paginated; callers should be resilient.
-    return await esi_get_json(f"/corporations/{int(corp_id)}/orders/", access_token=access_token)
 
 
 async def get_corp_industry_jobs(corp_id: int, *, access_token: str, include_completed: bool = False) -> List[Dict[str, Any]]:

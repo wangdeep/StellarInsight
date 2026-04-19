@@ -445,9 +445,10 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
           font-size:9px;color:var(--muted);pointer-events:none;">0 systems · 0 connections</div>
       </div>
       <div id="cmPanel">
-        <div style="padding:10px 12px;border-bottom:1px solid rgba(50,182,255,.1);
-          font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;flex-shrink:0;">
-          Chain Mapper
+        <div style="padding:8px 10px;border-bottom:1px solid rgba(50,182,255,.1);
+          display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <span style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;flex:1;">Chain Mapper</span>
+          <button id="cmShareBtn" onclick="shareChainMap()" style="padding:3px 9px;font-size:10px;font-weight:700;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:#32b6ff;border-radius:5px;cursor:pointer;" title="Share this chain map">🔗 Share</button>
         </div>
         <div id="cmPanelContent" style="flex:1;overflow-y:auto;"></div>
       </div>
@@ -2081,7 +2082,9 @@ function drawChainConn(c,byId){
 }
 
 function drawChainNode(s){
-  const isSel=s.id===_cmSel, col=cmSecCol(s.class||''), bc=isSel?'#32b6ff':'rgba(50,182,255,.2)';
+  const isTarget=_cmConnFrom!=null && s.id!==_cmConnFrom;
+  const isSel=s.id===_cmSel, col=cmSecCol(s.class||'');
+  const bc=isSel?'#32b6ff':isTarget?'rgba(34,197,94,.5)':'rgba(50,182,255,.2)';
   const g=document.createElementNS('http://www.w3.org/2000/svg','g');
   g.setAttribute('transform',`translate(${s.x},${s.y})`);
   g.dataset.nid=s.id;
@@ -2125,6 +2128,12 @@ function drawChainNode(s){
   g.addEventListener('click',e=>{
     if(e.target.classList.contains('cm-anc'))return;
     if(_cmDragNode)return;
+    // If connect mode active, treat click as connection target
+    if(_cmConnFrom!=null && s.id!==_cmConnFrom){
+      cmAddConn(_cmConnFrom,s.id);
+      _cmConnFrom=null; cmSvg.style.cursor='';
+      return;
+    }
     _cmSel=s.id;_cmSelConn=null;renderChain();
   });
   cmNodesG.appendChild(g);
@@ -2146,6 +2155,7 @@ function renderChainPanel(){
         ${s.notes?`<div style="font-size:10px;color:var(--muted);">${esc(s.notes)}</div>`:''}
         <div style="font-size:10px;color:var(--muted);">${conns.length} connection(s)</div>
         <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">
+          <button class="btn" style="font-size:10px;padding:3px 8px;background:rgba(50,182,255,.15);border-color:rgba(50,182,255,.35);color:var(--accent);" onclick="cmStartConnect(${s.id})">🔗 Connect to…</button>
           <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmSetHome(${s.id})">${s.is_home?'★ Home':'Set Home'}</button>
           <button class="btn" style="font-size:10px;padding:3px 8px;" onclick="cmEditSys(${s.id})">✏ Edit</button>
           <button class="btn" style="font-size:10px;padding:3px 8px;background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#f87171;" onclick="cmDelSys(${s.id})">🗑 Remove</button>
@@ -2178,6 +2188,20 @@ function renderChainPanel(){
       </div>`;
     return;
   }
+  // Connection-mode active?
+  if(_cmConnFrom!=null){
+    const fromSys=_cm.systems.find(x=>x.id===_cmConnFrom);
+    panel.innerHTML=`
+      <div style="padding:10px 12px;background:rgba(50,182,255,.08);border-bottom:1px solid rgba(50,182,255,.15);">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);">🔗 Connecting from ${esc(fromSys?.name||'?')}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">Click any other system node on the canvas to create a connection.</div>
+      </div>
+      <div style="padding:10px 12px;">
+        <button class="btn" style="width:100%;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#f87171;font-size:10px;" onclick="cmCancelConnect()">✕ Cancel</button>
+      </div>`;
+    return;
+  }
+
   // Default: add system form + clear
   panel.innerHTML=`
     <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
@@ -2194,8 +2218,14 @@ function renderChainPanel(){
       <button class="btn" style="width:100%;" onclick="cmAddSys()">＋ Add System</button>
       <div id="cmAddStatus" style="font-size:10px;color:var(--muted);min-height:14px;"></div>
     </div>
-    <div style="padding:8px 12px;border-top:1px solid rgba(50,182,255,.08);margin-top:4px;">
-      <div style="font-size:9px;color:var(--muted);margin-bottom:6px;">Drag node anchor points to connect systems. Right-click nodes for options.</div>
+    <div style="padding:8px 12px;border-top:1px solid rgba(50,182,255,.08);">
+      <div style="font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">How to use</div>
+      <div style="font-size:10px;color:var(--muted);line-height:1.6;">
+        1. Add systems using the form above<br>
+        2. Click a system node, then click <span style="color:var(--accent);">🔗 Connect to…</span><br>
+        3. Click the target system to draw the chain<br>
+        4. Click a connection line to edit mass / EOL
+      </div>
     </div>
     <div style="padding:8px 12px;border-top:1px solid rgba(50,182,255,.08);">
       <button class="btn" style="width:100%;background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#f87171;font-size:10px;" onclick="cmClear()">⚠ Clear All</button>
@@ -2219,6 +2249,20 @@ async function cmAddSys(){
   _cmSel=d.id; renderChain();
 }
 function cmFocusAdd(){ document.getElementById('cmAddName')?.focus(); }
+
+function cmStartConnect(id){
+  _cmConnFrom = id;
+  _cmSel = null;
+  _cmSelConn = null;
+  cmSvg.style.cursor = 'crosshair';
+  renderChainPanel();
+}
+
+function cmCancelConnect(){
+  _cmConnFrom = null;
+  cmSvg.style.cursor = '';
+  renderChainPanel();
+}
 async function cmDelSys(id){
   if(!confirm('Remove this system and its connections?'))return;
   await fetch(`${API}/chain/system/${id}`,{method:'DELETE',credentials:'include'});
@@ -2326,5 +2370,27 @@ window.addEventListener('mouseup',e=>{
   _cmDragging=false;cmSvg.style.cursor='';
 });
 cmApplyT();
+
+// ── Chain Map Share ───────────────────────────────────────────
+function shareChainMap(){
+  const home = (_cm.systems||[]).find(s=>s.is_home);
+  const systems = (_cm.systems||[]).map(s=>({
+    name:   s.name||s.system_name||'',
+    class:  s.class_label||s.security_class||'',
+    static: s.static_data ? (s.static_data.map ? s.static_data.map(x=>x.hole_type||x.destination||'').join(', ') : String(s.static_data)) : '',
+    notes:  s.notes||''
+  }));
+  const connections = (_cm.connections||[]).map(c=>{
+    const a = (_cm.systems||[]).find(s=>s.id===c.from_id||s.id===c.system_a_id);
+    const b = (_cm.systems||[]).find(s=>s.id===c.to_id||s.id===c.system_b_id);
+    return {from: a?.name||a?.system_name||String(c.from_id||c.system_a_id||'?'), to: b?.name||b?.system_name||String(c.to_id||c.system_b_id||'?')};
+  });
+  const title = `Chain Map — ${systems.length} system${systems.length!==1?'s':''}`;
+  stellarShare(title, 'chain_map', {
+    home: home?.name||home?.system_name||'',
+    systems,
+    connections
+  });
+}
 </script>
 {% endblock %}

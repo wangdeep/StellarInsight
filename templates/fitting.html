@@ -182,6 +182,7 @@
         <span style="font-size:7px;font-weight:700;text-transform:uppercase;color:#6b7280;">EFT</span>
         <button class="eve-btn" style="font-size:7px;padding:1px 6px;" onclick="importEFT()">IMPORT</button>
         <button class="eve-btn" style="font-size:7px;padding:1px 6px;" onclick="exportEFT()">EXPORT</button>
+        <button class="eve-btn" style="font-size:7px;padding:1px 6px;background:rgba(50,182,255,.15);border-color:rgba(50,182,255,.3);color:#32b6ff;" onclick="shareFitting()">🔗 SHARE</button>
       </div>
       <textarea id="eftText" class="eft-area" placeholder="Paste EFT format…"></textarea>
     </div>
@@ -1300,6 +1301,22 @@ function hideModTooltip(){
   clearTimeout(_ttTimer);
   const tt=document.getElementById('fitTooltip');
   if(tt)tt.style.display='none';
+}
+
+function shareFitting(){
+  if(!sD){ return; }
+  exportEFT(); // ensure EFT text is current
+  const eftText = document.getElementById('eftText')?.value || '';
+  const ship = sD.name || '';
+  // Collect stat panel values
+  const stats = {};
+  document.querySelectorAll('.stat-row').forEach(row=>{
+    const lbl = row.querySelector('.stat-lbl')?.textContent;
+    const val = row.querySelector('.stat-val')?.textContent;
+    if(lbl && val) stats[lbl.trim()] = val.trim();
+  });
+  const title = `${ship} Fitting`;
+  stellarShare(title, 'fitting', {ship, eft: eftText, stats});
 }
 </script>
 {% endblock %}

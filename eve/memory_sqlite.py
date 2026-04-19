@@ -742,12 +742,26 @@ class MemoryStore:
         return True
 
     def key_check_dev_code(self, code: str, character_id: int,
-                           current_code: str = "teacup") -> bool:
+                           current_code: str = "",
+                           code_hash: bytes = b"") -> bool:
         """
-        Validate a developer secret code. If correct, whitelist the character
-        and return True.
+        Validate a developer secret code using bcrypt (C-1).
+        Pass code_hash (bytes) for secure comparison; current_code is kept
+        for backward compatibility but is ignored when code_hash is provided.
         """
-        if not code or code.strip().lower() != current_code.strip().lower():
+        import bcrypt as _bcrypt
+        if not code:
+            return False
+        try:
+            if code_hash:
+                # Preferred path: bcrypt hash comparison (constant-time)
+                ok = _bcrypt.checkpw(code.strip().encode(), code_hash)
+            else:
+                # Legacy fallback (deprecated — do not use in production)
+                ok = code.strip().lower() == current_code.strip().lower()
+        except Exception:
+            return False
+        if not ok:
             return False
         self.dev_whitelist_add(character_id, note="dev_code")
         return True
@@ -1121,7 +1135,7 @@ class MemoryStore:
         if not updates:
             return False
         self._ensure_map_tables()
-        sets = ', '.join(f"{k}=?" for k in updates)
+        sets = ', '.join(f'"{k}"=?' for k in updates)
         with self._conn() as conn:
             conn.execute(f"UPDATE map_systems SET {sets} WHERE map_id=? AND system_id=?",
                          list(updates.values()) + [map_id, int(system_id)])
@@ -1170,7 +1184,7 @@ class MemoryStore:
         if not updates:
             return False
         self._ensure_map_tables()
-        sets = ', '.join(f"{k}=?" for k in updates)
+        sets = ', '.join(f'"{k}"=?' for k in updates)
         with self._conn() as conn:
             conn.execute(f"UPDATE map_connections SET {sets} WHERE id=?",
                          list(updates.values()) + [int(conn_id)])
@@ -1404,7 +1418,7 @@ class MemoryStore:
         if not updates:
             return False
         self._ensure_map_tables()
-        sets = ', '.join(f"{k}=?" for k in updates)
+        sets = ', '.join(f'"{k}"=?' for k in updates)
         with self._conn() as conn:
             conn.execute(f"UPDATE map_systems SET {sets} WHERE map_id=? AND system_id=?",
                          list(updates.values()) + [map_id, int(system_id)])
@@ -1453,7 +1467,7 @@ class MemoryStore:
         if not updates:
             return False
         self._ensure_map_tables()
-        sets = ', '.join(f"{k}=?" for k in updates)
+        sets = ', '.join(f'"{k}"=?' for k in updates)
         with self._conn() as conn:
             conn.execute(f"UPDATE map_connections SET {sets} WHERE id=?",
                          list(updates.values()) + [int(conn_id)])

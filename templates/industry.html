@@ -14,6 +14,13 @@
   /* outer shell that holds tabs + panels */
   .ind-shell{display:flex;flex-direction:column;height:calc(100vh - var(--topbar-h,72px) - var(--ticker-h,32px) - 4px);}
 
+  /* ── Scanner tab ── */
+  .scan-row{display:flex;align-items:center;padding:4px 10px;border-bottom:1px solid rgba(46,51,59,.3);font-size:11px;transition:background .08s;background:rgba(255,255,255,.03);}
+  .scan-row:hover{background:rgba(50,182,255,.07);}
+  .scan-row:nth-child(even){background:rgba(0,0,0,.15);}
+  .scan-col-hd{cursor:pointer;user-select:none;}
+  .scan-col-hd:hover{color:var(--accent);}
+
   /* ── T2 Chain tab ── */
   .chain-card{background:rgba(0,0,0,.4);border:1px solid rgba(50,182,255,.15);border-radius:8px;padding:14px 16px;max-width:640px;width:100%;}
   .chain-card-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:10px;}
@@ -23,8 +30,56 @@
   .chain-stat-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;background:rgba(50,182,255,.08);border:1px solid rgba(50,182,255,.18);border-radius:20px;font-size:10px;font-weight:600;color:var(--accent);}
   .chain-prob-pill{background:rgba(168,85,247,.1);border-color:rgba(168,85,247,.25);color:#c084fc;}
   .chain-run-box{background:rgba(0,0,0,.6);border:1px solid rgba(50,182,255,.12);border-radius:6px;padding:8px 12px;font-size:11px;margin-top:10px;}
-  #t2Dropdown div{padding:6px 10px;font-size:11px;cursor:pointer;color:var(--text);}
-  #t2Dropdown div:hover{background:rgba(50,182,255,.1);}
+  #t2Dropdown div,#qDropdown div{padding:6px 10px;font-size:11px;cursor:pointer;color:var(--text);}
+  #t2Dropdown div:hover,#qDropdown div:hover{background:rgba(50,182,255,.1);}
+
+  /* ── Catalog browse panels ── */
+  .cat-browser{display:flex;flex-direction:column;height:100%;min-height:0;}
+  .cat-filter-bar{display:flex;gap:5px;flex-wrap:wrap;padding:10px 16px 8px;flex-shrink:0;border-bottom:1px solid rgba(50,182,255,.08);}
+  .cat-chip{padding:4px 12px;border-radius:20px;font-size:10px;font-weight:700;cursor:pointer;border:1px solid rgba(50,182,255,.2);color:var(--muted);background:rgba(0,0,0,.3);transition:all .12s;white-space:nowrap;}
+  .cat-chip:hover{color:var(--accent);border-color:rgba(50,182,255,.4);background:rgba(50,182,255,.08);}
+  .cat-chip.active{color:var(--accent);border-color:rgba(50,182,255,.5);background:rgba(50,182,255,.15);}
+  .cat-scroll{flex:1;overflow-y:auto;padding:10px 16px;}
+  .cat-group-hdr{display:flex;align-items:center;gap:6px;padding:5px 0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);cursor:pointer;user-select:none;border-bottom:1px solid rgba(50,182,255,.08);margin-bottom:3px;}
+  .cat-group-hdr:hover{color:var(--accent);}
+  .cat-group-hdr .caret{font-size:8px;transition:transform .12s;}
+  .cat-group-hdr.open .caret{transform:rotate(90deg);}
+  .cat-group-body{display:none;}
+  .cat-group-body.open{display:block;}
+  .cat-item{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 16px;border-radius:5px;cursor:pointer;font-size:11px;color:var(--text);transition:background .08s;}
+  .cat-item:hover{background:rgba(50,182,255,.1);color:var(--accent);}
+  .cat-item img{width:22px;height:22px;border-radius:3px;border:1px solid rgba(50,182,255,.12);background:rgba(0,0,0,.6);flex-shrink:0;}
+
+  /* PI tier colors */
+  .tier-p0{--tc:rgba(100,116,139,.6);--tb:rgba(100,116,139,.1);}
+  .tier-p1{--tc:rgba(50,182,255,.6);--tb:rgba(50,182,255,.08);}
+  .tier-p2{--tc:rgba(74,222,128,.6);--tb:rgba(74,222,128,.08);}
+  .tier-p3{--tc:rgba(251,146,60,.6);--tb:rgba(251,146,60,.08);}
+  .tier-p4{--tc:rgba(192,132,252,.6);--tb:rgba(192,132,252,.08);}
+  .pi-tier-block{border:1px solid var(--tc);border-radius:8px;background:var(--tb);margin-bottom:14px;overflow:hidden;}
+  .pi-tier-hdr{display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;user-select:none;border-bottom:1px solid var(--tc);}
+  .pi-tier-hdr:hover{filter:brightness(1.1);}
+  .pi-tier-badge{padding:2px 10px;border-radius:20px;font-size:10px;font-weight:700;background:var(--tc);color:#fff;letter-spacing:.04em;}
+  .pi-tier-name{font-size:11px;font-weight:600;color:var(--text);flex:1;}
+  .pi-tier-count{font-size:10px;color:var(--muted);}
+  .pi-tier-caret{font-size:8px;color:var(--muted);transition:transform .12s;}
+  .pi-tier-hdr.open .pi-tier-caret{transform:rotate(90deg);}
+  .pi-tier-body{display:none;padding:6px 8px;}
+  .pi-tier-body.open{display:flex;flex-wrap:wrap;gap:4px;}
+  .pi-item-pill{padding:4px 12px;border-radius:20px;font-size:11px;cursor:pointer;border:1px solid var(--tc);background:rgba(0,0,0,.3);color:var(--text);transition:all .1s;white-space:nowrap;}
+  .pi-item-pill:hover{background:var(--tb);color:#fff;filter:brightness(1.2);}
+
+  /* ── PI sub-tabs ── */
+  .pi-subtab{padding:5px 14px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;border-radius:5px 5px 0 0;cursor:pointer;color:var(--muted);border:1px solid transparent;border-bottom:none;}
+  .pi-subtab:hover{color:var(--text);}
+  .pi-subtab.active{color:var(--accent);background:rgba(50,182,255,.1);border-color:rgba(50,182,255,.18);}
+  /* planet cards */
+  .pi-planet-card{background:rgba(0,0,0,.4);border:1px solid rgba(50,182,255,.14);border-radius:8px;padding:12px 14px;cursor:pointer;transition:border-color .12s;}
+  .pi-planet-card:hover{border-color:rgba(50,182,255,.35);}
+  .pi-planet-card.expanded{border-color:rgba(50,182,255,.3);}
+  .pi-pin-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:10px;border-bottom:1px solid rgba(46,51,59,.3);}
+  .pi-pin-row:last-child{border-bottom:none;}
+  .planet-type-icon{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
 
   /* ── PI Chain tab ── */
   .pi-node{border-radius:7px;border:1px solid rgba(50,182,255,.14);background:rgba(0,0,0,.4);padding:9px 12px;display:flex;align-items:center;gap:8px;min-width:200px;max-width:320px;}
@@ -50,8 +105,9 @@
   /* ── Jobs tab ── */
   .jobs-filter{padding:3px 10px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:4px;cursor:pointer;border:1px solid rgba(50,182,255,.15);background:rgba(0,0,0,.4);color:var(--muted);}
   .jobs-filter.active{background:rgba(50,182,255,.15);color:var(--accent);border-color:var(--accent);}
-  .jobs-row{display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(46,51,59,.35);font-size:11px;transition:background .08s;}
-  .jobs-row:hover{background:rgba(50,182,255,.05);}
+  .jobs-row{display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(46,51,59,.35);font-size:11px;transition:background .08s;background:rgba(255,255,255,.03);}
+  .jobs-row:hover{background:rgba(50,182,255,.07);}
+  .jobs-row:nth-child(even){background:rgba(0,0,0,.15);}
   .job-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
   .job-badge.active{background:rgba(50,182,255,.15);color:var(--accent);border:1px solid rgba(50,182,255,.25);}
   .job-badge.ready{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.25);}
@@ -344,6 +400,9 @@
           <div class="mfg-stat-lbl">Job Time</div>
           <div class="mfg-stat-val" id="rJobTime" style="font-size:13px;">—</div>
         </div>
+        <div class="mfg-stat" style="flex:0;padding:8px 12px;display:flex;align-items:center;">
+          <button onclick="shareCalcResults()" style="background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);border-radius:6px;padding:4px 10px;font-size:10px;font-weight:700;color:#32b6ff;cursor:pointer;white-space:nowrap;" title="Share this calculation">🔗 Share</button>
+        </div>
       </div>
 
       <!-- Lower: materials + job panel -->
@@ -386,9 +445,61 @@
 </div><!-- .mfg-wrap -->
 </div><!-- #pg-calculator -->
 
-<!-- ── Scanner panel ── -->
+<!-- ── Blueprint Profit Scanner panel ── -->
 <div class="pg-panel" id="pg-scanner">
-  <div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:13px;">📊 Scanner — coming soon</div>
+  <!-- toolbar -->
+  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;flex-wrap:wrap;">
+    <select class="mfg-inp" id="scanChar" style="min-width:120px;">
+      {% for c in chars %}<option value="{{ c.alias or c.character_name }}">{{ c.character_name }}</option>{% endfor %}
+    </select>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl">Hub</span>
+      <select class="mfg-inp" id="scanHub"><option>Jita</option><option>Amarr</option><option>Dodixie</option><option>Rens</option><option>Hek</option></select>
+    </div>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl" style="white-space:nowrap;">Cost Idx%</span>
+      <input class="mfg-inp" id="scanCI" type="number" min="0" step="0.01" value="0" style="width:60px;">
+    </div>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl" style="white-space:nowrap;">Min Profit</span>
+      <input class="mfg-inp" id="scanMinProfit" type="number" value="0" step="1000000" style="width:80px;" oninput="scanApplyFilter()">
+    </div>
+    <div class="mfg-field" style="flex-direction:row;align-items:center;gap:4px;">
+      <span class="mfg-lbl">Activity</span>
+      <select class="mfg-inp" id="scanAct">
+        <option value="1">Manufacturing</option>
+        <option value="11">Reactions</option>
+      </select>
+    </div>
+    <button class="mfg-calc-btn" onclick="startScan()" id="scanBtn" style="padding:5px 14px;font-size:11px;">📊 Scan Blueprints</button>
+    <button onclick="scanStop()" id="scanStopBtn" style="display:none;padding:5px 10px;font-size:11px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:6px;cursor:pointer;">⏹ Stop</button>
+    <button id="scanShareBtn" onclick="shareScanResults()" style="display:none;padding:5px 10px;font-size:11px;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:#32b6ff;border-radius:6px;cursor:pointer;">🔗 Share</button>
+    <span id="scanStatus" style="font-size:10px;color:var(--muted);min-width:160px;"></span>
+  </div>
+  <!-- progress bar -->
+  <div id="scanProgressWrap" style="display:none;height:3px;background:rgba(50,182,255,.1);flex-shrink:0;">
+    <div id="scanProgress" style="height:100%;background:linear-gradient(90deg,rgba(50,182,255,.8),rgba(168,85,247,.6));width:0%;transition:width .2s;"></div>
+  </div>
+  <!-- table header -->
+  <div id="scanHeader" style="display:none;flex-shrink:0;display:flex;align-items:center;padding:4px 10px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(50,182,255,.1);font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);">
+    <span class="scan-col-hd" style="flex:1.5;" onclick="scanSort('name')">Blueprint ▾</span>
+    <span class="scan-col-hd" style="width:45px;text-align:center;" onclick="scanSort('runs')">Runs</span>
+    <span class="scan-col-hd" style="width:95px;text-align:right;" onclick="scanSort('mat')">Mat Cost</span>
+    <span class="scan-col-hd" style="width:95px;text-align:right;" onclick="scanSort('install')">Install</span>
+    <span class="scan-col-hd" style="width:95px;text-align:right;" onclick="scanSort('total')">Total Cost</span>
+    <span class="scan-col-hd" style="width:95px;text-align:right;" onclick="scanSort('sell')">Net Sell</span>
+    <span class="scan-col-hd" style="width:90px;text-align:right;" onclick="scanSort('profit')">Profit ▾</span>
+    <span class="scan-col-hd" style="width:65px;text-align:right;" onclick="scanSort('margin')">Margin</span>
+    <span class="scan-col-hd" style="width:85px;text-align:right;" onclick="scanSort('iskhour')">ISK/hr</span>
+  </div>
+  <!-- results -->
+  <div style="flex:1;overflow-y:auto;" id="scanResults">
+    <div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;flex-direction:column;gap:8px;display:flex;align-items:center;">
+      <div style="font-size:32px;">📊</div>
+      <div>Select a character and click Scan Blueprints</div>
+      <div style="font-size:11px;opacity:.6;">Iterates all your manufacturing BPs and ranks them by profit</div>
+    </div>
+  </div>
 </div>
 
 <!-- ── Queue Builder panel ── -->
@@ -416,6 +527,7 @@
     </div>
     <button class="mfg-calc-btn" onclick="calcQueue()" style="padding:5px 14px;font-size:11px;">⟳ Calculate All</button>
     <button onclick="clearQueue()" style="padding:5px 10px;font-size:11px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.2);color:#ef4444;border-radius:6px;cursor:pointer;">✕ Clear</button>
+    <button onclick="shareQueueResults()" style="padding:5px 10px;font-size:11px;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:#32b6ff;border-radius:6px;cursor:pointer;" title="Share queue plan">🔗 Share</button>
     <span id="qStatus" style="font-size:10px;color:var(--muted);margin-left:4px;"></span>
   </div>
   <!-- body: queue list left, results right -->
@@ -524,47 +636,80 @@
       <input class="mfg-inp" id="t2TargetRuns" type="number" min="1" value="10" style="width:55px;" oninput="recalcT2Runs()">
     </div>
     <button class="mfg-calc-btn" id="t2LoadBtn" onclick="loadT2Chain()" disabled style="padding:5px 14px;font-size:11px;opacity:.45;">🔬 Load Chain</button>
+    <button id="t2ShareBtn" onclick="shareT2Chain()" style="display:none;padding:5px 10px;font-size:11px;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:#32b6ff;border-radius:6px;cursor:pointer;">🔗 Share</button>
   </div>
-  <!-- chain display -->
-  <div style="flex:1;overflow-y:auto;padding:16px 20px;" id="t2ChainBody">
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;gap:8px;">
-      <div style="font-size:32px;">🔬</div>
-      <div>Search for a T2 item to see its invention chain</div>
+  <!-- chain display + catalog browser -->
+  <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;" id="t2ChainOuter">
+    <!-- catalog browser (shown by default, hidden while chain is displayed) -->
+    <div id="t2CatalogPanel" class="cat-browser">
+      <div class="cat-filter-bar" id="t2CatChips">
+        <span style="font-size:10px;color:var(--muted);align-self:center;">Loading catalog…</span>
+      </div>
+      <div class="cat-scroll" id="t2CatScroll">
+        <div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;">⏳</div>
+      </div>
     </div>
+    <!-- chain result (hidden until chain loads) -->
+    <div id="t2ChainBody" style="display:none;flex:1;overflow-y:auto;padding:16px 20px;"></div>
   </div>
 </div>
 
-<!-- ── PI Chain panel ── -->
+<!-- ── PI panel ── -->
 <div class="pg-panel" id="pg-pi">
-  <!-- search bar -->
-  <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;flex-wrap:wrap;">
-    <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">PI Product</span>
-    <div style="position:relative;flex:1;max-width:360px;">
-      <input class="mfg-search" id="piSearch" placeholder="Search PI product… (e.g. Robotics, Coolant)" autocomplete="off"
-             oninput="piSearchInput()" style="width:100%;">
-      <div id="piDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:rgba(10,16,28,.97);border:1px solid rgba(50,182,255,.25);border-top:none;border-radius:0 0 6px 6px;max-height:220px;overflow-y:auto;"></div>
-    </div>
-    <div style="display:flex;align-items:center;gap:4px;">
-      <span style="font-size:10px;color:var(--muted);">Qty target:</span>
-      <input class="mfg-inp" id="piTargetQty" type="number" min="1" value="1" style="width:60px;" oninput="renderPiChain(_piChain)">
-    </div>
-    <button class="mfg-calc-btn" id="piLoadBtn" onclick="loadPiChain()" disabled style="padding:5px 14px;font-size:11px;opacity:.45;">🌍 Load Chain</button>
-    <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);cursor:pointer;margin-left:4px;">
-      <input type="checkbox" id="piShowRaw" onchange="renderPiChain(_piChain)" style="accent-color:var(--accent);">
-      Show raw materials
-    </label>
+  <!-- PI sub-tab bar -->
+  <div style="display:flex;gap:2px;padding:4px 10px 0;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.1);flex-shrink:0;">
+    <div class="pi-subtab active" id="piSubTab-planets" onclick="piSubTab('planets')">🌍 My Planets</div>
+    <div class="pi-subtab" id="piSubTab-planner" onclick="piSubTab('planner')">🔬 Chain Planner</div>
   </div>
-  <!-- two-column layout: tree left, summary right -->
-  <div style="flex:1;display:flex;min-height:0;overflow:hidden;">
-    <div style="flex:1;overflow-y:auto;padding:16px 20px;" id="piChainBody">
+
+  <!-- ── Sub-panel: My Planets ── -->
+  <div class="pi-subpanel active" id="pi-sub-planets" style="flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden;">
+    <!-- toolbar -->
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;">
+      <select class="mfg-inp" id="piPlanetsChar" style="min-width:130px;">
+        {% for c in chars %}<option value="{{ c.alias or c.character_name }}">{{ c.character_name }}</option>{% endfor %}
+      </select>
+      <button class="mfg-calc-btn" onclick="loadMyPlanets()" style="padding:5px 12px;font-size:11px;">⟳ Load Planets</button>
+      <span id="piPlanetsStatus" style="font-size:10px;color:var(--muted);"></span>
+    </div>
+    <!-- planet grid -->
+    <div style="flex:1;overflow-y:auto;padding:12px 14px;" id="piPlanetGrid">
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;gap:8px;">
-        <div style="font-size:32px;">🌍</div>
-        <div>Search for a PI product to see its production chain</div>
-        <div style="font-size:11px;opacity:.6;">Works for P1 through P4 products</div>
+        <div style="font-size:32px;">🌍</div><div>Select a character and load planets</div>
       </div>
     </div>
-    <!-- summary sidebar -->
-    <div id="piSummary" style="display:none;width:260px;flex-shrink:0;border-left:1px solid rgba(50,182,255,.1);overflow-y:auto;padding:12px;background:rgba(0,0,0,.4);">
+  </div>
+
+  <!-- ── Sub-panel: Chain Planner ── -->
+  <div class="pi-subpanel" id="pi-sub-planner" style="display:none;flex:1;flex-direction:column;min-height:0;overflow:hidden;">
+    <!-- search bar -->
+    <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;background:rgba(0,0,0,.4);border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;flex-wrap:wrap;">
+      <div style="position:relative;flex:1;max-width:360px;">
+        <input class="mfg-search" id="piSearch" placeholder="Search PI product… (e.g. Robotics, Coolant)" autocomplete="off"
+               oninput="piSearchInput()" style="width:100%;">
+        <div id="piDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:50;background:rgba(10,16,28,.97);border:1px solid rgba(50,182,255,.25);border-top:none;border-radius:0 0 6px 6px;max-height:220px;overflow-y:auto;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;">
+        <span style="font-size:10px;color:var(--muted);">Qty:</span>
+        <input class="mfg-inp" id="piTargetQty" type="number" min="1" value="1" style="width:60px;" oninput="renderPiChain(_piChain)">
+      </div>
+      <button class="mfg-calc-btn" id="piLoadBtn" onclick="loadPiChain()" disabled style="padding:5px 14px;font-size:11px;opacity:.45;">🔬 Load Chain</button>
+      <button id="piShareBtn" onclick="sharePiChain()" style="display:none;padding:5px 10px;font-size:11px;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:#32b6ff;border-radius:6px;cursor:pointer;">🔗 Share</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);cursor:pointer;">
+        <input type="checkbox" id="piShowRaw" onchange="renderPiChain(_piChain)" style="accent-color:var(--accent);">Show raw
+      </label>
+    </div>
+    <!-- tree + sidebar -->
+    <div style="flex:1;display:flex;min-height:0;overflow:hidden;">
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;" id="piChainOuter">
+        <!-- catalog browser shown by default -->
+        <div id="piCatalogPanel" style="flex:1;overflow-y:auto;padding:12px 16px;">
+          <div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;">⏳ Loading PI catalog…</div>
+        </div>
+        <!-- chain result -->
+        <div style="display:none;flex:1;overflow-y:auto;padding:16px 20px;" id="piChainBody"></div>
+      </div>
+      <div id="piSummary" style="display:none;width:260px;flex-shrink:0;border-left:1px solid rgba(50,182,255,.1);overflow-y:auto;padding:12px;background:rgba(0,0,0,.4);"></div>
     </div>
   </div>
 </div>
@@ -580,6 +725,8 @@ let _charTE        = 0;
 let _structME      = 0;
 let _structTE      = 0;
 let _searchTimer   = null;
+let _lastCalcData  = null;   // last calc API result — used by share
+let _qAgg          = {};     // aggregate materials map from queue — used by share
 
 // ── Formatters ──────────────────────────────────────────────
 function fmtIsk(v){
@@ -925,6 +1072,7 @@ async function calc(force){
 
 // ── Render results ───────────────────────────────────────────
 function renderResults(d){
+  _lastCalcData = d;  // save for share
   const t = d.totals, j = d.job, p = d.product;
 
   // Stat bar
@@ -1174,41 +1322,222 @@ function applyStructBonuses(){
 
 // ── Tab stubs (replaced in subsequent steps) ────────────────
 // ═══════════════════════════════════════════════════════════
-// PI CHAIN TAB
+// PI TAB
 // ═══════════════════════════════════════════════════════════
-let _piProducts = null;   // [{typeID, typeName}] loaded once
+let _piProducts   = null;
 let _piSelectedId = null;
-let _piChain = null;
-let _piSearchTimer = null;
+let _piChain      = null;
+let _piSearchTimer= null;
+
+const PLANET_TYPE_COLORS = {
+  temperate:'#22c55e', barren:'#f97316', oceanic:'#38bdf8',
+  ice:'#a5f3fc', gas:'#eab308', lava:'#ef4444',
+  storm:'#a78bfa', plasma:'#fb923c',
+};
+
+// ── Sub-tab switcher ─────────────────────────────────────────
+function piSubTab(name){
+  document.querySelectorAll('.pi-subtab').forEach(t=>t.classList.toggle('active', t.id===`piSubTab-${name}`));
+  document.querySelectorAll('.pi-subpanel').forEach(p=>{
+    const show = p.id===`pi-sub-${name}`;
+    p.style.display = show ? 'flex' : 'none';
+    p.classList.toggle('active', show);
+  });
+  if(name==='planner'){ _loadPiProducts(); initPiTab(); }
+}
+
+let _piCatalog = null;
 
 async function initPiTab(){
-  if(_piProducts) return;  // already loaded
+  // Load PI catalog for the planner sub-tab (lazy)
+  if(!_piCatalog){
+    try{
+      const r = await fetch(`${API}/sde/pi_catalog`,{credentials:'include'});
+      _piCatalog = await r.json();
+    }catch(e){ _piCatalog={}; }
+    renderPiCatalog();
+  }
+}
+
+const _PI_TIER_META = {
+  'P0 — Raw':        {cls:'tier-p0', short:'P0', desc:'Raw planet resources'},
+  'P1 — Basic':      {cls:'tier-p1', short:'P1', desc:'Basic commodities'},
+  'P2 — Refined':    {cls:'tier-p2', short:'P2', desc:'Refined commodities'},
+  'P3 — Specialized':{cls:'tier-p3', short:'P3', desc:'Specialized commodities'},
+  'P4 — Advanced':   {cls:'tier-p4', short:'P4', desc:'Advanced commodities (most valuable)'},
+};
+
+function renderPiCatalog(){
+  const panel = document.getElementById('piCatalogPanel');
+  if(!_piCatalog || !Object.keys(_piCatalog).length){
+    panel.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">PI catalog unavailable</div>';
+    return;
+  }
+  // Ordered tiers
+  const tierOrder = ['P4 — Advanced','P3 — Specialized','P2 — Refined','P1 — Basic','P0 — Raw'];
+  let html='';
+  for(const tier of tierOrder){
+    const items = _piCatalog[tier];
+    if(!items?.length) continue;
+    const meta = _PI_TIER_META[tier] || {cls:'tier-p1',short:tier,desc:''};
+    const isP0 = tier==='P0 — Raw';
+    html+=`<div class="pi-tier-block ${meta.cls}">
+      <div class="pi-tier-hdr${isP0?'':' open'}" onclick="piToggleTier(this)">
+        <span class="pi-tier-badge">${meta.short}</span>
+        <span class="pi-tier-name">${tier.replace(/P\d — /,'')}</span>
+        <span class="pi-tier-count">${items.length} items</span>
+        <span class="pi-tier-caret">▶</span>
+      </div>
+      <div class="pi-tier-body${isP0?'':' open'}">`;
+    for(let i=0;i<items.length;i++){
+      const it=items[i];
+      if(isP0){
+        // P0 are not searchable for chain planner, just display
+        html+=`<span class="pi-item-pill" style="cursor:default;opacity:.6;" title="Raw resource — extract with Planetary Command Center">${esc(it.typeName)}</span>`;
+      } else {
+        html+=`<span class="pi-item-pill" data-tid="${it.typeID}" data-name="${esc(it.typeName)}" onclick="piSelectFromCatalog(this)">${esc(it.typeName)}</span>`;
+      }
+    }
+    html+='</div></div>';
+  }
+  panel.innerHTML = html || '<div style="padding:40px;text-align:center;color:var(--muted);">No PI data</div>';
+}
+
+function piToggleTier(hdr){
+  hdr.classList.toggle('open');
+  const body = hdr.nextElementSibling;
+  if(body) body.classList.toggle('open');
+}
+
+function piSelectFromCatalog(el){
+  const tid  = parseInt(el.dataset.tid);
+  const name = el.dataset.name;
+  _piSelectedId = tid;
+  document.getElementById('piSearch').value = name;
+  const btn = document.getElementById('piLoadBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  // Switch to chain view immediately
+  loadPiChain();
+}
+
+// ── My Planets ───────────────────────────────────────────────
+async function loadMyPlanets(){
+  const alias   = document.getElementById('piPlanetsChar').value;
+  const grid    = document.getElementById('piPlanetGrid');
+  const status  = document.getElementById('piPlanetsStatus');
+  if(!alias) return;
+  grid.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Loading planets…</div>';
+  status.textContent='';
+  try{
+    const r = await fetch(`${API}/eve/character/pi?alias=${encodeURIComponent(alias)}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){ grid.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">${esc(d.detail||'Error')}</div>`; return; }
+    const planets = d.planets||[];
+    if(!planets.length){ grid.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">No PI planets found.</div>'; return; }
+    status.textContent=`${planets.length} planet${planets.length!==1?'s':''}`;
+    renderPlanetGrid(planets, alias);
+  }catch(e){
+    grid.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderPlanetGrid(planets, alias){
+  const grid = document.getElementById('piPlanetGrid');
+  const typeOrder = ['barren','temperate','oceanic','ice','gas','lava','storm','plasma'];
+  planets.sort((a,b)=>{
+    return (typeOrder.indexOf(a.planet_type)-typeOrder.indexOf(b.planet_type)) ||
+           (a.system_name||'').localeCompare(b.system_name||'');
+  });
+  grid.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;">
+    ${planets.map((p,i)=>{
+      const col = PLANET_TYPE_COLORS[p.planet_type]||'var(--accent)';
+      const upg = p.upgrade_level||0;
+      const stars = '★'.repeat(upg)+'☆'.repeat(Math.max(0,5-upg));
+      return `<div class="pi-planet-card" id="pc-${i}" onclick="togglePlanetDetail(${i},${p.planet_id},'${esc(alias)}')">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <div class="planet-type-icon" style="background:${col};width:12px;height:12px;box-shadow:0 0 6px ${col}55;"></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:12px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(p.planet_name||`Planet ${p.planet_id}`)}</div>
+            <div style="font-size:10px;color:var(--muted);">${esc(p.system_name||'')} · ${esc(p.planet_type||'')}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:9px;color:${col};">${stars}</div>
+            <div style="font-size:9px;color:var(--muted);">${p.num_pins||0} pins</div>
+          </div>
+        </div>
+        <div id="pd-${i}" style="display:none;margin-top:6px;border-top:1px solid rgba(50,182,255,.1);padding-top:8px;"></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+async function togglePlanetDetail(idx, planetId, alias){
+  const card   = document.getElementById(`pc-${idx}`);
+  const detail = document.getElementById(`pd-${idx}`);
+  if(detail.style.display !== 'none'){
+    detail.style.display='none';
+    card.classList.remove('expanded');
+    return;
+  }
+  card.classList.add('expanded');
+  detail.style.display='block';
+  if(detail.dataset.loaded){ return; }
+  detail.innerHTML='<div style="color:var(--muted);font-size:10px;">⏳ Loading schematics…</div>';
+  try{
+    const r = await fetch(`${API}/eve/character/pi_planet?alias=${encodeURIComponent(alias)}&planet_id=${planetId}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){ detail.innerHTML=`<div style="color:#f87171;font-size:10px;">${esc(d.detail||'Error')}</div>`; return; }
+    const pins = (d.pins||[]).filter(p=>p.schematic_name);
+    if(!pins.length){ detail.innerHTML='<div style="color:var(--muted);font-size:10px;">No active processors found.</div>'; detail.dataset.loaded='1'; return; }
+    // Count unique schematics
+    const counts = {};
+    pins.forEach(p=>{ counts[p.schematic_name]=(counts[p.schematic_name]||0)+1; });
+    detail.innerHTML = Object.entries(counts).map(([name,qty])=>
+      `<div class="pi-pin-row">
+        <span style="flex:1;color:var(--text);">${esc(name)}</span>
+        <span style="font-family:monospace;color:var(--accent);">×${qty} processor${qty!==1?'s':''}</span>
+      </div>`
+    ).join('');
+    detail.dataset.loaded='1';
+  }catch(e){
+    detail.innerHTML=`<div style="color:#f87171;font-size:10px;">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Chain Planner ─────────────────────────────────────────────
+async function _loadPiProducts(){
+  if(_piProducts) return;
   try{
     const r = await fetch(`${API}/sde/pi_products`,{credentials:'include'});
     _piProducts = await r.json();
-  }catch(e){ _piProducts = []; }
+  }catch(e){ _piProducts=[]; }
 }
 
 function piSearchInput(){
+  if(!_piProducts) _loadPiProducts();
   clearTimeout(_piSearchTimer);
   _piSearchTimer = setTimeout(doPiSearch, 200);
 }
 
+let _piDropItems = [];
 function doPiSearch(){
   const q = document.getElementById('piSearch').value.trim().toLowerCase();
   const dd = document.getElementById('piDropdown');
   if(!q || q.length < 2 || !_piProducts){ dd.style.display='none'; return; }
-  const matches = _piProducts.filter(p=>p.typeName.toLowerCase().includes(q)).slice(0,25);
-  if(!matches.length){ dd.style.display='none'; return; }
-  dd.innerHTML = matches.map(p=>
-    `<div onclick="piSelectItem(${p.typeID},'${esc(p.typeName)}')">${esc(p.typeName)}</div>`
+  _piDropItems = _piProducts.filter(p=>p.typeName.toLowerCase().includes(q)).slice(0,25);
+  if(!_piDropItems.length){ dd.style.display='none'; return; }
+  dd.innerHTML = _piDropItems.map((p,i)=>
+    `<div onclick="piSelectItem(${i})">${esc(p.typeName)}</div>`
   ).join('');
   dd.style.display='block';
 }
 
-function piSelectItem(id, name){
-  _piSelectedId = id;
-  document.getElementById('piSearch').value = name;
+function piSelectItem(idx){
+  const p = _piDropItems[idx];
+  if(!p) return;
+  _piSelectedId = p.typeID;
+  document.getElementById('piSearch').value = p.typeName;
   document.getElementById('piDropdown').style.display='none';
   const btn = document.getElementById('piLoadBtn');
   btn.disabled = false;
@@ -1224,18 +1553,38 @@ document.addEventListener('click', e=>{
 
 async function loadPiChain(){
   if(!_piSelectedId) return;
+  // Switch panels: hide catalog, show chain
+  document.getElementById('piCatalogPanel').style.display = 'none';
   const body = document.getElementById('piChainBody');
+  body.style.display = 'block';
   body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Loading chain…</div>';
   document.getElementById('piSummary').style.display='none';
   try{
     const r = await fetch(`${API}/industry/pi_chain?type_id=${_piSelectedId}`,{credentials:'include'});
     const d = await r.json();
-    if(!d.ok){ body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">${esc(d.error||'Chain not found')}</div>`; return; }
+    if(!d.ok){
+      body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">${esc(d.error||'Chain not found')}</div>
+        <div style="text-align:center;margin-top:8px;"><button onclick="piBackToCatalog()" style="padding:5px 14px;font-size:11px;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:#32b6ff;border-radius:6px;cursor:pointer;">← Back to catalog</button></div>`;
+      return;
+    }
     _piChain = d.chain;
     renderPiChain(_piChain);
+    document.getElementById('piShareBtn').style.display = 'inline-block';
   }catch(e){
     body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">Error: ${esc(e.message)}</div>`;
   }
+}
+
+function piBackToCatalog(){
+  _piChain = null;
+  _piSelectedId = null;
+  document.getElementById('piSearch').value = '';
+  document.getElementById('piChainBody').style.display = 'none';
+  document.getElementById('piCatalogPanel').style.display = '';
+  document.getElementById('piSummary').style.display = 'none';
+  document.getElementById('piShareBtn').style.display = 'none';
+  const btn = document.getElementById('piLoadBtn');
+  btn.disabled = true; btn.style.opacity = '.45';
 }
 
 // Determine PI tier by traversing max depth
@@ -1327,7 +1676,11 @@ function renderPiChain(chain){
   const maxDepth = piMaxDepth(chain);
 
   const treeHtml = buildPiNodeHtml(chain, qty, maxDepth, 0, showRaw);
-  body.innerHTML = `<div style="display:flex;justify-content:center;padding-bottom:24px;overflow-x:auto;">${treeHtml}</div>`;
+  body.innerHTML = `
+    <div style="margin-bottom:8px;">
+      <button onclick="piBackToCatalog()" style="padding:4px 12px;font-size:10px;background:rgba(50,182,255,.08);border:1px solid rgba(50,182,255,.2);color:#32b6ff;border-radius:5px;cursor:pointer;">← Back to catalog</button>
+    </div>
+    <div style="display:flex;justify-content:center;padding-bottom:24px;overflow-x:auto;">${treeHtml}</div>`;
 
   // Build summary sidebar
   const raws = {};
@@ -1365,10 +1718,98 @@ function renderPiChain(chain){
 let _t2SelectedId = null;
 let _t2Chain = null;
 let _t2SearchTimer = null;
+let _t2DropItems = [];
 
-function initT2Tab(){ /* nothing to lazy-load, search is on-demand */ }
+// ── T2 Catalog Browser ────────────────────────────────────────
+let _t2Catalog = null;         // raw catalog data {category: {group: [items]}}
+let _t2ActiveCat = 'All';      // currently selected category chip
 
+async function initT2Tab(){
+  if(_t2Catalog) return;       // already loaded
+  try{
+    const r = await fetch(`${API}/sde/t2_catalog`,{credentials:'include'});
+    _t2Catalog = await r.json();
+  }catch(e){ _t2Catalog={}; }
+  renderT2Catalog();
+}
+
+function renderT2Catalog(){
+  const chips = document.getElementById('t2CatChips');
+  const scroll = document.getElementById('t2CatScroll');
+  if(!_t2Catalog || !Object.keys(_t2Catalog).length){
+    scroll.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">Catalog unavailable</div>';
+    return;
+  }
+  const cats = Object.keys(_t2Catalog).sort();
+  // Category chips
+  chips.innerHTML = ['All',...cats].map(cat=>
+    `<div class="cat-chip${cat===_t2ActiveCat?' active':''}" onclick="t2SetCat('${cat}')">${cat}</div>`
+  ).join('');
+  // Groups + items
+  const activeCats = _t2ActiveCat==='All' ? cats : [_t2ActiveCat];
+  let html='';
+  for(const cat of activeCats){
+    const groups = _t2Catalog[cat];
+    if(!groups) continue;
+    for(const [grpName, items] of Object.entries(groups)){
+      const gid = `t2g_${grpName.replace(/[^a-zA-Z0-9]/g,'_')}`;
+      html+=`<div class="cat-group-hdr open" onclick="t2ToggleGroup(this,'${gid}')">
+        <span class="caret">▶</span>
+        <span>${esc(grpName)}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--muted);">${items.length}</span>
+      </div>
+      <div class="cat-group-body open" id="${gid}">`;
+      for(let i=0;i<items.length;i++){
+        const it=items[i];
+        // encode item into dataset to avoid string-in-onclick issues
+        html+=`<div class="cat-item" data-tid="${it.typeID}" data-name="${esc(it.typeName)}" onclick="t2SelectFromCatalog(this)">
+          <img src="https://images.evetech.net/types/${it.typeID}/icon?size=32" loading="lazy" onerror="this.style.display='none'">
+          ${esc(it.typeName)}
+        </div>`;
+      }
+      html+='</div>';
+    }
+  }
+  scroll.innerHTML = html || '<div style="padding:20px;color:var(--muted);font-size:12px;">No items</div>';
+}
+
+function t2SetCat(cat){
+  _t2ActiveCat = cat;
+  renderT2Catalog();
+}
+
+function t2ToggleGroup(hdr, bodyId){
+  hdr.classList.toggle('open');
+  const body = document.getElementById(bodyId);
+  if(body) body.classList.toggle('open');
+}
+
+function t2SelectFromCatalog(el){
+  const tid  = parseInt(el.dataset.tid);
+  const name = el.dataset.name;
+  // Reuse existing select logic
+  _t2SelectedId = tid;
+  document.getElementById('t2Search').value = name;
+  const btn = document.getElementById('t2LoadBtn');
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  // Immediately load the chain
+  loadT2Chain();
+}
+
+// When search is active, hide catalog; when cleared, show it
 function t2SearchDebounce(){
+  const q = document.getElementById('t2Search').value.trim();
+  // show/hide catalog panel based on whether user is typing
+  const catalogPanel = document.getElementById('t2CatalogPanel');
+  const chainBody    = document.getElementById('t2ChainBody');
+  if(q.length >= 2){
+    catalogPanel.style.display='none';
+    chainBody.style.display='';   // will be populated by doT2Search dropdown
+  } else if(!_t2Chain){
+    catalogPanel.style.display='';
+    chainBody.style.display='none';
+  }
   clearTimeout(_t2SearchTimer);
   _t2SearchTimer = setTimeout(doT2Search, 280);
 }
@@ -1381,20 +1822,25 @@ async function doT2Search(){
     const r = await fetch(`${API}/sde/type_search?q=${encodeURIComponent(q)}`,{credentials:'include'});
     const items = await r.json();
     if(!items.length){ dd.style.display='none'; return; }
-    dd.innerHTML = items.slice(0,20).map(it=>
-      `<div onclick="t2SelectItem(${it.typeID},'${esc(it.typeName)}')">${esc(it.typeName)}</div>`
+    _t2DropItems = items.slice(0,20);
+    dd.innerHTML = _t2DropItems.map((it,i)=>
+      `<div onclick="t2SelectItem(${i})">${esc(it.typeName)}</div>`
     ).join('');
     dd.style.display='block';
   }catch(e){ dd.style.display='none'; }
 }
 
-function t2SelectItem(id, name){
-  _t2SelectedId = id;
-  document.getElementById('t2Search').value = name;
+function t2SelectItem(idx){
+  const it = _t2DropItems[idx];
+  if(!it) return;
+  _t2SelectedId = it.typeID;
+  document.getElementById('t2Search').value = it.typeName;
   document.getElementById('t2Dropdown').style.display='none';
   const btn = document.getElementById('t2LoadBtn');
   btn.disabled = false;
   btn.style.opacity = '1';
+  // Immediately load chain
+  loadT2Chain();
 }
 
 document.addEventListener('click', e=>{
@@ -1406,17 +1852,36 @@ document.addEventListener('click', e=>{
 
 async function loadT2Chain(){
   if(!_t2SelectedId) return;
+  // Switch from catalog panel to chain panel
+  document.getElementById('t2CatalogPanel').style.display = 'none';
   const body = document.getElementById('t2ChainBody');
+  body.style.display = 'block';
   body.innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);">⏳ Loading chain…</div>';
   try{
     const r = await fetch(`${API}/industry/invention_chain?t2_type_id=${_t2SelectedId}`,{credentials:'include'});
     const d = await r.json();
-    if(!d.ok){ body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">${esc(d.error||'Chain not found')}</div>`; return; }
+    if(!d.ok){
+      body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">${esc(d.error||'Chain not found')}</div>
+        <div style="text-align:center;margin-top:8px;"><button onclick="t2BackToCatalog()" style="padding:5px 14px;font-size:11px;background:rgba(50,182,255,.12);border:1px solid rgba(50,182,255,.25);color:#32b6ff;border-radius:6px;cursor:pointer;">← Back to catalog</button></div>`;
+      return;
+    }
     _t2Chain = d;
     renderT2Chain(d);
+    document.getElementById('t2ShareBtn').style.display = 'inline-block';
   }catch(e){
     body.innerHTML=`<div style="padding:40px;text-align:center;color:#f87171;">Error: ${esc(e.message)}</div>`;
   }
+}
+
+function t2BackToCatalog(){
+  _t2Chain = null;
+  _t2SelectedId = null;
+  document.getElementById('t2Search').value = '';
+  document.getElementById('t2ChainBody').style.display = 'none';
+  document.getElementById('t2CatalogPanel').style.display = '';
+  document.getElementById('t2ShareBtn').style.display = 'none';
+  const btn = document.getElementById('t2LoadBtn');
+  btn.disabled = true; btn.style.opacity = '.45';
 }
 
 function recalcT2Runs(){
@@ -1449,6 +1914,11 @@ function renderT2Chain(d){
 
   document.getElementById('t2ChainBody').innerHTML = `
     <div style="display:flex;flex-direction:column;align-items:center;gap:0;padding-bottom:24px;">
+
+      <!-- Back button -->
+      <div style="width:100%;max-width:640px;margin-bottom:10px;">
+        <button onclick="t2BackToCatalog()" style="padding:4px 12px;font-size:10px;background:rgba(50,182,255,.08);border:1px solid rgba(50,182,255,.2);color:#32b6ff;border-radius:5px;cursor:pointer;">← Back to catalog</button>
+      </div>
 
       <!-- T1 Blueprint -->
       <div class="chain-card">
@@ -1519,8 +1989,422 @@ function renderT2Chain(d){
 
     </div>`;
 }
-function initScannerTab(){}
-function initQueueTab(){}
+// ═══════════════════════════════════════════════════════════
+// BLUEPRINT PROFIT SCANNER TAB
+// ═══════════════════════════════════════════════════════════
+let _scanResults  = [];   // [{name, runs, mat, install, total, sell, profit, margin, iskhour}]
+let _scanSortKey  = 'profit';
+let _scanSortDesc = true;
+let _scanRunning  = false;
+let _scanAbort    = false;
+
+function initScannerTab(){ /* nothing to pre-load */ }
+
+function scanStop(){
+  _scanAbort = true;
+  document.getElementById('scanStopBtn').style.display='none';
+}
+
+function scanApplyFilter(){
+  renderScanTable();
+}
+
+function scanSort(key){
+  if(_scanSortKey === key) _scanSortDesc = !_scanSortDesc;
+  else { _scanSortKey = key; _scanSortDesc = true; }
+  renderScanTable();
+}
+
+function renderScanTable(){
+  const el = document.getElementById('scanResults');
+  const minP = parseFloat(document.getElementById('scanMinProfit').value)||0;
+  let rows = _scanResults.filter(r => r.profit >= minP);
+
+  const keyMap = {name:'name',runs:'runs',mat:'mat',install:'install',total:'total',sell:'sell',profit:'profit',margin:'margin',iskhour:'iskhour'};
+  const k = keyMap[_scanSortKey]||'profit';
+  rows.sort((a,b)=>{
+    const av = typeof a[k]==='string' ? a[k].toLowerCase() : a[k];
+    const bv = typeof b[k]==='string' ? b[k].toLowerCase() : b[k];
+    return _scanSortDesc ? (bv>av?1:bv<av?-1:0) : (av>bv?1:av<bv?-1:0);
+  });
+
+  if(!rows.length){
+    el.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">No results match the current filter.</div>';
+    return;
+  }
+
+  el.innerHTML = rows.map(r=>{
+    const profPos = r.profit >= 0;
+    return `<div class="scan-row">
+      <span style="flex:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);" title="${esc(r.name)}">${esc(r.name)}</span>
+      <span style="width:45px;text-align:center;font-family:monospace;">${r.runs}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:var(--muted);">${fmtIsk(r.mat)}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:var(--muted);">${fmtIsk(r.install)}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:#ef4444;">${fmtIsk(r.total)}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:var(--accent);">${fmtIsk(r.sell)}</span>
+      <span style="width:90px;text-align:right;font-family:monospace;font-weight:700;color:${profPos?'#22c55e':'#ef4444'};">${fmtIsk(r.profit)}</span>
+      <span style="width:65px;text-align:right;font-family:monospace;color:${profPos?'#22c55e':'#ef4444'};">${r.margin.toFixed(1)}%</span>
+      <span style="width:85px;text-align:right;font-family:monospace;color:var(--accent);">${fmtIsk(r.iskhour)}/h</span>
+    </div>`;
+  }).join('');
+}
+
+async function startScan(){
+  if(_scanRunning) return;
+  const alias  = document.getElementById('scanChar').value;
+  const hub    = document.getElementById('scanHub').value;
+  const ci     = parseFloat(document.getElementById('scanCI').value)||0;
+  const actId  = parseInt(document.getElementById('scanAct').value)||1;
+
+  if(!alias) return;
+
+  _scanResults = [];
+  _scanRunning = true;
+  _scanAbort   = false;
+
+  const status   = document.getElementById('scanStatus');
+  const progWrap = document.getElementById('scanProgressWrap');
+  const prog     = document.getElementById('scanProgress');
+  const resultsEl= document.getElementById('scanResults');
+
+  document.getElementById('scanBtn').disabled = true;
+  document.getElementById('scanStopBtn').style.display = 'inline-block';
+  document.getElementById('scanHeader').style.display = 'flex';
+  progWrap.style.display = 'block';
+  prog.style.width = '0%';
+  resultsEl.innerHTML = '';
+  status.textContent = '⏳ Loading blueprints…';
+
+  // 1. Load character blueprints
+  let bps = [];
+  try{
+    const r = await fetch(`${API}/eve/character/blueprints?alias=${encodeURIComponent(alias)}`,{credentials:'include'});
+    const d = await r.json();
+    if(!d.ok){ status.textContent='Error loading blueprints'; _scanRunning=false; document.getElementById('scanBtn').disabled=false; document.getElementById('scanStopBtn').style.display='none'; return; }
+
+    const rawBPs = d.blueprints||[];
+    const names  = d.type_names||{};
+
+    // Resolve missing names
+    const missingIds = [...new Set(rawBPs.map(b=>b.type_id).filter(tid=>{ const n=names[String(tid)]||names[tid]; return !n||String(n)===String(tid); }))];
+    if(missingIds.length){
+      try{
+        const snR = await fetch(`${API}/sde/type_names?type_ids=${missingIds.join(',')}`,{credentials:'include'});
+        const snD = await snR.json();
+        Object.entries(snD).forEach(([k,v])=>{ const name=(v&&typeof v==='object')?(v.typeName||v.name):v; if(name) names[k]=name; });
+      }catch(e){}
+    }
+
+    // Dedupe, keep BPO or best ME
+    const byType = {};
+    rawBPs.forEach(b=>{
+      const tid  = b.type_id;
+      const name = names[String(tid)]||names[tid]||`Type ${tid}`;
+      const isBPO= b.quantity===-1||b.quantity===-2;
+      if(!byType[tid]||isBPO){
+        byType[tid]={typeId:tid, typeName:typeof name==='object'?(name.typeName||name.name||String(tid)):String(name), me:b.material_efficiency||0, te:b.time_efficiency||0, runs:b.runs>0?b.runs:1, isBPO};
+      }
+    });
+
+    // Filter to selected activity
+    bps = Object.values(byType).filter(b=>{
+      if(actId===11) return b.typeName.toLowerCase().includes('reaction formula');
+      return !b.typeName.toLowerCase().includes('reaction formula');
+    });
+  }catch(e){
+    status.textContent=`Error: ${e.message}`;
+    _scanRunning=false;
+    document.getElementById('scanBtn').disabled=false;
+    document.getElementById('scanStopBtn').style.display='none';
+    return;
+  }
+
+  if(!bps.length){
+    status.textContent='No blueprints found for this activity.';
+    _scanRunning=false;
+    document.getElementById('scanBtn').disabled=false;
+    document.getElementById('scanStopBtn').style.display='none';
+    return;
+  }
+
+  // 2. Scan each blueprint
+  const total = bps.length;
+  let done = 0;
+
+  for(const bp of bps){
+    if(_scanAbort) break;
+    status.textContent = `Scanning ${done+1}/${total}: ${bp.typeName}…`;
+    prog.style.width = `${Math.round((done/total)*100)}%`;
+
+    try{
+      const payload={
+        bp_type_id: bp.typeId, runs: bp.runs, me: bp.me, te: bp.te, activity: actId,
+        facility_tax:0, scc_surcharge:4, cost_index:ci,
+        mat_hub:hub, out_hub:hub, mat_order_type:'sell', out_order_type:'sell',
+        char_te_bonus_pct:0, struct_me_bonus_pct:0, struct_te_bonus_pct:0,
+        buy_broker_fee:1, sell_broker_fee:1, sales_tax:3.6,
+      };
+      const r = await fetch(`${API}/industry/calc`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      const d = await r.json();
+      if(d.ok){
+        const t = d.totals, j = d.job;
+        _scanResults.push({
+          name:    bp.typeName.replace(/ Blueprint$/i,'').replace(/ Reaction Formula$/i,''),
+          runs:    bp.runs,
+          mat:     t.mat_cost_chosen||0,
+          install: t.install_cost||0,
+          total:   t.total_cost||0,
+          sell:    t.out_net_sell||0,
+          profit:  t.profit||0,
+          margin:  t.margin_pct||0,
+          iskhour: t.isk_per_hour||0,
+        });
+        // Live-update table every 5 results
+        if(_scanResults.length % 5 === 0) renderScanTable();
+      }
+    }catch(e){}
+
+    done++;
+  }
+
+  prog.style.width='100%';
+  renderScanTable();
+  const stopped = _scanAbort ? ' (stopped)' : '';
+  status.textContent = `Done — ${_scanResults.length} results from ${done} blueprints${stopped}`;
+  progWrap.style.display='none';
+  _scanRunning = false;
+  document.getElementById('scanBtn').disabled = false;
+  document.getElementById('scanStopBtn').style.display = 'none';
+  if(_scanResults.length > 0) document.getElementById('scanShareBtn').style.display = 'inline-block';
+}
+// ═══════════════════════════════════════════════════════════
+// QUEUE BUILDER TAB
+// ═══════════════════════════════════════════════════════════
+let _queue = [];          // [{typeId, typeName, runs, me, te}]
+let _qSearchTimer = null;
+let _qDropdownItems = [];
+
+function initQueueTab(){ /* on-demand, no preload needed */ }
+
+// ── Search / add ────────────────────────────────────────────
+function qSearchDebounce(){
+  clearTimeout(_qSearchTimer);
+  _qSearchTimer = setTimeout(doQSearch, 280);
+}
+
+async function doQSearch(){
+  const q = document.getElementById('qSearch').value.trim();
+  const dd = document.getElementById('qDropdown');
+  if(q.length < 2){ dd.style.display='none'; return; }
+  try{
+    const r = await fetch(`${API}/sde/type_search?q=${encodeURIComponent(q)}`,{credentials:'include'});
+    const items = await r.json();
+    _qDropdownItems = items.slice(0,20);
+    if(!_qDropdownItems.length){ dd.style.display='none'; return; }
+    dd.innerHTML = _qDropdownItems.map((it,i)=>
+      `<div onclick="qAddItem(${i})">${esc(it.typeName)}</div>`
+    ).join('');
+    dd.style.display='block';
+  }catch(e){ dd.style.display='none'; }
+}
+
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#qSearch') && !e.target.closest('#qDropdown')){
+    const dd = document.getElementById('qDropdown');
+    if(dd) dd.style.display='none';
+  }
+});
+
+function qAddItem(idx){
+  const it = _qDropdownItems[idx];
+  if(!it) return;
+  const typeId   = it.typeID;
+  const typeName = it.typeName;
+  document.getElementById('qSearch').value = '';
+  document.getElementById('qDropdown').style.display = 'none';
+  // dedupe by typeId
+  if(_queue.find(q=>q.typeId===typeId)) return;
+  _queue.push({
+    typeId,
+    typeName: typeName.replace(/ Blueprint$/i,'').replace(/ Reaction Formula$/i,''),
+    bpName: typeName,
+    runs: 1,
+    me: parseInt(document.getElementById('qME').value)||0,
+    te: parseInt(document.getElementById('qTE').value)||0,
+    result: null,
+  });
+  renderQueueList();
+}
+
+function qRemoveItem(typeId){
+  _queue = _queue.filter(q=>q.typeId!==typeId);
+  renderQueueList();
+  if(!_queue.length) clearQueueResults();
+}
+
+function qUpdateRuns(typeId, val){
+  const item = _queue.find(q=>q.typeId===typeId);
+  if(item) item.runs = Math.max(1, parseInt(val)||1);
+}
+
+function clearQueue(){
+  _queue = [];
+  renderQueueList();
+  clearQueueResults();
+}
+
+function clearQueueResults(){
+  document.getElementById('qResults').innerHTML='<div style="padding:40px;text-align:center;color:var(--muted);font-size:12px;">Add blueprints and click Calculate All</div>';
+  document.getElementById('qAggPanel').style.display='none';
+  document.getElementById('qResHeader').style.display='none';
+  document.getElementById('qStatus').textContent='';
+}
+
+function renderQueueList(){
+  const el = document.getElementById('qList');
+  const footer = document.getElementById('qFooter');
+  if(!_queue.length){
+    el.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);font-size:12px;">Search above to add blueprints</div>';
+    footer.style.display='none';
+    return;
+  }
+  el.innerHTML = _queue.map(item=>`
+    <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid rgba(46,51,59,.35);" id="qrow-${item.typeId}">
+      <img src="https://images.evetech.net/types/${item.typeId}/bp?size=24"
+           onerror="this.src='https://images.evetech.net/types/${item.typeId}/icon?size=24'"
+           style="width:24px;height:24px;border-radius:3px;border:1px solid rgba(50,182,255,.15);flex-shrink:0;" loading="lazy">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(item.typeName)}</div>
+        <div style="font-size:9px;color:var(--muted);">ME${item.me} · TE${item.te}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:3px;flex-shrink:0;">
+        <span style="font-size:9px;color:var(--muted);">×</span>
+        <input class="mfg-inp" type="number" min="1" value="${item.runs}" style="width:44px;font-size:11px;padding:2px 4px;"
+               onchange="qUpdateRuns(${item.typeId},this.value)">
+      </div>
+      <span onclick="qRemoveItem(${item.typeId})" style="color:var(--muted);cursor:pointer;padding:2px 5px;font-size:12px;" title="Remove">✕</span>
+    </div>`).join('');
+  footer.style.display='block';
+  document.getElementById('qFooterText').textContent = `${_queue.length} blueprint${_queue.length!==1?'s':''} queued`;
+}
+
+// ── Calculate all ───────────────────────────────────────────
+async function calcQueue(){
+  if(!_queue.length) return;
+  const hub       = document.getElementById('qHub').value;
+  const costIdx   = parseFloat(document.getElementById('qCostIdx').value)||0;
+  const alias     = document.getElementById('qChar').value;
+  const status    = document.getElementById('qStatus');
+  const resultsEl = document.getElementById('qResults');
+
+  document.getElementById('qResHeader').style.display='flex';
+  document.getElementById('qAggPanel').style.display='none';
+  status.textContent = `Calculating 0 / ${_queue.length}…`;
+  resultsEl.innerHTML = '';
+
+  const aggMats = {};  // typeId → {name, qty}
+  let totalCost = 0, totalProfit = 0;
+  let done = 0;
+
+  for(const item of _queue){
+    status.textContent = `Calculating ${done+1} / ${_queue.length}: ${item.typeName}…`;
+    try{
+      const payload = {
+        bp_type_id:    item.typeId,
+        runs:          item.runs,
+        me:            item.me,
+        te:            item.te,
+        activity:      1,
+        facility_tax:  0,
+        scc_surcharge: 4,
+        cost_index:    costIdx,
+        mat_hub:       hub,
+        out_hub:       hub,
+        mat_order_type: 'sell',
+        out_order_type: 'sell',
+        char_te_bonus_pct: 0,
+        struct_me_bonus_pct: 0,
+        struct_te_bonus_pct: 0,
+        buy_broker_fee: 1,
+        sell_broker_fee: 1,
+        sales_tax: 3.6,
+      };
+      const r = await fetch(`${API}/industry/calc`,{
+        method:'POST', credentials:'include',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const d = await r.json();
+      item.result = d.ok ? d : null;
+
+      if(d.ok){
+        totalCost   += d.totals.total_cost  || 0;
+        totalProfit += d.totals.profit       || 0;
+        (d.materials||[]).forEach(m=>{
+          aggMats[m.type_id] = aggMats[m.type_id] || {name: m.name, qty: 0};
+          aggMats[m.type_id].qty += m.adj_qty || 0;
+        });
+      }
+    }catch(e){ item.result = null; }
+
+    // Render this row immediately
+    renderQueueRow(item, resultsEl);
+    done++;
+  }
+
+  // Totals footer row
+  resultsEl.innerHTML += `
+    <div style="display:flex;padding:6px 10px;background:rgba(0,0,0,.4);border-top:1px solid rgba(50,182,255,.15);font-size:11px;font-weight:700;">
+      <span style="flex:1.5;color:var(--text);">TOTAL</span>
+      <span style="width:45px;"></span>
+      <span style="width:95px;"></span><span style="width:95px;"></span>
+      <span style="width:95px;text-align:right;color:#ef4444;">${fmtIsk(totalCost)} ISK</span>
+      <span style="width:95px;"></span>
+      <span style="width:80px;text-align:right;color:${totalProfit>=0?'#22c55e':'#ef4444'};">${fmtIsk(totalProfit)} ISK</span>
+      <span style="width:65px;"></span>
+    </div>`;
+
+  // Aggregate shopping list
+  const sorted = Object.values(aggMats).sort((a,b)=>b.qty-a.qty);
+  // Save for share function
+  _qAgg = {};
+  sorted.forEach(m=>{ _qAgg[m.name]=m.qty; });
+  if(sorted.length){
+    document.getElementById('qAggList').innerHTML = sorted.map(m=>
+      `<div style="display:flex;align-items:center;gap:5px;padding:3px 7px;background:rgba(255,255,255,.03);border:1px solid rgba(50,182,255,.1);border-radius:5px;font-size:10px;">
+        <span style="color:var(--text);">${esc(m.name)}</span>
+        <span style="font-family:monospace;font-weight:600;color:var(--accent);">× ${fmtNum(m.qty)}</span>
+      </div>`
+    ).join('');
+    document.getElementById('qAggPanel').style.display='block';
+  }
+
+  status.textContent = `Done — ${_queue.length} job${_queue.length!==1?'s':''} calculated`;
+}
+
+function renderQueueRow(item, container){
+  const d = item.result;
+  if(!d){
+    container.innerHTML += `
+      <div style="display:flex;padding:5px 10px;border-bottom:1px solid rgba(46,51,59,.3);font-size:11px;color:#f87171;">
+        <span style="flex:1.5;">${esc(item.typeName)}</span>
+        <span style="flex:1;color:var(--muted);">Calculation failed</span>
+      </div>`;
+    return;
+  }
+  const t = d.totals, profPos = t.profit>=0;
+  container.innerHTML += `
+    <div style="display:flex;align-items:center;padding:5px 10px;border-bottom:1px solid rgba(46,51,59,.3);font-size:11px;transition:background .08s;" onmouseover="this.style.background='rgba(50,182,255,.04)'" onmouseout="this.style.background=''">
+      <span style="flex:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);" title="${esc(item.typeName)}">${esc(item.typeName)}</span>
+      <span style="width:45px;text-align:center;font-family:monospace;">${item.runs}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:var(--muted);">${fmtIsk(t.mat_cost_chosen)}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:var(--muted);">${fmtIsk(t.install_cost)}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:#ef4444;">${fmtIsk(t.total_cost)}</span>
+      <span style="width:95px;text-align:right;font-family:monospace;color:var(--accent);">${fmtIsk(t.out_net_sell)}</span>
+      <span style="width:80px;text-align:right;font-family:monospace;color:${profPos?'#22c55e':'#ef4444'};">${fmtIsk(t.profit)}</span>
+      <span style="width:65px;text-align:right;font-family:monospace;color:${profPos?'#22c55e':'#ef4444'};">${t.margin_pct.toFixed(1)}%</span>
+    </div>`;
+}
 
 // ═══════════════════════════════════════════════════════════
 // ACTIVE JOBS TAB
@@ -1643,5 +2527,84 @@ window.addEventListener('DOMContentLoaded', ()=>{
   loadCharBlueprints();
   fetchCostIndex();
 });
+
+// ── Share functions ───────────────────────────────────────────
+
+function shareCalcResults(){
+  if(!_lastCalcData) return stellarShare('Calculator','industry_calc',{});
+  const d = _lastCalcData;
+  const name = document.getElementById('calcName').textContent || '';
+  const runs = parseInt(document.getElementById('cfgRuns').value)||1;
+  const mats = Array.from(document.querySelectorAll('.mfg-mat-row')).map(r=>{
+    const cells = r.querySelectorAll('span,div');
+    return {name: r.querySelector('.mfg-mat-name')?.textContent||'', quantity: r.querySelector('.mfg-mat-qty')?.textContent||''};
+  });
+  const payload = {
+    item: name,
+    runs,
+    total_cost: d.total_cost||0,
+    sell_price: d.sell_gross||0,
+    profit: d.profit||0,
+    materials: (d.materials||[]).map(m=>({name:m.typeName||m.name||'',quantity:m.adjusted_qty||m.quantity||0,unit_cost:m.buy_price||0}))
+  };
+  stellarShare(`${name} × ${runs} — Industry Calc`, 'industry_calc', payload);
+}
+
+function shareQueueResults(){
+  const items = _queue.map(q=>({
+    name: q.name||'',
+    runs: q.runs||1,
+    cost: q.result?.total_cost||0,
+    profit: q.result?.profit||0
+  }));
+  // aggregate shopping list from _qAgg
+  const shopping = Object.entries(_qAgg||{}).map(([name,qty])=>({name,quantity:qty}));
+  stellarShare('Production Queue Plan', 'industry_queue', {items, shopping});
+}
+
+function shareT2Chain(){
+  if(!_t2Chain) return;
+  const name = _t2Chain.product_name || _t2Chain.name || '';
+  const runs = parseInt(document.getElementById('t2TargetRuns').value)||10;
+  // Flatten chain steps for display
+  const steps = [];
+  const walkChain = (node)=>{
+    if(!node) return;
+    steps.push({name: node.product_name||node.name||''});
+    (node.materials||[]).filter(m=>m.activity).forEach(walkChain);
+  };
+  walkChain(_t2Chain);
+  const mats = (_t2Chain.materials||[]).filter(m=>!m.activity).map(m=>({name:m.typeName||m.name||'',quantity:m.quantity||0}));
+  stellarShare(`${name} × ${runs} — T2 Chain`, 't2_chain', {item:name, runs, steps, materials:mats});
+}
+
+function sharePiChain(){
+  if(!_piChain) return;
+  const name = _piChain.typeName||_piChain.name||'';
+  const qty = parseInt(document.getElementById('piTargetQty').value)||1;
+  // Convert tree to shareable structure
+  const serializeTree = (node)=>{
+    if(!node) return null;
+    return {
+      name: node.typeName||node.name||'',
+      tier: node.tier||'',
+      quantity: node.qty||node.quantity||1,
+      inputs: (node.inputs||[]).map(serializeTree).filter(Boolean)
+    };
+  };
+  stellarShare(`${name} × ${qty} — PI Chain`, 'pi_chain', {root:name, qty, tree:serializeTree(_piChain)});
+}
+
+function shareScanResults(){
+  const rows = (_scanResults||[]).slice(0,100).map(r=>({
+    name: r.name||'',
+    runs: r.runs||1,
+    cost: r.total_cost||0,
+    revenue: r.sell_net||0,
+    profit: r.profit||0,
+    margin: r.margin!=null ? r.margin.toFixed(1)+'%' : ''
+  }));
+  stellarShare('Blueprint Scanner Results', 'industry_scanner', {rows});
+}
 </script>
 {% endblock %}
