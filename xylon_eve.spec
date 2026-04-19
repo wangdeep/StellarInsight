@@ -71,8 +71,25 @@ hidden_imports = [
     "cryptography",
     "cryptography.fernet",
     "cryptography.hazmat.primitives",
+    "cryptography.hazmat.primitives.asymmetric",
+    "cryptography.hazmat.primitives.asymmetric.rsa",
+    "cryptography.hazmat.primitives.asymmetric.ec",
     "cryptography.hazmat.backends",
+    "cryptography.hazmat.backends.openssl",
+    # bcrypt — constant-time password hashing (C-1 dev bypass)
+    "bcrypt",
+    # PyJWT — local JWKS JWT validation for EVE SSO (L-4)
+    "jwt",
+    "jwt.algorithms",
+    "jwt.exceptions",
+    "jwt.jwks_client",
+    "jwt.jwk_set_cache",
     # HTTP / WebSocket
+    "requests",
+    "requests.adapters",
+    "requests.auth",
+    "urllib3",
+    "certifi",
     "httpx",
     "httpx._transports.default",
     "websockets",
@@ -103,6 +120,7 @@ hidden_imports = [
     "eve.game_eve",
     "eve.sde_local",
     "eve.relay_client",
+    "eve.chain_mapper",
 ]
 
 a = Analysis(

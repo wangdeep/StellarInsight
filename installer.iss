@@ -94,37 +94,132 @@ Filename: "{app}\{#AppExeName}"; \
 Filename: "taskkill.exe"; Parameters: "/F /IM {#AppExeName}"; Flags: runhidden; RunOnceId: "KillApp"
 
 [Code]
-// Check for Edge WebView2 Runtime — required by pywebview
+// ─────────────────────────────────────────────────────────────────────────────
+// Edge WebView2 Runtime detection + silent bootstrap install
+// Required by pywebview on Windows. Most Win10/11 PCs already have it via
+// Windows Update, but clean installs may not.
+// ─────────────────────────────────────────────────────────────────────────────
+
 function IsWebView2Installed: Boolean;
 var
   Version: String;
 begin
+  // Check machine-wide (typical Windows Update install)
   Result := RegQueryStringValue(
     HKLM,
     'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
-    'pv',
-    Version
+    'pv', Version
   ) and (Version <> '') and (Version <> '0.0.0.0');
+
+  // Also check per-user install
   if not Result then
     Result := RegQueryStringValue(
       HKCU,
       'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}',
-      'pv',
-      Version
+      'pv', Version
     ) and (Version <> '') and (Version <> '0.0.0.0');
+end;
+
+// Download a file from URL to a local path using WinInet (no external tools)
+function DownloadFile(URL, DestPath: String): Boolean;
+var
+  WinHttpReq: Variant;
+  FileStream:  Variant;
+begin
+  Result := False;
+  try
+    WinHttpReq := CreateOleObject('WinHttp.WinHttpRequest.5.1');
+    WinHttpReq.Open('GET', URL, False);
+    WinHttpReq.Send('');
+    if WinHttpReq.Status = 200 then
+    begin
+      FileStream := CreateOleObject('ADODB.Stream');
+      FileStream.Type_    := 1;  // adTypeBinary
+      FileStream.Open;
+      FileStream.Write(WinHttpReq.ResponseBody);
+      FileStream.SaveToFile(DestPath, 2);  // adSaveCreateOverWrite
+      FileStream.Close;
+      Result := True;
+    end;
+  except
+    // Download failed — caller handles the fallback
+  end;
+end;
+
+procedure InstallWebView2;
+var
+  TempDir:    String;
+  Bootstrapper: String;
+  ResultCode: Integer;
+begin
+  TempDir      := ExpandConstant('{tmp}');
+  Bootstrapper := TempDir + '\MicrosoftEdgeWebview2Setup.exe';
+
+  MsgBox(
+    'Stellar Insight needs the Microsoft Edge WebView2 Runtime to display its window.' + #13#10 +
+    #13#10 +
+    'It will now be downloaded and installed silently (~2 MB).' + #13#10 +
+    'An internet connection is required.',
+    mbInformation, MB_OK
+  );
+
+  // Microsoft's evergreen bootstrapper — tiny (~2 MB), installs the latest Runtime
+  if DownloadFile(
+    'https://go.microsoft.com/fwlink/p/?LinkId=2124703',
+    Bootstrapper
+  ) then
+  begin
+    if Exec(Bootstrapper, '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      if IsWebView2Installed then
+        MsgBox('WebView2 Runtime installed successfully.', mbInformation, MB_OK)
+      else
+        MsgBox(
+          'WebView2 installation finished but could not be verified.' + #13#10 +
+          'If Stellar Insight does not open, please install WebView2 manually from:' + #13#10 +
+          'https://developer.microsoft.com/en-us/microsoft-edge/webview2/',
+          mbError, MB_OK
+        );
+    end else
+      MsgBox(
+        'WebView2 bootstrapper failed to run (error ' + IntToStr(ResultCode) + ').' + #13#10 +
+        'Please install it manually from:' + #13#10 +
+        'https://developer.microsoft.com/en-us/microsoft-edge/webview2/',
+        mbError, MB_OK
+      );
+  end else
+    MsgBox(
+      'Could not download the WebView2 bootstrapper.' + #13#10 +
+      'Please install it manually from:' + #13#10 +
+      'https://developer.microsoft.com/en-us/microsoft-edge/webview2/',
+      mbError, MB_OK
+    );
 end;
 
 procedure InitializeWizard;
 begin
-  if not IsWebView2Installed then
-    MsgBox(
-      'Microsoft Edge WebView2 Runtime was not detected on this PC.' + #13#10 + #13#10 +
-      'Stellar Insight needs it to display its window.' + #13#10 +
-      'After installation, download and run the WebView2 installer from:' + #13#10 +
-      'https://developer.microsoft.com/en-us/microsoft-edge/webview2/' + #13#10 + #13#10 +
-      '(Most Windows 10/11 PCs already have it via Windows Update.)',
-      mbInformation,
-      MB_OK
-    );
+  // Nothing to show here — WebView2 check happens at install time
 end;
 
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if not IsWebView2Installed then
+    InstallWebView2;
+end;
+
+// Offer a clean exit if WebView2 still missing after the install attempt
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpReady) and not IsWebView2Installed then
+  begin
+    if MsgBox(
+      'Edge WebView2 Runtime is still not detected.' + #13#10 +
+      'Stellar Insight may not start correctly.' + #13#10 + #13#10 +
+      'Continue with installation anyway?',
+      mbConfirmation, MB_YESNO
+    ) = IDNO then
+      Result := False;
+  end;
+en

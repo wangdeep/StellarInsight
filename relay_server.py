@@ -39,6 +39,36 @@ NAV_CONN_TTL      = 48 * 3600   # 48 hours: nav-map connection kill timer
 TOKEN_TTL         = 30 * 86400  # 30 days: signed token lifetime
 CLEANUP_INTERVAL  = 900         # 15 minutes between background cleanup passes
 _RC_ALPHABET      = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I ambiguity
+MAX_PUSH_BYTES    = 1 * 1024 * 1024   # 1 MB per push request
+MAX_PUSH_ITEMS    = 200               # max items per push call
+
+# ── Simple in-memory rate limiter ─────────────────────────────────────────────
+# Tracks request timestamps per IP; no external dependency required.
+import collections, threading
+_rl_lock    = threading.Lock()
+_rl_buckets: dict = collections.defaultdict(list)   # key → [timestamps]
+
+def _rate_check(key: str, limit: int, window: int) -> bool:
+    """Return True (allowed) if fewer than `limit` events in last `window` seconds."""
+    now    = time.time()
+    cutoff = now - window
+    with _rl_lock:
+        ts = _rl_buckets[key]
+        # Evict old entries
+        while ts and ts[0] < cutoff:
+            ts.pop(0)
+        if len(ts) >= limit:
+            return False
+        ts.append(now)
+    return True
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort client IP, honouring X-Forwarded-For for reverse-proxy setups."""
+    xff = request.headers.get("x-forwarded-for", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return getattr(request.client, "host", "unknown")
 
 # ── CLI args ──────────────────────────────────────────────────────────────────
 def _parse_args() -> argparse.Namespace:
@@ -54,12 +84,49 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
-_args = _parse_args()
-DB_PATH: str = _args.db
+# ── Embedded-relay state ──────────────────────────────────────────────────────
+# These are set by relay_init() when the relay is started inside the main app.
+# When running standalone (python relay_server.py), relay_init() is called from
+# the startup event handler using the CLI-provided DB path.
+_relay_db_path: str  = ""        # set by relay_init()
+_relay_ready:   bool = False     # True after relay_init() succeeds
+_relay_bg_started: bool = False  # True after cleanup task is running
+
+_STANDALONE_DB_DEFAULT = os.path.join(
+    os.path.expanduser("~"), ".stellar_insight", "relay.db"
+)
+
+
+def _get_db_path() -> str:
+    return _relay_db_path or _STANDALONE_DB_DEFAULT
+
+
+def relay_init(db_path: str = "") -> None:
+    """
+    Initialise the relay (DB schema + server secret).
+    Call this once before handling any relay requests.
+    Works in both embedded (called from app.py) and standalone mode.
+    """
+    global _relay_db_path, _relay_ready
+    _relay_db_path = db_path or _STANDALONE_DB_DEFAULT
+    _init_db()
+    _relay_ready = True
+    log.info("Relay initialised  db=%s", _relay_db_path)
+
+
+async def relay_start_bg_task() -> None:
+    """
+    Start the relay cleanup background task.
+    Safe to call multiple times — only starts the task once.
+    """
+    global _relay_bg_started
+    if not _relay_bg_started:
+        _relay_bg_started = True
+        asyncio.create_task(_cleanup_loop())
 
 # ── Database helpers ──────────────────────────────────────────────────────────
-def _raw_conn(path: str = DB_PATH) -> sqlite3.Connection:
-    conn = sqlite3.connect(path, check_same_thread=False)
+def _raw_conn(path: str = "") -> sqlite3.Connection:
+    conn = sqlite3.connect(path or _get_db_path(), check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -76,8 +143,21 @@ def _conn():
         c.close()
 
 
+def _check_ready() -> None:
+    """Raise 503 if the relay has not been initialised yet."""
+    if not _relay_ready:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Embedded relay not started. "
+                "Go to Settings → Corp Sharing and choose 'Use this device' to start it."
+            ),
+        )
+
+
 def _init_db() -> None:
-    db_dir = os.path.dirname(DB_PATH)
+    db_path = _get_db_path()
+    db_dir = os.path.dirname(db_path)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
     with _conn() as c:
@@ -121,7 +201,7 @@ def _init_db() -> None:
                 "INSERT INTO config(key,value) VALUES('server_secret',?)",
                 (secrets.token_hex(32),),
             )
-    log.info("DB initialised: %s", DB_PATH)
+    log.info("DB initialised: %s", _get_db_path())
 
 
 def _server_secret() -> str:
@@ -279,40 +359,43 @@ async def _cleanup_loop() -> None:
     """Mark nav connections older than NAV_CONN_TTL as expired; broadcast."""
     while True:
         await asyncio.sleep(CLEANUP_INTERVAL)
-        now    = time.time()
-        cutoff = now - NAV_CONN_TTL
-        affected: Dict[str, List[str]] = {}
-        with _conn() as c:
-            rows = c.execute(
-                """SELECT room_code, data_key, data_json
-                   FROM sync_data
-                   WHERE data_type='nav_connection' AND updated_ts < ?""",
-                (cutoff,),
-            ).fetchall()
-            for row in rows:
-                try:
-                    d = json.loads(row["data_json"])
-                except Exception:
-                    d = {}
-                if d.get("expired"):
-                    continue  # already marked
-                d["expired"] = True
-                c.execute(
-                    """UPDATE sync_data SET data_json=?, updated_ts=?
-                       WHERE room_code=? AND data_type='nav_connection' AND data_key=?""",
-                    (json.dumps(d), now, row["room_code"], row["data_key"]),
-                )
-                affected.setdefault(row["room_code"], []).append(row["data_key"])
+        try:
+            now    = time.time()
+            cutoff = now - NAV_CONN_TTL
+            affected: Dict[str, List[str]] = {}
+            with _conn() as c:
+                rows = c.execute(
+                    """SELECT room_code, data_key, data_json
+                       FROM sync_data
+                       WHERE data_type='nav_connection' AND updated_ts < ?""",
+                    (cutoff,),
+                ).fetchall()
+                for row in rows:
+                    try:
+                        d = json.loads(row["data_json"])
+                    except Exception:
+                        d = {}
+                    if d.get("expired"):
+                        continue  # already marked
+                    d["expired"] = True
+                    c.execute(
+                        """UPDATE sync_data SET data_json=?, updated_ts=?
+                           WHERE room_code=? AND data_type='nav_connection' AND data_key=?""",
+                        (json.dumps(d), now, row["room_code"], row["data_key"]),
+                    )
+                    affected.setdefault(row["room_code"], []).append(row["data_key"])
 
-        if affected:
-            total = sum(len(v) for v in affected.values())
-            log.info("Expired %d nav connections across %d rooms", total, len(affected))
-            for room_code, keys in affected.items():
-                await _mgr.broadcast(room_code, {
-                    "event": "nav_connections_expired",
-                    "keys":  keys,
-                    "ts":    now,
-                })
+            if affected:
+                total = sum(len(v) for v in affected.values())
+                log.info("Expired %d nav connections across %d rooms", total, len(affected))
+                for room_code, keys in affected.items():
+                    await _mgr.broadcast(room_code, {
+                        "event": "nav_connections_expired",
+                        "keys":  keys,
+                        "ts":    now,
+                    })
+        except Exception as exc:
+            log.error("Cleanup loop error (will retry next cycle): %s", exc)
 
 
 # ── FastAPI application ───────────────────────────────────────────────────────
@@ -321,8 +404,12 @@ app = FastAPI(title="Stellar Insight Relay", version="1.0.0")
 
 @app.on_event("startup")
 async def _startup() -> None:
-    _init_db()
-    asyncio.create_task(_cleanup_loop())
+    # Standalone mode: relay_ready is False, so init with CLI/default path.
+    # Embedded mode (mounted in main app): relay_init() was already called
+    # by app.py's startup, so _relay_ready is True — just start the bg task.
+    if not _relay_ready:
+        relay_init()  # uses _STANDALONE_DB_DEFAULT
+    await relay_start_bg_task()
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -338,19 +425,46 @@ async def register(request: Request):
     Called once by the premium user hosting for their corp.
     Creates (or returns) the permanent room code for that corp_id.
 
-    Body: { corp_id, corp_name?, character_id, char_name? }
+    Body: { corp_id, corp_name?, character_id, char_name?, reg_sig? }
+      reg_sig is an optional HMAC-SHA256 over "register:{corp_id}:{character_id}"
+      signed with the server secret. When absent the request is accepted only from
+      loopback/private addresses (self-host LAN) — public relays should set a
+      RELAY_REGISTER_SECRET env var and clients must supply the sig.
     Returns: { room_code, token }
     """
-    body = await request.json()
+    _check_ready()
+
+    # Rate-limit: 10 registrations per IP per hour
+    ip = _client_ip(request)
+    if not _rate_check(f"reg:{ip}", limit=10, window=3600):
+        raise HTTPException(429, "Too many registration attempts. Try again later.")
+
+    body         = await request.json()
     corp_id      = int(body.get("corp_id") or 0)
     corp_name    = str(body.get("corp_name") or "")
     character_id = int(body.get("character_id") or 0)
     char_name    = str(body.get("char_name") or "")
+    reg_sig      = str(body.get("reg_sig") or "")
+
     if not corp_id or not character_id:
         raise HTTPException(400, "corp_id and character_id are required")
+
+    # Optional registration signature check.
+    # If RELAY_REGISTER_SECRET is set in env, all register calls must supply
+    # a valid HMAC-SHA256(secret, "register:{corp_id}:{character_id}") sig.
+    reg_secret = os.environ.get("RELAY_REGISTER_SECRET", "")
+    if reg_secret:
+        expected_sig = hmac.new(
+            reg_secret.encode(), f"register:{corp_id}:{character_id}".encode(),
+            hashlib.sha256
+        ).hexdigest()
+        if not hmac.compare_digest(expected_sig, reg_sig):
+            log.warning("REGISTER rejected — bad reg_sig  corp=%d  ip=%s", corp_id, ip)
+            raise HTTPException(403, "Invalid registration signature")
+
     room_code = _get_or_create_room(corp_id, corp_name)
     token     = _make_token(corp_id, character_id, room_code, char_name)
-    log.info("REGISTER  corp=%d  room=%s  char=%s", corp_id, room_code, char_name)
+    log.info("REGISTER  corp=%d  room=%s  char=%s  ip=%s", corp_id, room_code, char_name, ip)
     return {"ok": True, "room_code": room_code, "token": token}
 
 
@@ -363,12 +477,19 @@ async def join_room(room_code: str, request: Request):
     Body: { character_id, char_name? }
     Returns: { token, room_code, corp_id, corp_name }
     """
+    _check_ready()
+
+    # Rate-limit: 30 join attempts per IP per 10 minutes (prevents room code brute-force)
+    ip = _client_ip(request)
+    if not _rate_check(f"join:{ip}", limit=30, window=600):
+        raise HTTPException(429, "Too many join attempts. Try again later.")
+
     body         = await request.json()
     character_id = int(body.get("character_id") or 0)
     char_name    = str(body.get("char_name") or "")
     if not character_id:
         raise HTTPException(400, "character_id is required")
-    rc = room_code.upper()
+    rc = room_code.strip().upper()
     with _conn() as c:
         row = c.execute(
             "SELECT corp_id, corp_name FROM rooms WHERE room_code=?", (rc,)
@@ -376,7 +497,7 @@ async def join_room(room_code: str, request: Request):
     if not row:
         raise HTTPException(404, "Room not found — check the room code")
     token = _make_token(int(row["corp_id"]), character_id, rc, char_name)
-    log.info("JOIN  room=%s  char=%s  corp=%d", rc, char_name, row["corp_id"])
+    log.info("JOIN  room=%s  char=%s  corp=%d  ip=%s", rc, char_name, row["corp_id"], ip)
     return {
         "ok":        True,
         "token":     token,
@@ -403,10 +524,18 @@ async def push_data(
     rc = room_code.upper()
     if payload["room_code"] != rc:
         raise HTTPException(403, "Token does not match this room")
+
+    # Size guard: reject oversized requests before parsing
+    content_length = int(request.headers.get("content-length", 0))
+    if content_length > MAX_PUSH_BYTES:
+        raise HTTPException(413, f"Request too large (max {MAX_PUSH_BYTES // 1024} KB)")
+
     body  = await request.json()
     items = body.get("items") or []
     if not items:
         raise HTTPException(400, "items list is required and must not be empty")
+    if len(items) > MAX_PUSH_ITEMS:
+        raise HTTPException(400, f"Too many items per push (max {MAX_PUSH_ITEMS})")
     now     = time.time()
     char_id = payload["character_id"]
     stored: List[dict] = []
@@ -651,8 +780,11 @@ async def ws_endpoint(ws: WebSocket) -> None:
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    _args = _parse_args()
+    # Pre-set the DB path so relay_init() in the startup event uses it
+    _relay_db_path = _args.db
     log.info(
         "Starting Stellar Insight Relay  host=%s  port=%d  db=%s",
-        _args.host, _args.port, DB_PATH,
+        _args.host, _args.port, _args.db,
     )
     uvicorn.run(app, host=_args.host, port=_args.port, log_level="info")

@@ -107,10 +107,13 @@ $deps = @(
     "python-multipart>=0.0.9",
     "itsdangerous>=2.1.0",
     "starlette>=0.36.0",
+    "requests>=2.31.0",
     "aiohttp>=3.9.0",
     "httpx>=0.27.0",
     "websockets>=12.0",
-    "cryptography>=42.0.0"
+    "cryptography>=42.0.0",
+    "bcrypt>=4.0.0",
+    "PyJWT[crypto]>=2.8.0"
 )
 
 Info "Upgrading pip..."
@@ -161,7 +164,8 @@ foreach ($c in @(
     try { $null = & $c /? 2>&1; if ($LASTEXITCODE -eq 0) { $iscc = $c; break } } catch { }
 }
 
-$setup = $null
+$setup     = $null
+$setupHash = $null
 if (-not $iscc) {
     Warn "Inno Setup not found -- skipping installer step."
     Warn "Install from https://jrsoftware.org/isdl.php then rebuild."
@@ -174,6 +178,13 @@ if (-not $iscc) {
     if (-not (Test-Path $setup)) { Fail "Expected installer\StellarInsight_Setup.exe was not produced." }
     $sizeMB2 = [math]::Round((Get-Item $setup).Length / 1MB, 1)
     Ok "installer\StellarInsight_Setup.exe  ($($sizeMB2) MB)"
+
+    # Generate SHA-256 checksum alongside the installer (companion file for auto-updater C-3)
+    Info "Generating SHA-256 checksum..."
+    $setupHash = "$setup.sha256"
+    $hash = (Get-FileHash $setup -Algorithm SHA256).Hash.ToLower()
+    Set-Content -Path $setupHash -Value $hash -NoNewline
+    Ok "installer\StellarInsight_Setup.exe.sha256  ($hash)"
 }
 
 # ---------------------------------------------------------------------------
@@ -206,11 +217,13 @@ if ($Release) {
     & git push --tags
     if ($LASTEXITCODE -ne 0) { Fail "Git push failed." }
 
-    # Create GitHub Release and upload installer
+    # Create GitHub Release and upload installer + SHA-256 checksum
     Info "Creating GitHub Release..."
-    & gh release create "v$newVersion" $setup `
+    $releaseAssets = @($setup)
+    if ($setupHash -and (Test-Path $setupHash)) { $releaseAssets += $setupHash }
+    & gh release create "v$newVersion" @releaseAssets `
         --title "Stellar Insight v$newVersion" `
-        --notes "## Stellar Insight v$newVersion`n`nDownload and run ``StellarInsight_Setup.exe`` to install or update." `
+        --notes "## Stellar Insight v$newVersion`n`nDownload and run ``StellarInsight_Setup.exe`` to install or update.`n`n``StellarInsight_Setup.exe.sha256`` contains the SHA-256 checksum for verification." `
         --latest
     if ($LASTEXITCODE -ne 0) { Fail "GitHub release creation failed." }
 
@@ -226,6 +239,7 @@ Write-Host ""
 Write-Host "  Standalone exe  ->  dist\StellarInsight.exe" -ForegroundColor White
 if ($setup) {
     Write-Host "  Installer       ->  installer\StellarInsight_Setup.exe" -ForegroundColor White
+    Write-Host "  Checksum        ->  installer\StellarInsight_Setup.exe.sha256" -ForegroundColor White
 }
 if ($Release) {
     Write-Host "  GitHub Release  ->  https://github.com/wangdeep/StellarInsight/releases" -ForegroundColor White

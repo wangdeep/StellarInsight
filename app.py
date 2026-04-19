@@ -39,6 +39,13 @@ from eve.eve_sso import (
 )
 from eve.memory_sqlite import MemoryStore
 from eve.relay_client import relay as _relay
+from relay_server import (
+    app as _relay_sub_app,
+    relay_init as _relay_server_init,
+    relay_start_bg_task as _relay_server_bg,
+    _get_or_create_room as _relay_get_room,
+    _make_token as _relay_make_token,
+)
 
 logger = logging.getLogger("xylon_eve")
 
@@ -520,6 +527,12 @@ def create_app() -> FastAPI:
         StaticFiles(directory=os.path.join(base_dir, "static")),
         name="static",
     )
+
+    # ── Embedded relay sub-app ────────────────────────────────────────────────
+    # Always mounted so the routes exist; returns 503 until relay_init() is
+    # called (via /app/api/sync/relay/start or on startup if self-host was
+    # previously configured).
+    app.mount("/relay", _relay_sub_app, name="relay")
 
     # ── Health ──────────────────────────────────────────────────────────────────
 
@@ -5530,6 +5543,14 @@ async def _location_track_task():
 async def _start_background_tasks():
     # M-7: wire up Fernet key auto-generation from SQLite
     set_token_key_db(_db_path())
+
+    # Auto-start embedded relay if previously configured as self-host
+    if (_sync_cfg_get("sync_mode") or "") == "self":
+        relay_db = os.path.join(os.path.dirname(_db_path()), "relay.db")
+        _relay_server_init(relay_db)
+        await _relay_server_bg()
+        logger.info("[RELAY] Embedded relay auto-started (self-host mode)")
+
     asyncio.create_task(_ticker_loop())
     asyncio.create_task(_esi_auto_refresh_task())
     asyncio.create_task(_location_track_task())
@@ -5544,27 +5565,40 @@ async def _start_background_tasks():
 
 _SYNC_CONFIG_KEYS = ("sync_url", "sync_token", "sync_corp_id",
                      "sync_corp_name", "sync_is_admin", "sync_invite_token",
-                     "sync_room_code")
+                     "sync_room_code", "sync_mode")  # sync_mode: "self" | "external"
 
 # Default relay URL (developer-hosted instance)
 DEFAULT_RELAY_URL = "https://insight.stellarforge.nexus/share"  # C-4: HTTPS enforced
 
 
+def _is_private_relay_host(url: str) -> bool:
+    """Return True if the relay URL points to a loopback or RFC-1918 address."""
+    from urllib.parse import urlparse
+    import ipaddress
+    host = (urlparse(url).hostname or "").lower()
+    if host in ("localhost", "::1"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
 def _validate_relay_url(url: str) -> str:
     """
-    C-4: Enforce HTTPS for all relay URLs.
-    Raises HTTPException(400) if the caller tries to use plain HTTP.
+    C-4: Enforce HTTPS for public relay URLs.
+    LAN/loopback addresses (embedded relay, self-host LAN) may use plain HTTP.
     Returns the url (stripped of trailing slash) if valid.
     """
     from urllib.parse import urlparse
     parsed = urlparse(url)
-    if parsed.scheme != "https":
+    if parsed.scheme != "https" and not _is_private_relay_host(url):
         raise HTTPException(
             status_code=400,
             detail=(
-                "Relay URL must use HTTPS for security. "
-                f"Received scheme: '{parsed.scheme}'. "
-                "Update your relay URL to start with 'https://'."
+                "Relay URL must use HTTPS for public/internet servers. "
+                f"Received: '{parsed.scheme}://{parsed.hostname}'. "
+                "Use https:// or point to a local/LAN address for self-hosting."
             ),
         )
     return url.rstrip("/")
@@ -5776,29 +5810,101 @@ async def api_sync_status():
     url       = _sync_cfg_get("sync_url")
     token     = _sync_cfg_get("sync_token")
     room_code = _sync_cfg_get("sync_room_code") or ""
+    sync_mode = _sync_cfg_get("sync_mode") or "external"
+
+    # For self-hosted relay, provide the LAN-accessible URL for corpmates
+    relay_lan_url = ""
+    if sync_mode == "self":
+        try:
+            import socket as _socket
+            with _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM) as _s:
+                _s.connect(("8.8.8.8", 80))
+                lan_ip = _s.getsockname()[0]
+            relay_lan_url = f"http://{lan_ip}:{APP_PORT}/relay"
+        except Exception:
+            relay_lan_url = f"http://localhost:{APP_PORT}/relay"
+
     return {
-        "configured":  bool(url and token and room_code),
-        "connected":   _relay.connected,
-        "url":         url or "",
-        "room_code":   room_code,
-        "corp_name":   _sync_cfg_get("sync_corp_name") or "",
-        "corp_id":     int(_sync_cfg_get("sync_corp_id") or 0),
-        "is_admin":    (_sync_cfg_get("sync_is_admin") or "0") == "1",
-        "invite_token": _sync_cfg_get("sync_invite_token") or "",
+        "configured":     bool(url and token and room_code),
+        "connected":      _relay.connected,
+        "url":            url or "",
+        "relay_lan_url":  relay_lan_url,   # LAN URL for self-host mode (empty otherwise)
+        "room_code":      room_code,
+        "corp_name":      _sync_cfg_get("sync_corp_name") or "",
+        "corp_id":        int(_sync_cfg_get("sync_corp_id") or 0),
+        "is_admin":       (_sync_cfg_get("sync_is_admin") or "0") == "1",
+        "invite_token":   _sync_cfg_get("sync_invite_token") or "",
         "default_relay_url": DEFAULT_RELAY_URL,
+        "sync_mode":      sync_mode,
+    }
+
+
+# ── Embedded relay management ─────────────────────────────────────────────────
+
+@app.get(f"{API_PREFIX}/sync/local_ip")
+async def api_sync_local_ip():
+    """
+    Detect the LAN IP of this machine so the host can share it with corp members.
+    Returns the relay URL that members should use when connecting to a self-hosted relay.
+    """
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(2)
+        s.connect(("8.8.8.8", 80))
+        lan_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        lan_ip = "127.0.0.1"
+    return {
+        "lan_ip":          lan_ip,
+        "port":            APP_PORT,
+        "relay_url_lan":   f"http://{lan_ip}:{APP_PORT}/relay",
+        "relay_url_local": f"http://localhost:{APP_PORT}/relay",
+    }
+
+
+@app.post(f"{API_PREFIX}/sync/relay/start")
+async def api_sync_relay_start():
+    """
+    Start the embedded relay server inside this app process.
+    No external server needed — corp members connect directly to this machine.
+    """
+    from relay_server import _relay_ready
+    if not _relay_ready:
+        relay_db = os.path.join(os.path.dirname(_db_path()), "relay.db")
+        _relay_server_init(relay_db)
+        await _relay_server_bg()
+        logger.info("[RELAY] Embedded relay started")
+    return {
+        "ok":              True,
+        "relay_ready":     True,
+        "relay_url_local": f"http://localhost:{APP_PORT}/relay",
+    }
+
+
+@app.get(f"{API_PREFIX}/sync/relay/status")
+async def api_sync_relay_status():
+    """Return embedded relay status."""
+    from relay_server import _relay_ready, _relay_db_path
+    return {
+        "relay_ready": _relay_ready,
+        "db_path":     _relay_db_path,
+        "relay_url":   f"http://localhost:{APP_PORT}/relay" if _relay_ready else "",
     }
 
 
 @app.post(f"{API_PREFIX}/sync/setup")
 async def api_sync_setup(request: Request):
     """
-    Host setup: register the current character's corp on the relay.
-    Creates a permanent room code for the corp and returns it.
+    Host setup: register the current character's corp on a relay and get a room code.
 
-    Body: { relay_url? }  — defaults to DEFAULT_RELAY_URL
+    Body: { mode?, relay_url? }
+      mode = "self"     → embedded relay (no external server needed)
+      mode = "external" → use relay_url (default DEFAULT_RELAY_URL)
     """
     body = await request.json()
-    relay_url = _validate_relay_url(body.get("relay_url") or DEFAULT_RELAY_URL)
+    mode = str(body.get("mode") or "external").strip().lower()
 
     chars = eve_list_characters(LOCAL_USER_ID)
     if not chars:
@@ -5822,45 +5928,64 @@ async def api_sync_setup(request: Request):
     if not corp_id:
         raise HTTPException(status_code=400, detail="Could not look up your corporation from ESI")
 
-    # Register with relay
-    try:
-        import httpx
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(
-                relay_url + "/register",
-                json={
-                    "corp_id":      corp_id,
-                    "corp_name":    corp_name,
-                    "character_id": cid,
-                    "char_name":    char_name,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail=f"Could not reach relay: {exc}")
+    if mode == "self":
+        # ── Self-host mode: embedded relay ───────────────────────────────────
+        # Ensure the embedded relay is running inside this process
+        from relay_server import _relay_ready
+        if not _relay_ready:
+            relay_db = os.path.join(os.path.dirname(_db_path()), "relay.db")
+            _relay_server_init(relay_db)
+            await _relay_server_bg()
 
-    room_code = data.get("room_code", "")
-    token     = data.get("token", "")
+        # Call relay functions directly — no HTTP round-trip needed
+        relay_url = f"http://localhost:{APP_PORT}/relay"
+        room_code = _relay_get_room(corp_id, corp_name)
+        token     = _relay_make_token(corp_id, cid, room_code, char_name)
 
-    # Persist relay credentials
-    _sync_cfg_set("sync_url",       relay_url)
-    _sync_cfg_set("sync_token",     token)
-    _sync_cfg_set("sync_room_code", room_code)
-    _sync_cfg_set("sync_corp_id",   str(corp_id))
-    _sync_cfg_set("sync_corp_name", corp_name)
-    _sync_cfg_set("sync_is_admin",  "1")
+    else:
+        # ── External relay mode ───────────────────────────────────────────────
+        relay_url = _validate_relay_url(body.get("relay_url") or DEFAULT_RELAY_URL)
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    relay_url + "/register",
+                    json={
+                        "corp_id":      corp_id,
+                        "corp_name":    corp_name,
+                        "character_id": cid,
+                        "char_name":    char_name,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"Could not reach relay: {exc}")
+
+        room_code = data.get("room_code", "")
+        token     = data.get("token", "")
+
+    # Persist relay credentials (+ mode so we know on next startup)
+    _sync_cfg_set("sync_url",          relay_url)
+    _sync_cfg_set("sync_token",        token)
+    _sync_cfg_set("sync_room_code",    room_code)
+    _sync_cfg_set("sync_corp_id",      str(corp_id))
+    _sync_cfg_set("sync_corp_name",    corp_name)
+    _sync_cfg_set("sync_is_admin",     "1")
     _sync_cfg_set("sync_invite_token", "")
+    _sync_cfg_set("sync_mode",         mode)
 
     # (Re-)connect relay WS
     await _relay.connect(relay_url, room_code, token, on_event=_relay_on_event)
 
     return {
         "ok":        True,
+        "mode":      mode,
         "room_code": room_code,
         "corp_name": corp_name,
         "corp_id":   corp_id,
         "character": char_name,
+        "relay_url": relay_url,
     }
 
 
@@ -5873,8 +5998,16 @@ async def api_sync_join(request: Request):
     Body: { room_code, relay_url? }  — relay_url defaults to DEFAULT_RELAY_URL
     """
     body = await request.json()
-    room_code = (body.get("room_code") or "").strip().upper()
-    relay_url = _validate_relay_url(body.get("relay_url") or DEFAULT_RELAY_URL)
+    room_code  = (body.get("room_code") or "").strip().upper()
+    raw_url    = (body.get("relay_url") or "").strip()
+
+    if not raw_url:
+        # If the member doesn't supply a relay URL, use the one saved from a
+        # previous connection (e.g. they were already on a self-hosted relay)
+        # before falling back to the developer's relay.
+        raw_url = _sync_cfg_get("sync_url") or DEFAULT_RELAY_URL
+
+    relay_url = _validate_relay_url(raw_url)
 
     if not room_code:
         raise HTTPException(status_code=400, detail="room_code is required (format: SNEK-XXXX)")
@@ -5904,13 +6037,14 @@ async def api_sync_join(request: Request):
     corp_name = data.get("corp_name", "")
 
     # Persist credentials
-    _sync_cfg_set("sync_url",       relay_url)
-    _sync_cfg_set("sync_token",     token)
-    _sync_cfg_set("sync_room_code", room_code)
-    _sync_cfg_set("sync_corp_id",   str(corp_id))
-    _sync_cfg_set("sync_corp_name", corp_name)
-    _sync_cfg_set("sync_is_admin",  "0")
+    _sync_cfg_set("sync_url",          relay_url)
+    _sync_cfg_set("sync_token",        token)
+    _sync_cfg_set("sync_room_code",    room_code)
+    _sync_cfg_set("sync_corp_id",      str(corp_id))
+    _sync_cfg_set("sync_corp_name",    corp_name)
+    _sync_cfg_set("sync_is_admin",     "0")
     _sync_cfg_set("sync_invite_token", "")
+    _sync_cfg_set("sync_mode",         "external")  # members always use an external relay URL
 
     # Connect relay WS
     await _relay.connect(relay_url, room_code, token, on_event=_relay_on_event)

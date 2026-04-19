@@ -288,24 +288,34 @@
   </div>
   <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">
     Share live navigation, fits, and skill plans with corp members in real time.
-    One person hosts (creates a room code), everyone else joins with that code.
+    One person hosts — everyone else joins with the room code.
   </div>
 
   <!-- Connected state -->
   <div id="syncConnected" style="display:none;">
     <div style="padding:12px 14px;border-radius:10px;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.18);margin-bottom:12px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
         <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:none;stroke:#22c55e;stroke-width:2.5;flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
         <span style="font-weight:600;font-size:13px;color:#22c55e;">Connected</span>
         <span id="syncCorpName" style="font-size:12px;color:var(--muted);"></span>
+        <span id="syncModeBadge" style="font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(50,182,255,.12);color:var(--accent);margin-left:auto;"></span>
       </div>
-      <!-- Room code (shown when admin — share this with corpmates) -->
-      <div id="syncRoomCodeRow" style="display:none;">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Room Code — share with corpmates to join</div>
+      <!-- Room code (admin only) -->
+      <div id="syncRoomCodeRow" style="display:none;margin-bottom:8px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Room Code — share with corpmates</div>
         <div style="display:flex;align-items:center;gap:8px;">
           <span id="syncRoomCodeDisplay" class="mono" style="font-size:16px;letter-spacing:.14em;font-weight:700;"></span>
           <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;" onclick="copyRoomCode()">Copy</button>
         </div>
+      </div>
+      <!-- Self-host: relay URL for members (admin only + mode=self) -->
+      <div id="syncRelayUrlRow" style="display:none;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Your relay URL — share this with corpmates alongside the room code</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span id="syncRelayUrlDisplay" class="mono" style="font-size:12px;color:var(--accent);word-break:break-all;"></span>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;" onclick="copyRelayUrl()">Copy</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:5px;">⚠ Port-forward <strong id="syncRelayPort"></strong> in your router for internet access.</div>
       </div>
     </div>
     <button class="btn btn-ghost" style="font-size:12px;color:#ef4444;border-color:rgba(239,68,68,.2);" onclick="disconnectSync()">Disconnect</button>
@@ -328,47 +338,89 @@
 
 <!-- ── Host Setup Modal ──────────────────────────────────────────────────── -->
 <div id="syncSetupModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.80);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
-  <div style="background:#0f1117;border:1px solid rgba(50,182,255,.18);border-radius:16px;padding:28px 30px;width:460px;max-width:calc(100vw - 32px);position:relative;">
+  <div style="background:#0f1117;border:1px solid rgba(50,182,255,.18);border-radius:16px;padding:28px 30px;width:500px;max-width:calc(100vw - 32px);position:relative;">
     <button onclick="closeSetupModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">×</button>
 
     <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Host Corp Sharing</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
-      This registers your corp on the relay server and gives you a <strong style="color:var(--text);">room code</strong> (SNEK-XXXX).
-      Share the code with corpmates so they can join.
+    <div style="font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6;">
+      Choose how you want to host. One person hosts — everyone else joins with the room code.
     </div>
 
-    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Relay Server URL</label>
-    <input id="setupRelayUrl" type="text" placeholder="http://insight.stellarforge.nexus/share"
-      style="width:100%;box-sizing:border-box;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:monospace;" />
-    <div style="font-size:11px;color:var(--muted);margin-top:5px;margin-bottom:18px;">Leave blank to use the default shared relay.</div>
+    <!-- Mode tabs -->
+    <div style="display:flex;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,.1);margin-bottom:20px;">
+      <button id="tabSelfBtn" onclick="setHostMode('self')"
+        style="flex:1;padding:10px 0;background:rgba(50,182,255,.12);border:none;color:var(--accent);font-size:13px;font-weight:600;cursor:pointer;border-right:1px solid rgba(255,255,255,.1);">
+        📡 Use This Device
+      </button>
+      <button id="tabExternalBtn" onclick="setHostMode('external')"
+        style="flex:1;padding:10px 0;background:none;border:none;color:var(--muted);font-size:13px;font-weight:500;cursor:pointer;">
+        🌐 External Server
+      </button>
+    </div>
+
+    <!-- Self-host panel -->
+    <div id="selfHostPanel">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+        The relay runs <strong style="color:var(--text);">inside this app</strong> — no external server needed.
+        Corp members connect directly to your computer using the URL below.
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Your relay URL (share with corpmates alongside the room code)</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span id="selfRelayUrlDisplay" class="mono" style="font-size:12px;color:var(--accent);word-break:break-all;">Detecting…</span>
+          <button class="btn btn-ghost" style="font-size:11px;padding:4px 9px;" onclick="copySelfRelayUrl()">Copy</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.5;">
+        ℹ️ This works on your local network automatically.
+        For internet access, forward <strong id="selfRelayPortDisplay"></strong> in your router.
+        Members will need <em>both</em> the room code and this URL.
+      </div>
+    </div>
+
+    <!-- External server panel -->
+    <div id="externalPanel" style="display:none;">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+        Connect to a separately hosted relay server (e.g. your own VPS or a friend's server running relay_server.py).
+      </div>
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Relay Server URL</label>
+      <input id="setupRelayUrl" type="text" placeholder="https://yourserver.example.com/relay"
+        style="width:100%;box-sizing:border-box;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:13px;outline:none;font-family:monospace;" />
+      <div style="font-size:11px;color:var(--muted);margin-top:5px;margin-bottom:16px;">Must be HTTPS for public servers.</div>
+    </div>
 
     <div id="setupModalStatus" style="font-size:12px;min-height:1.4em;margin-bottom:12px;text-align:center;"></div>
 
     <div style="display:flex;gap:10px;justify-content:flex-end;">
       <button class="btn btn-ghost" onclick="closeSetupModal()">Cancel</button>
-      <button class="btn" id="setupRegisterBtn" onclick="doHostSetup()">Register My Corp →</button>
+      <button class="btn" id="setupRegisterBtn" onclick="doHostSetup()">Start Hosting →</button>
     </div>
   </div>
 </div>
 
 <!-- ── Join Modal (member) ──────────────────────────────────────────────── -->
 <div id="syncJoinModal" style="display:none;position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,0.80);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
-  <div style="background:#0f1117;border:1px solid rgba(50,182,255,.18);border-radius:16px;padding:28px 30px;width:440px;max-width:calc(100vw - 32px);position:relative;">
+  <div style="background:#0f1117;border:1px solid rgba(50,182,255,.18);border-radius:16px;padding:28px 30px;width:460px;max-width:calc(100vw - 32px);position:relative;">
     <button onclick="closeJoinModal()" style="position:absolute;top:14px;right:16px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;">×</button>
 
     <div style="font-size:17px;font-weight:700;margin-bottom:4px;">Join Corp Sharing</div>
     <div style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6;">
-      Enter the <strong style="color:var(--text);">room code</strong> your corp host shared with you.
+      Your corp host will give you a <strong style="color:var(--text);">room code</strong> (SNEK-XXXX).
+      If they're self-hosting they'll also give you a <strong style="color:var(--text);">relay URL</strong>.
     </div>
 
     <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Room Code</label>
     <input id="joinRoomCode" type="text" placeholder="SNEK-XXXX"
-      style="width:100%;box-sizing:border-box;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:16px;outline:none;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px;"
+      style="width:100%;box-sizing:border-box;padding:10px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:16px;outline:none;font-family:monospace;letter-spacing:.1em;text-transform:uppercase;margin-bottom:14px;"
       oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')doJoin()" />
 
-    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;">Relay Server URL <span style="font-weight:400;color:var(--muted);">(optional — leave blank for default)</span></label>
-    <input id="joinRelayUrl" type="text" placeholder="http://insight.stellarforge.nexus/share"
-      style="width:100%;box-sizing:border-box;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:12px;outline:none;font-family:monospace;margin-bottom:14px;" />
+    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">
+      Relay URL
+      <span style="font-weight:400;color:var(--muted);">(only if your host gave you one)</span>
+    </label>
+    <input id="joinRelayUrl" type="text" placeholder="http://192.168.x.x:7742/relay  or  https://yourserver.com/relay"
+      style="width:100%;box-sizing:border-box;padding:9px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:8px;color:var(--text);font-size:12px;outline:none;font-family:monospace;margin-bottom:6px;" />
+    <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Leave blank only if your host is using a shared hosted relay.</div>
 
     <div id="joinStatus" style="font-size:12px;min-height:1.4em;margin-bottom:12px;text-align:center;"></div>
 
@@ -669,21 +721,82 @@ async function loadSyncStatus(){
       document.getElementById('syncDisconnected').style.display = 'none';
       const corpName = d.corp_name ? '— ' + d.corp_name : '';
       document.getElementById('syncCorpName').textContent = corpName;
+
+      // Mode badge
+      const badge = document.getElementById('syncModeBadge');
+      if(badge){
+        if(d.sync_mode === 'self'){
+          badge.textContent = '📡 Self-hosted';
+          badge.style.background = 'rgba(139,92,246,.18)';
+          badge.style.color = '#a78bfa';
+        } else {
+          badge.textContent = '🌐 External relay';
+          badge.style.background = 'rgba(14,165,233,.13)';
+          badge.style.color = '#38bdf8';
+        }
+        badge.style.display = 'inline-block';
+      }
+
+      // Room code (admin only)
       if(d.is_admin && d.room_code){
         document.getElementById('syncRoomCodeRow').style.display = '';
         document.getElementById('syncRoomCodeDisplay').textContent = d.room_code;
       } else {
         document.getElementById('syncRoomCodeRow').style.display = 'none';
       }
+
+      // Relay URL row (admin + self-host only — shows LAN address for corpmates)
+      const relayRow = document.getElementById('syncRelayUrlRow');
+      const relayDisp = document.getElementById('syncRelayUrlDisplay');
+      const relayPortEl = document.getElementById('syncRelayPort');
+      if(relayRow && d.is_admin && d.sync_mode === 'self'){
+        // relay_lan_url is the LAN-accessible URL, e.g. "http://192.168.1.5:7742/relay"
+        const displayUrl = d.relay_lan_url || d.url || '';
+        if(relayDisp) relayDisp.textContent = displayUrl;
+        if(relayPortEl){
+          try {
+            const portNum = new URL(displayUrl).port;
+            relayPortEl.textContent = portNum ? portNum : '';
+          } catch(e){ relayPortEl.textContent = ''; }
+        }
+        relayRow.style.display = '';
+      } else if(relayRow){
+        relayRow.style.display = 'none';
+      }
     } else {
       document.getElementById('syncConnected').style.display = 'none';
       document.getElementById('syncDisconnected').style.display = '';
+      const badge = document.getElementById('syncModeBadge');
+      if(badge) badge.style.display = 'none';
     }
   }catch(e){}
 }
 
 function copyRoomCode(){
   const text = document.getElementById('syncRoomCodeDisplay')?.textContent?.trim();
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(()=>btn.textContent=orig, 1500);
+  });
+}
+
+function copyRelayUrl(){
+  const text = document.getElementById('syncRelayUrlDisplay')?.textContent?.trim();
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(()=>btn.textContent=orig, 1500);
+  });
+}
+
+function copySelfRelayUrl(){
+  const el = document.getElementById('selfRelayUrlDisplay');
+  const text = el?.textContent?.trim();
   if(!text) return;
   navigator.clipboard.writeText(text).then(()=>{
     const btn = event.target;
@@ -702,30 +815,84 @@ async function disconnectSync(){
 }
 
 // ── Host setup modal ──────────────────────────────────
-function openSetupModal(){
+let _setupMode = 'self';   // 'self' | 'external'
+
+function setHostMode(mode){
+  _setupMode = mode;
+  const selfTab = document.getElementById('tabSelfBtn');
+  const extTab  = document.getElementById('tabExternalBtn');
+  const selfPanel = document.getElementById('selfHostPanel');
+  const extPanel  = document.getElementById('externalPanel');
+  if(mode === 'self'){
+    selfTab?.classList.add('prem-tab-active');
+    extTab?.classList.remove('prem-tab-active');
+    if(selfPanel) selfPanel.style.display = '';
+    if(extPanel)  extPanel.style.display  = 'none';
+  } else {
+    extTab?.classList.add('prem-tab-active');
+    selfTab?.classList.remove('prem-tab-active');
+    if(selfPanel) selfPanel.style.display = 'none';
+    if(extPanel)  extPanel.style.display  = '';
+  }
+  document.getElementById('setupModalStatus').textContent = '';
+  document.getElementById('setupRegisterBtn').disabled = false;
+}
+
+async function openSetupModal(){
+  _setupMode = 'self';
   document.getElementById('syncSetupModal').style.display = 'flex';
   document.getElementById('setupModalStatus').textContent = '';
   document.getElementById('setupRegisterBtn').disabled = false;
-  // Pre-fill default relay URL
-  const urlInput = document.getElementById('setupRelayUrl');
-  if(!urlInput.value) urlInput.value = 'http://insight.stellarforge.nexus/share';
+  setHostMode('self');
+
+  // Fetch LAN IP to display in self-host panel
+  try{
+    const r  = await fetch('/app/api/sync/local_ip');
+    const d  = await r.json();
+    const ip = d.lan_ip || '(detecting…)';
+    const port = d.port || 7742;
+    const relayUrl = d.relay_url_lan || `http://${ip}:${port}/relay`;
+    const el = document.getElementById('selfRelayUrlDisplay');
+    if(el) el.textContent = relayUrl;
+    const portEl = document.getElementById('selfRelayPortDisplay');
+    if(portEl) portEl.textContent = port;
+  }catch(e){
+    const el = document.getElementById('selfRelayUrlDisplay');
+    if(el) el.textContent = 'Could not detect LAN IP';
+  }
 }
+
 function closeSetupModal(){
   document.getElementById('syncSetupModal').style.display = 'none';
 }
 
 async function doHostSetup(){
-  const relayUrl = (document.getElementById('setupRelayUrl').value||'').trim() || 'http://insight.stellarforge.nexus/share';
   const statusEl = document.getElementById('setupModalStatus');
-  const btn = document.getElementById('setupRegisterBtn');
-  btn.disabled = true;
+  const btn      = document.getElementById('setupRegisterBtn');
+  btn.disabled   = true;
   statusEl.style.color = 'var(--muted)';
-  statusEl.textContent = 'Registering with relay…';
+
+  let body;
+  if(_setupMode === 'self'){
+    statusEl.textContent = 'Starting embedded relay on this device…';
+    body = { mode: 'self' };
+  } else {
+    const relayUrl = (document.getElementById('setupRelayUrl')?.value||'').trim();
+    if(!relayUrl){
+      statusEl.style.color = '#f59e0b';
+      statusEl.textContent = 'Enter the relay URL first.';
+      btn.disabled = false;
+      return;
+    }
+    statusEl.textContent = 'Registering with external relay…';
+    body = { mode: 'external', relay_url: relayUrl };
+  }
+
   try{
     const r = await fetch('/app/api/sync/setup', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({relay_url: relayUrl})
+      body: JSON.stringify(body)
     });
     const d = await r.json();
     if(!r.ok){
@@ -735,7 +902,8 @@ async function doHostSetup(){
       return;
     }
     statusEl.style.color = '#22c55e';
-    statusEl.innerHTML = `✓ Registered! Room code: <strong class="mono" style="font-size:15px;letter-spacing:.12em;">${d.room_code}</strong><br>
+    const modeLabel = _setupMode === 'self' ? 'Self-hosted relay ready!' : 'Registered!';
+    statusEl.innerHTML = `✓ ${modeLabel} Room code: <strong class="mono" style="font-size:15px;letter-spacing:.12em;">${d.room_code}</strong><br>
       <span style="font-size:11px;color:var(--muted);">Share this code with corpmates.</span>`;
     setTimeout(()=>{ closeSetupModal(); loadSyncStatus(); }, 2500);
   }catch(e){
@@ -750,8 +918,9 @@ function openJoinModal(){
   document.getElementById('syncJoinModal').style.display = 'flex';
   document.getElementById('joinStatus').textContent = '';
   document.getElementById('joinBtn').disabled = false;
-  const urlInput = document.getElementById('joinRelayUrl');
-  if(!urlInput.value) urlInput.value = 'http://insight.stellarforge.nexus/share';
+  // Clear fields — no default URL; relay URL is optional (host provides it)
+  document.getElementById('joinRoomCode').value = '';
+  document.getElementById('joinRelayUrl').value = '';
 }
 function closeJoinModal(){
   document.getElementById('syncJoinModal').style.display = 'none';
@@ -759,9 +928,9 @@ function closeJoinModal(){
 
 async function doJoin(){
   const roomCode = (document.getElementById('joinRoomCode').value||'').trim().toUpperCase();
-  const relayUrl = (document.getElementById('joinRelayUrl').value||'').trim() || 'http://insight.stellarforge.nexus/share';
+  const relayUrl = (document.getElementById('joinRelayUrl').value||'').trim();
   const statusEl = document.getElementById('joinStatus');
-  const btn = document.getElementById('joinBtn');
+  const btn      = document.getElementById('joinBtn');
   if(!roomCode){
     statusEl.style.color = '#f59e0b';
     statusEl.textContent = 'Enter a room code (format: SNEK-XXXX).';
@@ -771,10 +940,12 @@ async function doJoin(){
   statusEl.style.color = 'var(--muted)';
   statusEl.textContent = 'Joining relay…';
   try{
+    const payload = { room_code: roomCode };
+    if(relayUrl) payload.relay_url = relayUrl;   // omit if blank — server uses saved/default
     const r = await fetch('/app/api/sync/join', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({room_code: roomCode, relay_url: relayUrl})
+      body: JSON.stringify(payload)
     });
     const d = await r.json();
     if(!r.ok){

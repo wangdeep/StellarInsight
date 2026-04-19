@@ -92,10 +92,13 @@ DEPS=(
     "python-multipart>=0.0.9"
     "itsdangerous>=2.1.0"
     "starlette>=0.36.0"
+    "requests>=2.31.0"
     "aiohttp>=3.9.0"
     "httpx>=0.27.0"
     "websockets>=12.0"
     "cryptography>=42.0.0"
+    "bcrypt>=4.0.0"
+    "PyJWT[crypto]>=2.8.0"
 )
 
 info "Upgrading pip..."
@@ -156,6 +159,26 @@ tar -czf "$ARCHIVE" -C dist StellarInsight $([ "$PLATFORM" = "Linux" ] && echo "
 ASIZE=$(du -sh "$ARCHIVE" | cut -f1)
 ok "$ARCHIVE  ($ASIZE)"
 
+# -- Generate SHA-256 checksums (for installer integrity verification) --------
+info "Generating SHA-256 checksums..."
+BINARY_HASH="dist/StellarInsight.sha256"
+ARCHIVE_HASH="${ARCHIVE}.sha256"
+
+if command -v sha256sum &>/dev/null; then
+    sha256sum "dist/StellarInsight"          | awk '{print $1}' > "$BINARY_HASH"
+    sha256sum "$ARCHIVE"                      | awk '{print $1}' > "$ARCHIVE_HASH"
+elif command -v shasum &>/dev/null; then
+    shasum -a 256 "dist/StellarInsight"       | awk '{print $1}' > "$BINARY_HASH"
+    shasum -a 256 "$ARCHIVE"                  | awk '{print $1}' > "$ARCHIVE_HASH"
+else
+    warn "sha256sum / shasum not found — skipping checksum generation"
+fi
+
+if [ -f "$BINARY_HASH" ]; then
+    ok "$BINARY_HASH"
+    ok "$ARCHIVE_HASH"
+fi
+
 # =============================================================================
 echo ""
 echo -e "${GREEN}========================================================${NC}"
@@ -166,5 +189,6 @@ echo -e "  Archive  ->  $ARCHIVE"
 if [ "$PLATFORM" = "Linux" ]; then
 echo -e "  Launcher ->  dist/StellarInsight.desktop"
 fi
+echo -e "  Checksums -> $BINARY_HASH / $ARCHIVE_HASH"
 echo -e "${GREEN}========================================================${NC}"
 echo ""
