@@ -120,7 +120,193 @@ _TTL_MEDIUM      = 60 * 10    # 10 m — assets, PI, structures
 _TTL_FAST        = 60 * 3     # 3 m  — industry jobs, orders
 _TTL_WALLET      = 60 * 2     # 2 m  — wallet balance, journal
 _TTL_SKILLQUEUE  = 60 * 5     # 5 m  — skill queue
-_TTL_ZKILL       = 60 * 15    # 15 m — zkillboard per-system intel
+_TTL_ZKILL_ACTIVE  = 3600 * 2   # 2 h  — zkill for actively visited/viewed systems
+_TTL_ZKILL_PASSIVE = 3600 * 24  # 24 h — zkill for cold (unvisited) systems
+_ZKILL_REFRESH_GAP = 5          # minimum seconds between API calls (be polite)
+
+# ── zKill persistent cache helpers ────────────────────────────────────────────
+# Stored in xylon_eve.db so data survives restarts.
+# Background task refreshes active systems; API is never hit per page-load.
+
+def _ensure_zkill_cache(con: sqlite3.Connection) -> None:
+    con.execute(
+        """CREATE TABLE IF NOT EXISTS zkill_cache (
+            system_id  INTEGER PRIMARY KEY,
+            fetched_at REAL    NOT NULL,
+            data_json  TEXT    NOT NULL DEFAULT '{}'
+        )"""
+    )
+    con.commit()
+
+
+def _zkill_db_get(system_id: int) -> Optional[dict]:
+    """Return cached zkill_info dict for a system, regardless of age (caller checks TTL)."""
+    try:
+        con = _connect()
+        _ensure_zkill_cache(con)
+        row = con.execute(
+            "SELECT data_json, fetched_at FROM zkill_cache WHERE system_id=?",
+            (system_id,),
+        ).fetchone()
+        con.close()
+        if not row:
+            return None
+        return {"data": json.loads(row["data_json"]), "fetched_at": float(row["fetched_at"])}
+    except Exception:
+        return None
+
+
+def _zkill_db_set(system_id: int, info: dict) -> None:
+    try:
+        con = _connect()
+        _ensure_zkill_cache(con)
+        con.execute(
+            "INSERT OR REPLACE INTO zkill_cache (system_id, fetched_at, data_json) VALUES (?,?,?)",
+            (system_id, time.time(), json.dumps(info)),
+        )
+        con.commit()
+        con.close()
+    except Exception:
+        pass
+
+
+# Systems viewed in navigator this session — background task prioritises these.
+_zkill_viewed_systems: set = set()
+# Asyncio queue of system_ids to refresh (populated by stale-while-revalidate hits).
+_zkill_refresh_queue: Optional[asyncio.Queue] = None
+
+
+def _zkill_parse_response(zkills: list) -> dict:
+    """Parse a raw zkillboard JSON list into the zkill_info summary dict."""
+    from collections import Counter as _Counter
+    kill_count   = len(zkills)
+    total_isk    = 0.0
+    corp_presence = _Counter()
+    ship_types    = _Counter()
+    hour_kills    = _Counter()
+    for km in zkills[:40]:
+        zkb = km.get("zkb", {})
+        total_isk += zkb.get("totalValue", 0)
+        kill_time  = km.get("killmail_time", "")
+        if kill_time and len(kill_time) >= 13:
+            try:
+                hour_kills[int(kill_time[11:13])] += 1
+            except Exception:
+                pass
+        for atk in (km.get("attackers") or [])[:5]:
+            if atk.get("corporation_id"):
+                corp_presence[atk["corporation_id"]] += 1
+            if atk.get("ship_type_id"):
+                ship_types[atk["ship_type_id"]] += 1
+    danger = 0
+    if kill_count >= 1:  danger = 1
+    if kill_count >= 3:  danger = 2
+    if kill_count >= 8:  danger = 3
+    if kill_count >= 15: danger = 4
+    if kill_count >= 30: danger = 5
+    return {
+        "kills_24h":          kill_count,
+        "last_kill":          zkills[0].get("killmail_time", "") if zkills else "",
+        "total_isk_destroyed": round(total_isk, 0),
+        "top_corps":          [cid for cid, _ in corp_presence.most_common(5)],
+        "top_ship_types":     [sid for sid, _ in ship_types.most_common(5)],
+        "peak_hour":          hour_kills.most_common(1)[0][0] if hour_kills else None,
+        "danger":             danger,
+    }
+
+
+async def _zkill_fetch_system(system_id: int) -> Optional[dict]:
+    """Hit the zKill API for one system and return the parsed summary, or None on error."""
+    try:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=8)
+        ) as session:
+            async with session.get(
+                f"https://zkillboard.com/api/kills/systemID/{system_id}/pastSeconds/86400/",
+                headers={"User-Agent": "StellarInsight/1.0", "Accept-Encoding": "gzip"},
+            ) as resp:
+                if resp.status == 200:
+                    zkills = await resp.json(content_type=None)
+                    if isinstance(zkills, list):
+                        return _zkill_parse_response(zkills)
+    except Exception:
+        pass
+    return None
+
+
+async def _zkill_refresh_task() -> None:
+    """
+    Background task: keep zKill data fresh for active systems without hammering the API.
+
+    Active systems = those visited ingame (nav_movements last 24 h)
+                   + those viewed in the navigator this session (_zkill_viewed_systems).
+
+    Refresh cadence:
+      • Active systems:  every 2 hours (_TTL_ZKILL_ACTIVE)
+      • Queued (on-demand from stale page hits): processed first, 1 req per 5 s
+      • Passive sweep:   processes any remaining stale active-system entries
+    """
+    global _zkill_refresh_queue
+    _zkill_refresh_queue = asyncio.Queue()
+    await asyncio.sleep(30)  # let the app finish starting up
+
+    logger.info("[ZKILL] Persistent cache refresh task started")
+
+    while True:
+        try:
+            now = time.time()
+
+            # Build the set of currently active systems
+            active: set = set(_zkill_viewed_systems)
+            try:
+                con = _connect()
+                rows = con.execute(
+                    """SELECT DISTINCT system_id FROM nav_movements
+                       WHERE timestamp > datetime('now', '-24 hours')"""
+                ).fetchall()
+                con.close()
+                for r in rows:
+                    if r["system_id"]:
+                        active.add(int(r["system_id"]))
+            except Exception:
+                pass
+
+            # Find stale active systems (not in cache, or cache older than _TTL_ZKILL_ACTIVE)
+            stale = []
+            for sid in active:
+                cached = _zkill_db_get(sid)
+                if cached is None or (now - cached["fetched_at"]) > _TTL_ZKILL_ACTIVE:
+                    stale.append(sid)
+
+            # Process on-demand queue entries first (page views that found stale cache)
+            queue_batch = []
+            while not _zkill_refresh_queue.empty() and len(queue_batch) < 20:
+                try:
+                    sid = _zkill_refresh_queue.get_nowait()
+                    if sid not in queue_batch:
+                        queue_batch.append(sid)
+                except asyncio.QueueEmpty:
+                    break
+
+            # Combine: queue first (user is looking at these), then passive stale sweep
+            to_refresh = queue_batch + [s for s in stale if s not in queue_batch]
+
+            for sid in to_refresh:
+                info = await _zkill_fetch_system(sid)
+                if info is not None:
+                    _zkill_db_set(sid, info)
+                    logger.debug("[ZKILL] Refreshed system %d — %d kills", sid, info.get("kills_24h", 0))
+                else:
+                    # Store empty result so we don't retry too soon
+                    _zkill_db_set(sid, {})
+                await asyncio.sleep(_ZKILL_REFRESH_GAP)
+
+        except Exception as exc:
+            logger.error("[ZKILL] Refresh task error: %s", exc)
+
+        # Sleep 60 s before next sweep (individual gaps between requests are above)
+        await asyncio.sleep(60)
+
 
 def _resp_cache_get(key: str, ttl: int) -> Optional[dict]:
     """Return cached ESI response dict if still fresh, else None."""
@@ -3614,61 +3800,22 @@ async def api_nav_system_detail(system_id: int, request: Request):
         if not jspace_info:
             jspace_info = {"class": "Unknown", "statics": [], "effect": None, "source": "none"}
 
-    zkill_info = None
-    _zk_ck = f"resp:zkill_system:{system_id}"
-    _zk_hit = _resp_cache_get(_zk_ck, _TTL_ZKILL)
-    if _zk_hit is not None:
-        zkill_info = _zk_hit.get('zkill_info')
-    else:
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=3)) as session:
-                async with session.get(
-                    f"https://zkillboard.com/api/kills/systemID/{system_id}/pastSeconds/86400/",
-                    headers={"User-Agent": "XylonEVE", "Accept-Encoding": "gzip"}
-                ) as resp:
-                    if resp.status == 200:
-                        zkills = await resp.json(content_type=None)
-                        if isinstance(zkills, list):
-                            kill_count = len(zkills)
-                            corp_presence = Counter()
-                            ship_types = Counter()
-                            total_isk = 0.0
-                            hour_kills = Counter()
-                            for km in zkills[:20]:
-                                zkb = km.get("zkb", {})
-                                total_isk += zkb.get("totalValue", 0)
-                                kill_time = km.get("killmail_time", "")
-                                if kill_time and "T" in kill_time:
-                                    try:
-                                        hour = int(kill_time.split("T")[1][:2])
-                                        hour_kills[hour] += 1
-                                    except Exception:
-                                        pass
-                                victim = km.get("victim", {})
-                                ship_id = victim.get("ship_type_id")
-                                if ship_id:
-                                    ship_types[ship_id] += 1
-                                vc = victim.get("corporation_id")
-                                if vc:
-                                    corp_presence[vc] += 1
-                            danger = 0
-                            if kill_count >= 1: danger = 1
-                            if kill_count >= 3: danger = 2
-                            if kill_count >= 8: danger = 3
-                            if kill_count >= 15: danger = 4
-                            if kill_count >= 30: danger = 5
-                            zkill_info = {
-                                "kills_24h": kill_count,
-                                "last_kill": zkills[0].get("killmail_time", "") if zkills else "",
-                                "total_isk_destroyed": round(total_isk, 0),
-                                "top_corps": [cid for cid, _ in corp_presence.most_common(5)],
-                                "top_ship_types": [sid for sid, _ in ship_types.most_common(5)],
-                                "peak_hours": [h for h, _ in hour_kills.most_common(3)],
-                                "danger_level": danger,
-                            }
-        except Exception:
-            pass
-        _resp_cache_set(_zk_ck, {'zkill_info': zkill_info}, _TTL_ZKILL)
+    # ── zKill: stale-while-revalidate from persistent SQLite cache ───────────
+    # Mark this system viewed so the background task refreshes it proactively.
+    _zkill_viewed_systems.add(system_id)
+
+    zkill_cached = _zkill_db_get(system_id)
+    zkill_info   = zkill_cached["data"] if (zkill_cached and zkill_cached.get("data")) else None
+    zkill_age    = (time.time() - zkill_cached["fetched_at"]) if zkill_cached else float("inf")
+
+    if zkill_age > _TTL_ZKILL_ACTIVE:
+        # Cache is stale (or missing) — serve whatever we have and queue a refresh.
+        # The background task will fetch and persist without blocking this request.
+        if _zkill_refresh_queue is not None:
+            try:
+                _zkill_refresh_queue.put_nowait(system_id)
+            except asyncio.QueueFull:
+                pass
 
     sec = system_info.get("security_status", 0.0)
     celestials = {}
@@ -5543,6 +5690,7 @@ async def _location_track_task():
 async def _start_background_tasks():
     # M-7: wire up Fernet key auto-generation from SQLite
     set_token_key_db(_db_path())
+    asyncio.create_task(_zkill_refresh_task())
 
     # Auto-start embedded relay if previously configured as self-host
     if (_sync_cfg_get("sync_mode") or "") == "self":

@@ -197,20 +197,31 @@ def pilot_stats(pilot_name: str) -> str:
         return f"❌ Pilot stats failed: {e}"
 
 
+# In-memory cache for character zkill stats: {char_id: (fetched_at, value)}
+_char_stats_cache: dict = {}
+_CHAR_STATS_TTL = 3600  # 1 hour — character danger ratio doesn't change minute-to-minute
+
+
 def _zkill_danger_ratio(char_id: int) -> Optional[float]:
-    """zKillboard danger ratio is not guaranteed in all responses; best-effort."""
+    """zKillboard danger ratio — cached in memory for 1 hour to avoid hammering the API."""
+    cid = int(char_id)
+    cached = _char_stats_cache.get(cid)
+    if cached and (time.time() - cached[0]) < _CHAR_STATS_TTL:
+        return cached[1]
     try:
-        # zKill JSON endpoints vary; this one usually returns summary fields.
-        url = f"https://zkillboard.com/api/stats/characterID/{int(char_id)}/"
-        r = requests.get(url, headers={"User-Agent": "XylonBot"}, timeout=10)
+        url = f"https://zkillboard.com/api/stats/characterID/{cid}/"
+        r = requests.get(url, headers={"User-Agent": "StellarInsight/1.0"}, timeout=10)
         if r.status_code != 200:
+            _char_stats_cache[cid] = (time.time(), None)
             return None
         data = r.json() or {}
-        # Many stats payloads include 'dangerRatio' or similar.
+        ratio = None
         for key in ("dangerRatio", "danger_ratio", "danger"):
             if key in data and isinstance(data[key], (int, float)):
-                return float(data[key])
-        return None
+                ratio = float(data[key])
+                break
+        _char_stats_cache[cid] = (time.time(), ratio)
+        return ratio
     except Exception:
         return None
 

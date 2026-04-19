@@ -31,7 +31,13 @@ EVE_LOCAL_RADIUS_JUMPS = int(os.getenv("EVE_LOCAL_RADIUS_JUMPS", "6"))
 EVE_DEFAULT_REGION = int(os.getenv("EVE_DEFAULT_REGION", "10000002"))  # The Forge
 EVE_JITA_STATION_ID = int(os.getenv("EVE_JITA_STATION_ID", "60003760"))  # Jita IV - Moon 4 - Caldari Navy Assembly Plant
 
-_UA = "XylonEVE/1.0 (+StellarForgeNexus)"
+_UA = "StellarInsight/1.0"
+
+# ── zKill in-memory cache ─────────────────────────────────────────────────────
+# Keyed by (character_id, "kills"/"losses"); value is (fetched_at, list).
+# 1-hour TTL — character activity doesn't flip faster than that.
+_zkill_char_cache: dict = {}
+_ZKILL_CHAR_TTL = 3600
 
 _session = requests.Session()
 _session.headers.update({"User-Agent": _UA, "Accept": "application/json"})
@@ -198,16 +204,27 @@ def zkill_character_url(character_id: int) -> str:
     return f"https://zkillboard.com/character/{character_id}/"
 
 def zkill_recent_kills(character_id: int, limit: int = 50) -> List[dict]:
-    # Unofficial but commonly used endpoint:
-    # https://zkillboard.com/api/kills/characterID/<id>/
-    url = f"https://zkillboard.com/api/kills/characterID/{character_id}/"
-    data = _zkill_api(url)
-    return (data or [])[:limit]
+    """Return recent kills for a character, cached for 1 hour."""
+    key = (int(character_id), "kills")
+    cached = _zkill_char_cache.get(key)
+    if cached and (time.time() - cached[0]) < _ZKILL_CHAR_TTL:
+        return cached[1][:limit]
+    url  = f"https://zkillboard.com/api/kills/characterID/{character_id}/"
+    data = _zkill_api(url) or []
+    _zkill_char_cache[key] = (time.time(), data)
+    return data[:limit]
+
 
 def zkill_recent_losses(character_id: int, limit: int = 50) -> List[dict]:
-    url = f"https://zkillboard.com/api/losses/characterID/{character_id}/"
-    data = _zkill_api(url)
-    return (data or [])[:limit]
+    """Return recent losses for a character, cached for 1 hour."""
+    key = (int(character_id), "losses")
+    cached = _zkill_char_cache.get(key)
+    if cached and (time.time() - cached[0]) < _ZKILL_CHAR_TTL:
+        return cached[1][:limit]
+    url  = f"https://zkillboard.com/api/losses/characterID/{character_id}/"
+    data = _zkill_api(url) or []
+    _zkill_char_cache[key] = (time.time(), data)
+    return data[:limit]
 
 
 def _parse_kill_time(k: dict) -> Optional[float]:
