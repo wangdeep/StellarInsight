@@ -1035,103 +1035,320 @@ async function showSysDet(s){
     _applyNebulaToPanelEl(_nebF2);
   }
 
-  // Security & class
-  const secClass = d.security_class || (isWH?'Wormhole':'—');
-  const secNum   = d.security_status ?? s.sec_status;
-  const secColor = secNum!=null ? secCol(secNum) : 'var(--muted)';
-  const pilots   = np.length ? np.join(', ') : null;
-  const constel  = d.constellation?.name || '—';
-  const planetsN = d.planets_count ?? '—';
-  const stargatesN = d.stargates_count ?? '—';
-  const activity = d.activity || {};
-  const jinfo    = d.jspace;
-  const zkill    = d.zkill;
-  const sov      = d.sovereignty;
-  const fw       = d.fw_status;
-  const hubD     = d.hub_distances || {};
-  const neighbors= d.neighbors || [];
-  const stations = d.npc_stations || [];
-  const visitors = d.recent_visitors || [];
+  // ── Pull everything from the response ──────────────────────────────────────
+  const secClass  = d.security_class || (isWH?'Wormhole':'—');
+  const secNum    = d.security_status ?? s.sec_status;
+  const secColor  = secNum!=null ? secCol(secNum) : 'var(--muted)';
+  const pilots    = np.length ? np.join(', ') : null;
+  const region    = d.region_name || '';
+  const constel   = d.constellation?.name || '';
+  const activity  = d.activity || {};
+  const jinfo     = d.jspace;
+  const zkill     = d.zkill;
+  const sov       = d.sovereignty;
+  const fw        = d.fw_status;
+  const hubD      = d.hub_distances || {};
+  const neighbors = d.neighbors  || [];
+  const stations  = d.npc_stations || [];    // staStations (NPC)
+  const stationsSDE = d.npc_stations_sde || []; // mapDenormalize (includes player-built NPC anchors)
+  const visitors  = d.recent_visitors || [];
+  const planets   = d.planets || [];
+  const belts     = d.belts || [];
+  const moonsN    = d.moons_count || 0;
+  const iceBelts  = d.ice_belts || 0;
+  const star      = d.star || {};
+  const desc      = d.description || '';
+  const nearHS    = d.nearest_highsec;
+  const nearLS    = d.nearest_lowsec;
 
-  let rows = '';
+  // ── Helpers ─────────────────────────────────────────────────────────────
+  const SDsep = () => `<div style="height:1px;background:rgba(50,182,255,.08);margin:6px 0;"></div>`;
+  const SDhead = (txt, icon='') => `<div style="font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);opacity:.7;margin:8px 0 4px;">${icon?icon+' ':''}${esc(txt)}</div>`;
+  const SDrow = (lbl, val, col='var(--text)') =>
+    `<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:2px 0;font-size:11px;">
+       <span style="color:var(--muted);flex-shrink:0;margin-right:6px;">${lbl}</span>
+       <span style="color:${col};text-align:right;">${val}</span></div>`;
 
-  // Core stats
-  if(pilots) rows += _kv2('Pilots', pilots, 'var(--accent)');
-  if(secNum!=null) rows += _kv2('Security', `${Number(secNum).toFixed(1)} · ${secClass}`, secColor);
-  rows += _kv2('Constellation', constel);
-  if(planetsN!=='—') rows += _kv2('Planets / Gates', `${planetsN} / ${stargatesN}`);
+  const fmtISK = v => {
+    if(!v) return '0 ISK';
+    if(v>=1e12) return (v/1e12).toFixed(2)+'T';
+    if(v>=1e9)  return (v/1e9).toFixed(2)+'B';
+    if(v>=1e6)  return (v/1e6).toFixed(1)+'M';
+    return Math.round(v).toLocaleString();
+  };
+  const fmtNum = v => v!=null ? Number(v).toLocaleString() : '—';
+  const PI_COLOR = {
+    'Excellent':'#22c55e','Good':'#86efac','Medium':'#fbbf24','Poor':'#f97316','None':'#6b7280',
+    'excellent':'#22c55e','good':'#86efac','medium':'#fbbf24','poor':'#f97316','none':'#6b7280',
+    'unknown':'#6b7280'
+  };
+  const PLANET_ICON = {
+    'Barren':'🟤','Gas':'🟡','Ice':'🔵','Lava':'🔴','Oceanic':'💧',
+    'Plasma':'🟠','Shattered':'💥','Storm':'🌪','Temperate':'🟢'
+  };
+  const SPECTRAL_COLOR = {
+    'A0':'#b0c4de','A1':'#b0c4de','A2':'#b0c4de','A3':'#c0c8d8','A5':'#c8d0e0','A7':'#d8d8e8',
+    'B0':'#7090e8','B2':'#80a0ef','B5':'#90b0f0',
+    'F0':'#e8e8d8','F2':'#ece8d0','F5':'#f0ead8','F8':'#f4e8d0',
+    'G0':'#ffe080','G2':'#ffe870','G5':'#fff070','G8':'#fff888',
+    'K0':'#ffb840','K2':'#ffa830','K4':'#ff9820','K5':'#ff9010',
+    'M0':'#ff6020','M1':'#ff5018','M2':'#ff4010',
+    'K':'#ffb840','G':'#ffe080','F':'#e8e8d8','A':'#b0c4de',
+    'B':'#7090e8','M':'#ff6020','O':'#9090ff',
+  };
+  const specColor = sc => {
+    if(!sc) return '#aaa';
+    const prefix = sc.length>=2 ? sc.substring(0,2) : sc.substring(0,1);
+    return SPECTRAL_COLOR[prefix] || SPECTRAL_COLOR[sc.substring(0,1)] || '#aaa';
+  };
 
-  // WH-specific
+  let html = '';
+
+  // ── HEADER: location breadcrumb + live pilots ────────────────────────────
+  if(pilots){
+    html += `<div style="background:rgba(50,182,255,.07);border-radius:4px;padding:4px 8px;margin-bottom:6px;font-size:11px;color:var(--accent);">
+      👤 ${esc(pilots)}</div>`;
+  }
+  if(region || constel){
+    html += `<div style="font-size:10px;color:var(--muted);margin-bottom:4px;">${esc(region)}${region&&constel?' › ':''}${esc(constel)}</div>`;
+  }
+
+  // ── WORMHOLE DETAILS ─────────────────────────────────────────────────────
   if(jinfo){
-    if(jinfo.class) rows += _kv2('Class', jinfo.class, '#a855f7');
-    if(jinfo.effect) rows += _kv2('Effect', jinfo.effect, '#fbbf24');
-    if(jinfo.shattered) rows += _kv2('', '<span style="color:#f97316;font-weight:700;">⚡ Shattered</span>');
+    html += SDhead('Wormhole', '🕳');
+    if(jinfo.class) html += SDrow('Class', `<span style="color:#a855f7;font-weight:700;">${esc(jinfo.class)}</span>`);
+    if(jinfo.shattered) html += SDrow('', '<span style="color:#f97316;font-weight:700;">⚡ Shattered</span>');
+    if(jinfo.effect) html += SDrow('Effect', `<span style="color:#fbbf24;">${esc(jinfo.effect)}</span>`);
     if(jinfo.statics && jinfo.statics.length){
       const stats = jinfo.statics.map(st=>{
         const whi=WHT[st]||{};
-        return `<span style="background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);border-radius:3px;padding:1px 5px;font-size:10px;color:#c084fc;">${esc(st)}${whi.d?' → '+esc(whi.d):''}</span>`;
+        return `<span style="background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);border-radius:3px;padding:1px 5px;font-size:10px;color:#c084fc;">${esc(st)}${whi.d?' →'+esc(whi.d):''}</span>`;
       }).join(' ');
-      rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;display:flex;justify-content:space-between;align-items:center;">
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:11px;">
         <span style="color:var(--muted);">Statics</span><span style="display:flex;gap:3px;flex-wrap:wrap;">${stats}</span></div>`;
     }
+    if(jinfo.source) html += `<div style="font-size:9px;color:var(--muted);margin-top:2px;">Source: ${esc(jinfo.source)}</div>`;
+    html += SDsep();
   }
 
-  // Sovereignty / faction
-  if(sov){
-    if(sov.faction_name) rows += _kv2('Faction', sov.faction_name);
-    if(sov.alliance_name) rows += _kv2('Alliance', sov.alliance_name);
+  // ── SOVEREIGNTY / FACTION WARFARE ────────────────────────────────────────
+  if(sov && (sov.faction_name || sov.alliance_name || sov.corporation_id)){
+    html += SDhead('Sovereignty', '🏛');
+    if(sov.faction_name){
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;">
+        ${sov.faction_logo?`<img src="${esc(sov.faction_logo)}" style="width:20px;height:20px;border-radius:2px;" loading="lazy">`:''}
+        <span style="font-size:11px;">${esc(sov.faction_name)}</span></div>`;
+    }
+    if(sov.alliance_name){
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;">
+        ${sov.alliance_logo?`<img src="${esc(sov.alliance_logo)}" style="width:20px;height:20px;border-radius:2px;" loading="lazy">`:''}
+        <span style="font-size:11px;">${esc(sov.alliance_name)}</span></div>`;
+    }
+    if(sov.corporation_id && sov.corp_logo){
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;">
+        <img src="${esc(sov.corp_logo)}" style="width:16px;height:16px;border-radius:2px;" loading="lazy">
+        <span style="font-size:10px;color:var(--muted);">Corp ID ${sov.corporation_id}</span></div>`;
+    }
+    html += SDsep();
   }
-  if(fw && fw.occupier_faction_id) rows += _kv2('FW Occupier', fw.occupier_faction_id);
 
-  // Activity
-  if(activity.jumps||activity.ship_kills||activity.npc_kills){
-    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;display:flex;justify-content:space-between;">
-      <span style="color:var(--muted);">Activity (1h)</span>
-      <span style="display:flex;gap:8px;">
-        ${activity.jumps?`<span title="Jumps">🚀 ${activity.jumps}</span>`:''}
-        ${activity.ship_kills?`<span title="Ship kills" style="color:#ef4444;">💀 ${activity.ship_kills}</span>`:''}
-        ${activity.npc_kills?`<span title="NPC kills" style="color:var(--muted);">🤖 ${activity.npc_kills}</span>`:''}
-      </span></div>`;
+  if(fw && (fw.occupier_faction_name || fw.owner_faction_name)){
+    html += SDhead('Faction Warfare', '⚔️');
+    if(fw.owner_faction_name)    html += SDrow('Owner',    esc(fw.owner_faction_name));
+    if(fw.occupier_faction_name) html += SDrow('Occupier', esc(fw.occupier_faction_name),
+      fw.owner_faction_name===fw.occupier_faction_name?'#22c55e':'#f97316');
+    if(fw.contested) html += SDrow('Status', `<span style="color:${fw.contested==='uncontested'?'#22c55e':'#f97316'};text-transform:capitalize;">${esc(fw.contested)}</span>`);
+    if(fw.vp_pct!=null){
+      html += `<div style="margin:4px 0 2px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">
+          <span style="color:var(--muted);">Victory Points</span>
+          <span>${fmtNum(fw.victory_points)} / ${fmtNum(fw.victory_points_threshold)}</span></div>
+        <div style="height:4px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;">
+          <div style="width:${fw.vp_pct}%;height:100%;background:${fw.vp_pct>75?'#ef4444':fw.vp_pct>40?'#fbbf24':'#22c55e'};transition:width .3s;"></div>
+        </div></div>`;
+    }
+    html += SDsep();
   }
 
-  // zKill danger
+  // ── STAR ─────────────────────────────────────────────────────────────────
+  if(star.spectral_class || star.type_id){
+    html += SDhead('Star', '⭐');
+    const sc = star.spectral_class || '';
+    const sc0 = sc.length>=2?sc.substring(0,2):sc.substring(0,1);
+    if(sc){
+      html += `<div style="display:flex;align-items:center;gap:6px;padding:2px 0;">
+        <div style="width:14px;height:14px;border-radius:50%;background:${specColor(sc)};box-shadow:0 0 6px ${specColor(sc)}88;flex-shrink:0;"></div>
+        <span style="font-size:11px;font-weight:600;">${esc(sc)} &nbsp;<span style="font-weight:400;color:var(--muted);">spectral class</span></span></div>`;
+    }
+    if(star.temperature) html += SDrow('Temperature', `${fmtNum(star.temperature)} K`);
+    if(star.luminosity)  html += SDrow('Luminosity',  `${star.luminosity} L☉`);
+    if(star.radius){
+      const rs = (star.radius / 695700000).toFixed(2);
+      html += SDrow('Radius', `${fmtNum(star.radius)} m <span style="color:var(--muted);font-size:10px;">(${rs} R☉)</span>`);
+    }
+    if(star.age){
+      const gy = (star.age / 1e9).toFixed(2);
+      html += SDrow('Age', `${gy} Gy`);
+    }
+    html += SDsep();
+  }
+
+  // ── PLANETS ──────────────────────────────────────────────────────────────
+  if(planets.length){
+    html += SDhead(`Planets (${planets.length})`, '🌍');
+    html += `<div style="display:flex;flex-direction:column;gap:3px;">`;
+    planets.forEach(p=>{
+      const ptype = p.type || 'Unknown';
+      const icon = PLANET_ICON[ptype] || '🪐';
+      const piQ = p.pi_quality||'unknown';
+      const piQc = PI_COLOR[piQ]||'#6b7280';
+      const resources = p.pi_resources ? `<span style="color:var(--muted);font-size:9px;">${esc(p.pi_resources)}</span>` : '';
+      html += `<div style="display:flex;align-items:flex-start;gap:5px;padding:2px 0;border-bottom:1px solid rgba(50,182,255,.04);">
+        <span style="font-size:13px;line-height:1.2;">${icon}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:10px;font-weight:500;">${esc(p.name||ptype)}</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:1px;">
+            <span style="font-size:9px;color:${piQc};font-weight:600;text-transform:capitalize;">PI:${piQ}</span>
+            ${resources}
+          </div>
+        </div></div>`;
+    });
+    html += `</div>`;
+    html += SDsep();
+  }
+
+  // ── MOONS, BELTS, ICE ────────────────────────────────────────────────────
+  const hasCelestials = moonsN || belts.length || iceBelts;
+  if(hasCelestials){
+    html += SDhead('Celestials', '🌙');
+    html += `<div style="display:flex;gap:12px;flex-wrap:wrap;padding:2px 0;">`;
+    if(moonsN)   html += `<span style="font-size:11px;">🌙 <strong>${moonsN}</strong> moon${moonsN!==1?'s':''}</span>`;
+    if(belts.length) html += `<span style="font-size:11px;">🪨 <strong>${belts.length}</strong> belt${belts.length!==1?'s':''}</span>`;
+    if(iceBelts) html += `<span style="font-size:11px;color:#7dd3fc;">❄️ <strong>${iceBelts}</strong> ice</span>`;
+    html += `</div>`;
+    if(belts.length && belts.length<=10){
+      html += `<div style="margin-top:3px;display:flex;flex-direction:column;gap:1px;">`;
+      belts.forEach(b=>{
+        const isIce = (b.type||'').toLowerCase().includes('ice');
+        html += `<div style="font-size:10px;color:${isIce?'#7dd3fc':'var(--muted)'};">${esc(b.name||'Belt')}</div>`;
+      });
+      html += `</div>`;
+    }
+    html += SDsep();
+  }
+
+  // ── NPC STATIONS ─────────────────────────────────────────────────────────
+  const allStations = stations.length ? stations : stationsSDE;
+  if(allStations.length){
+    html += SDhead(`NPC Stations (${allStations.length})`, '🏭');
+    allStations.forEach(st=>{
+      const repro = st.reprocessing ? `<span style="color:var(--muted);font-size:9px;">${st.reprocessing}% refine</span>` : '';
+      html += `<div style="padding:2px 0;border-bottom:1px solid rgba(50,182,255,.04);">
+        <div style="font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${esc(st.name||st.station_name||'')}">${esc(st.name||st.station_name||'Station')}</div>
+        ${repro?`<div style="margin-top:1px;">${repro}</div>`:''}
+      </div>`;
+    });
+    html += SDsep();
+  }
+
+  // ── ACTIVITY (ESI 1h) ────────────────────────────────────────────────────
+  if(activity.jumps||activity.ship_kills||activity.npc_kills||activity.pod_kills){
+    html += SDhead('Activity (last hour)', '📊');
+    if(activity.jumps)      html += SDrow('Jumps',      `🚀 ${fmtNum(activity.jumps)}`);
+    if(activity.ship_kills) html += SDrow('Ship kills', `<span style="color:#ef4444;">💀 ${fmtNum(activity.ship_kills)}</span>`);
+    if(activity.pod_kills)  html += SDrow('Pod kills',  `<span style="color:#f97316;">☠️ ${fmtNum(activity.pod_kills)}</span>`);
+    if(activity.npc_kills)  html += SDrow('NPC kills',  `🤖 ${fmtNum(activity.npc_kills)}`);
+    html += SDsep();
+  }
+
+  // ── ZKILL (24h) ──────────────────────────────────────────────────────────
   if(zkill){
-    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="color:var(--muted);">Danger (24h)</span>
-      <span>${_dangerBadge(zkill.danger_level)} <span style="color:var(--muted);font-size:10px;">${zkill.kills_24h} kill${zkill.kills_24h!==1?'s':''}</span></span></div>`;
-  }
-
-  // Hub distances
-  const hubs = Object.entries(hubD).filter(([,v])=>v!=null).slice(0,3);
-  if(hubs.length){
-    const hubTxt = hubs.map(([n,v])=>`${n}: ${v}j`).join(' · ');
-    rows += _kv2('To hubs', hubTxt);
-  }
-
-  // NPC stations
-  if(stations.length){
-    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
-      <div style="color:var(--muted);margin-bottom:3px;">Stations (${stations.length})</div>
-      ${stations.slice(0,4).map(st=>`<div style="font-size:10px;color:var(--text);padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(st.name||st.station_name||'Station')}</div>`).join('')}
+    html += SDhead('Killboard (24h)', '💀');
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:3px 0;">
+      ${_dangerBadge(zkill.danger_level)}
+      <span style="font-size:12px;font-weight:700;color:${zkill.kills_24h?'#ef4444':'#22c55e'};">${fmtNum(zkill.kills_24h)} kill${zkill.kills_24h!==1?'s':''}</span>
     </div>`;
+    if(zkill.total_isk_destroyed) html += SDrow('ISK destroyed', `<span style="color:#f97316;">${fmtISK(zkill.total_isk_destroyed)}</span>`);
+    if(zkill.last_kill)   html += SDrow('Last kill', `<span style="font-size:10px;">${esc(zkill.last_kill.substring(0,16).replace('T',' '))}</span>`);
+    if(zkill.peak_hour!=null) html += SDrow('Peak hour', `${zkill.peak_hour}:00 UTC`);
+    // Top attacking ships (icons from EVE image service)
+    if(zkill.top_ship_types && zkill.top_ship_types.length){
+      html += `<div style="margin-top:4px;"><div style="font-size:9px;color:var(--muted);margin-bottom:3px;">TOP SHIPS SEEN</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${zkill.top_ship_types.slice(0,8).map(tid=>`
+            <img src="https://images.evetech.net/types/${tid}/icon?size=32" title="Type ${tid}"
+              style="width:28px;height:28px;border-radius:3px;border:1px solid rgba(50,182,255,.2);" loading="lazy"
+              onerror="this.style.display='none'">`).join('')}
+        </div></div>`;
+    }
+    // Top attacking corps (logos)
+    if(zkill.top_corps && zkill.top_corps.length){
+      html += `<div style="margin-top:4px;"><div style="font-size:9px;color:var(--muted);margin-bottom:3px;">ACTIVE CORPS</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${zkill.top_corps.slice(0,6).map(cid=>`
+            <a href="https://zkillboard.com/corporation/${cid}/" target="_blank" title="Corp ${cid}">
+              <img src="https://images.evetech.net/corporations/${cid}/logo?size=32"
+                style="width:28px;height:28px;border-radius:3px;border:1px solid rgba(50,182,255,.2);" loading="lazy"
+                onerror="this.style.display='none'"></a>`).join('')}
+        </div></div>`;
+    }
+    html += SDsep();
   }
 
-  // Recent visitors
+  // ── NAVIGATION ──────────────────────────────────────────────────────────
+  const hubs = Object.entries(hubD).filter(([,v])=>v!=null);
+  if(hubs.length || nearHS || nearLS || neighbors.length){
+    html += SDhead('Navigation', '🗺');
+    if(hubs.length){
+      hubs.sort(([,a],[,b])=>a-b).forEach(([name,jumps])=>{
+        html += SDrow(esc(name), `${jumps}j`);
+      });
+    }
+    if(nearHS) html += SDrow('Nearest hi-sec', `<span style="color:#22c55e;">${esc(nearHS.name||nearHS)} (${nearHS.jumps||'?'}j)</span>`);
+    if(nearLS) html += SDrow('Nearest lo-sec', `<span style="color:#fbbf24;">${esc(nearLS.name||nearLS)} (${nearLS.jumps||'?'}j)</span>`);
+    if(neighbors.length){
+      html += `<div style="margin-top:3px;"><div style="font-size:9px;color:var(--muted);margin-bottom:2px;">GATES TO</div>
+        <div style="display:flex;flex-wrap:wrap;gap:3px;">
+          ${neighbors.map(n=>{
+            const nsec = n.security!=null ? Number(n.security) : null;
+            const nc   = nsec!=null ? secCol(nsec) : 'var(--text)';
+            const ns   = nsec!=null ? nsec.toFixed(1) : '';
+            return `<span style="font-size:10px;background:rgba(50,182,255,.06);border:1px solid rgba(50,182,255,.12);border-radius:3px;padding:1px 5px;">
+              <span style="color:${nc};">${ns?ns+' ':''}</span>${esc(n.name||n.system_name||'?')}</span>`;
+          }).join('')}
+        </div></div>`;
+    }
+    html += SDsep();
+  }
+
+  // ── RECENT VISITORS ──────────────────────────────────────────────────────
   if(visitors.length){
-    rows += `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;">
-      <div style="color:var(--muted);margin-bottom:3px;">Recent visitors</div>
-      ${visitors.slice(0,5).map(v=>`<div style="font-size:10px;color:var(--accent);padding:1px 0;">${esc(v.name||'?')}</div>`).join('')}
-    </div>`;
+    html += SDhead('Recent Visitors (24h)', '👁');
+    visitors.slice(0,8).forEach(v=>{
+      const t = v.time ? v.time.substring(11,16) : '';
+      html += `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:11px;">
+        <span style="color:var(--accent);">${esc(v.name||'?')}</span>
+        ${t?`<span style="color:var(--muted);font-size:10px;">${t} UTC</span>`:''}
+      </div>`;
+    });
+    html += SDsep();
   }
 
-  // Neighbors (gates to)
-  if(neighbors.length){
-    const nList = neighbors.slice(0,5).map(n=>esc(n.name||n.system_name||'?')).join(', ');
-    rows += _kv2('Gates to', nList);
+  // ── LORE DESCRIPTION ─────────────────────────────────────────────────────
+  if(desc){
+    const shortDesc = desc.length>300 ? desc.substring(0,300)+'…' : desc;
+    const detId = `sysDesc_${sid}`;
+    html += SDhead('Description', '📖');
+    html += `<div style="font-size:10px;color:var(--muted);line-height:1.5;" id="${detId}_short">${esc(shortDesc)}
+      ${desc.length>300?`<span style="color:var(--accent);cursor:pointer;" onclick="
+        document.getElementById('${detId}_short').style.display='none';
+        document.getElementById('${detId}_full').style.display='block';">…more</span>`:''}
+    </div>
+    ${desc.length>300?`<div style="font-size:10px;color:var(--muted);line-height:1.5;display:none;" id="${detId}_full">${esc(desc)}</div>`:''}`;
   }
 
   const bodyEl = document.getElementById('sdBody');
-  if(bodyEl) bodyEl.innerHTML = rows || '<div style="color:var(--muted);font-size:10px;padding:4px 0;">No additional data</div>';
+  if(bodyEl) bodyEl.innerHTML = html || '<div style="color:var(--muted);font-size:10px;padding:4px 0;">No additional data.</div>';
 }
 
 function showConnDet(c){

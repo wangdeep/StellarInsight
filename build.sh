@@ -18,23 +18,24 @@ cd "$(dirname "$0")"
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; MAGENTA='\033[0;35m'; NC='\033[0m'
 
-info()  { echo -e "${CYAN}  $*${NC}"; }
-ok()    { echo -e "${GREEN}  [OK]  $*${NC}"; }
-warn()  { echo -e "${YELLOW}  [!!]  $*${NC}"; }
-fail()  { echo -e "${RED}\n  [FAIL]  $*\n${NC}"; exit 1; }
-head()  { echo -e "${MAGENTA}\n===  $*  ===${NC}"; }
+info()    { echo -e "${CYAN}  $*${NC}"; }
+ok()      { echo -e "${GREEN}  [OK]  $*${NC}"; }
+warn()    { echo -e "${YELLOW}  [!!]  $*${NC}"; }
+fail()    { echo -e "${RED}\n  [FAIL]  $*\n${NC}"; exit 1; }
+section() { echo -e "${MAGENTA}\n===  $*  ===${NC}"; }
 
 PLATFORM="$(uname -s)"   # Linux or Darwin
 
 # =============================================================================
-head "Step 1 / 4 -- Checking Python"
+section "Step 1 / 5 -- Checking Python"
 
 PY=""
 for candidate in python3 python; do
     if command -v "$candidate" &>/dev/null; then
         VER=$("$candidate" --version 2>&1)
-        MINOR=$(echo "$VER" | grep -oP '3\.\K\d+' || echo "0")
-        if [ "$MINOR" -ge 10 ] 2>/dev/null; then
+        # Portable minor-version extraction: works on GNU grep and BSD/macOS grep
+        MINOR=$(echo "$VER" | grep -o '3\.[0-9]*' | head -1 | cut -d. -f2 || echo "0")
+        if [ "${MINOR:-0}" -ge 10 ] 2>/dev/null; then
             PY="$candidate"
             ok "$VER  ($candidate)"
             break
@@ -46,7 +47,7 @@ done
 [ -z "$PY" ] && fail "Python 3.10+ not found. Install it and try again."
 
 # =============================================================================
-head "Step 2 / 4 -- System dependencies"
+section "Step 2 / 5 -- System dependencies"
 
 if [ "$PLATFORM" = "Linux" ]; then
     info "Checking WebKit2GTK (required by pywebview on Linux)..."
@@ -79,7 +80,27 @@ elif [ "$PLATFORM" = "Darwin" ]; then
 fi
 
 # =============================================================================
-head "Step 3 / 4 -- Installing / upgrading Python packages"
+section "Step 3 / 5 -- Setting up build virtual environment"
+
+VENV_DIR=".build-venv"
+
+# Reuse an existing venv if it looks healthy, otherwise recreate it
+if [ -d "$VENV_DIR" ] && [ -x "$VENV_DIR/bin/python" ]; then
+    info "Reusing existing venv at $VENV_DIR"
+else
+    info "Creating isolated build venv at $VENV_DIR ..."
+    "$PY" -m venv "$VENV_DIR"
+    ok "Venv created"
+fi
+
+VPYTHON="$VENV_DIR/bin/python"
+VPIP="$VENV_DIR/bin/pip"
+
+info "Upgrading pip inside venv..."
+"$VPYTHON" -m pip install --upgrade --quiet pip
+
+# =============================================================================
+section "Step 4 / 5 -- Installing Python packages (into venv)"
 
 DEPS=(
     "pyinstaller>=6.0"
@@ -101,17 +122,14 @@ DEPS=(
     "PyJWT[crypto]>=2.8.0"
 )
 
-info "Upgrading pip..."
-"$PY" -m pip install --upgrade --quiet pip
-
 info "Installing packages..."
-"$PY" -m pip install --upgrade --quiet "${DEPS[@]}"
+"$VPIP" install --quiet "${DEPS[@]}"
 ok "All Python packages installed"
 
 # =============================================================================
-head "Step 4 / 4 -- Building with PyInstaller"
+section "Step 5 / 5 -- Building with PyInstaller"
 
-[ ! -f "xylon_eve.spec" ] && fail "xylon_eve.spec not found. Run this script from inside the xylon_eve/ folder."
+[ ! -f "xylon_eve.spec" ] && fail "xylon_eve.spec not found. Run this script from inside the StellarInsight/ folder."
 
 # Clean old output
 for dir in build dist; do
@@ -119,7 +137,7 @@ for dir in build dist; do
 done
 
 info "Running PyInstaller (this takes a minute)..."
-"$PY" -m PyInstaller xylon_eve.spec --clean --noconfirm
+"$VPYTHON" -m PyInstaller xylon_eve.spec --clean --noconfirm
 
 EXE="dist/StellarInsight"
 [ ! -f "$EXE" ] && fail "Expected dist/StellarInsight was not produced."
@@ -128,34 +146,69 @@ chmod +x "$EXE"
 SIZE=$(du -sh "$EXE" | cut -f1)
 ok "dist/StellarInsight  ($SIZE)"
 
-# -- Create a .desktop launcher (Linux only) ----------------------------------
+# -- Create a .desktop launcher and install helper (Linux only) ---------------
 if [ "$PLATFORM" = "Linux" ]; then
     DESKTOP_FILE="dist/StellarInsight.desktop"
-    ABS_EXE="$(pwd)/dist/StellarInsight"
-    ABS_ICON="$(pwd)/static/splash.png"
 
-    cat > "$DESKTOP_FILE" <<EOF
+    # Use placeholder paths — the install.sh script fills them in at install time
+    # so the tarball works regardless of where it's extracted on the target machine.
+    cat > "$DESKTOP_FILE" <<'DESKTOP'
 [Desktop Entry]
 Type=Application
 Name=Stellar Insight
 Comment=EVE Online companion app
-Exec=$ABS_EXE
-Icon=$ABS_ICON
+Exec=INSTALL_PATH_PLACEHOLDER
+Icon=ICON_PATH_PLACEHOLDER
 Terminal=false
 Categories=Game;
 StartupWMClass=StellarInsight
-EOF
-    chmod +x "$DESKTOP_FILE"
-    ok "dist/StellarInsight.desktop"
+DESKTOP
 
-    info "To add to your applications menu:"
-    info "  cp dist/StellarInsight.desktop ~/.local/share/applications/"
+    # Generate a small install script that writes correct absolute paths
+    INSTALL_SH="dist/install.sh"
+    cat > "$INSTALL_SH" <<'INSTALL'
+#!/usr/bin/env bash
+# Installs Stellar Insight for the current user (no root needed).
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN_SRC="$SCRIPT_DIR/StellarInsight"
+ICON_SRC="$SCRIPT_DIR/../static/splash.png"
+
+BIN_DEST="$HOME/.local/bin/StellarInsight"
+ICON_DEST="$HOME/.local/share/icons/StellarInsight.png"
+APP_DEST="$HOME/.local/share/applications/StellarInsight.desktop"
+
+mkdir -p "$HOME/.local/bin" "$HOME/.local/share/icons" "$HOME/.local/share/applications"
+
+cp "$BIN_SRC" "$BIN_DEST"
+chmod +x "$BIN_DEST"
+
+[ -f "$ICON_SRC" ] && cp "$ICON_SRC" "$ICON_DEST" || ICON_DEST="application-x-executable"
+
+sed "s|INSTALL_PATH_PLACEHOLDER|$BIN_DEST|g; s|ICON_PATH_PLACEHOLDER|$ICON_DEST|g" \
+    "$SCRIPT_DIR/StellarInsight.desktop" > "$APP_DEST"
+
+echo "Installed to $BIN_DEST"
+echo "Desktop entry written to $APP_DEST"
+echo "You may need to log out and back in for the app to appear in your launcher."
+INSTALL
+
+    chmod +x "$INSTALL_SH"
+    ok "dist/StellarInsight.desktop"
+    ok "dist/install.sh"
+    info "Users should run ./install.sh after extracting the archive."
 fi
 
 # -- Package into a tarball ---------------------------------------------------
 info "Creating distribution archive..."
 ARCHIVE="dist/StellarInsight_$(uname -s | tr '[:upper:]' '[:lower:]').tar.gz"
-tar -czf "$ARCHIVE" -C dist StellarInsight $([ "$PLATFORM" = "Linux" ] && echo "StellarInsight.desktop" || true)
+
+if [ "$PLATFORM" = "Linux" ]; then
+    tar -czf "$ARCHIVE" -C dist StellarInsight StellarInsight.desktop install.sh
+else
+    tar -czf "$ARCHIVE" -C dist StellarInsight
+fi
+
 ASIZE=$(du -sh "$ARCHIVE" | cut -f1)
 ok "$ARCHIVE  ($ASIZE)"
 
@@ -165,11 +218,11 @@ BINARY_HASH="dist/StellarInsight.sha256"
 ARCHIVE_HASH="${ARCHIVE}.sha256"
 
 if command -v sha256sum &>/dev/null; then
-    sha256sum "dist/StellarInsight"          | awk '{print $1}' > "$BINARY_HASH"
-    sha256sum "$ARCHIVE"                      | awk '{print $1}' > "$ARCHIVE_HASH"
+    sha256sum "dist/StellarInsight" | awk '{print $1}' > "$BINARY_HASH"
+    sha256sum "$ARCHIVE"            | awk '{print $1}' > "$ARCHIVE_HASH"
 elif command -v shasum &>/dev/null; then
-    shasum -a 256 "dist/StellarInsight"       | awk '{print $1}' > "$BINARY_HASH"
-    shasum -a 256 "$ARCHIVE"                  | awk '{print $1}' > "$ARCHIVE_HASH"
+    shasum -a 256 "dist/StellarInsight" | awk '{print $1}' > "$BINARY_HASH"
+    shasum -a 256 "$ARCHIVE"            | awk '{print $1}' > "$ARCHIVE_HASH"
 else
     warn "sha256sum / shasum not found — skipping checksum generation"
 fi
@@ -188,6 +241,7 @@ echo -e "  Binary   ->  dist/StellarInsight"
 echo -e "  Archive  ->  $ARCHIVE"
 if [ "$PLATFORM" = "Linux" ]; then
 echo -e "  Launcher ->  dist/StellarInsight.desktop"
+echo -e "  Installer->  dist/install.sh"
 fi
 echo -e "  Checksums -> $BINARY_HASH / $ARCHIVE_HASH"
 echo -e "${GREEN}========================================================${NC}"

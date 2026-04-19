@@ -18,7 +18,6 @@ import logging
 import os
 import platform
 import socket
-import subprocess
 import sys
 import threading
 import time
@@ -87,6 +86,7 @@ def _show_dialog(title: str, message: str) -> None:
         pass
     if _PLATFORM == "Linux":
         try:
+            import subprocess
             subprocess.run(["zenity", "--error", f"--title={title}", f"--text={message}"],
                            timeout=30)
             return
@@ -94,8 +94,9 @@ def _show_dialog(title: str, message: str) -> None:
             pass
     if _PLATFORM == "Darwin":
         try:
-            # L-6: escape backslashes and double-quotes so user-controlled
-            # strings can't break out of the AppleScript string literal
+            import subprocess
+            # Escape backslashes and double-quotes so user-controlled strings
+            # can't break out of the AppleScript string literal.
             safe_title   = title.replace("\\", "\\\\").replace('"', '\\"')
             safe_message = message.replace("\\", "\\\\").replace('"', '\\"')
             subprocess.run(["osascript", "-e",
@@ -175,42 +176,10 @@ def _run_server(port: int) -> None:
         logger.error("Server thread crashed:\n%s", _server_error)
 
 
-# ── Relay server subprocess ───────────────────────────────────────────────────
-_relay_proc: Optional[subprocess.Popen] = None
-_RELAY_PORT = 777
-
-
-def _relay_running() -> bool:
-    try:
-        with socket.create_connection(("127.0.0.1", _RELAY_PORT), timeout=0.3):
-            return True
-    except OSError:
-        return False
-
-
-def _start_relay() -> None:
-    global _relay_proc
-    if _relay_running():
-        return
-    relay_script = _resource_path("relay_server.py")
-    cmd = [sys.executable, str(relay_script), "--port", str(_RELAY_PORT)]
-    logger.info("Starting relay: %s", " ".join(cmd))
-    _relay_proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-
-def _stop_relay() -> None:
-    global _relay_proc
-    if _relay_proc and _relay_proc.poll() is None:
-        _relay_proc.terminate()
-        try:
-            _relay_proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            _relay_proc.kill()
-        _relay_proc = None
-        logger.info("Relay stopped")
-
-
 # ── Tray icon ─────────────────────────────────────────────────────────────────
+# NOTE: The corp sharing relay server is embedded in app.py and starts
+# automatically with the main FastAPI server — there is no separate relay
+# process to manage from the tray.
 def _load_tray_icon():
     try:
         from PIL import Image
@@ -240,13 +209,7 @@ def _run_tray(window_ref: list) -> None:
                 try: w.show()
                 except Exception: pass
 
-        def toggle_relay(icon, item):
-            if _relay_running(): _stop_relay()
-            else: _start_relay()
-            icon.menu = _make_menu()
-
         def quit_app(icon, item):
-            _stop_relay()
             icon.stop()
             w = _win()
             if w:
@@ -254,17 +217,13 @@ def _run_tray(window_ref: list) -> None:
                 except Exception: pass
             os._exit(0)
 
-        def _make_menu():
-            lbl = "Stop Relay Server" if _relay_running() else "Start Relay Server"
-            return pystray.Menu(
-                pystray.MenuItem("Open Stellar Insight", open_app, default=True),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem(lbl, toggle_relay),
-                pystray.Menu.SEPARATOR,
-                pystray.MenuItem("Quit", quit_app),
-            )
+        menu = pystray.Menu(
+            pystray.MenuItem("Open Stellar Insight", open_app, default=True),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Quit", quit_app),
+        )
 
-        icon = pystray.Icon("Stellar Insight", _load_tray_icon(), "Stellar Insight", _make_menu())
+        icon = pystray.Icon("Stellar Insight", _load_tray_icon(), "Stellar Insight", menu)
         logger.info("Tray icon running")
         icon.run()
 

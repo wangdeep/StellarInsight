@@ -327,6 +327,14 @@ async def get_wallet_journal(character_id: int, *, access_token: str, page: int 
     )
 
 
+async def get_notifications(character_id: int, *, access_token: str) -> List[Dict[str, Any]]:
+    """Get ESI character notifications (last ~30 days)."""
+    return await esi_get_json(
+        f"/characters/{int(character_id)}/notifications/",
+        access_token=access_token,
+    ) or []
+
+
 async def get_planets(character_id: int, *, access_token: str) -> List[Dict[str, Any]]:
     """List PI colonies for the character."""
     return await esi_get_json(f"/characters/{int(character_id)}/planets/", access_token=access_token)

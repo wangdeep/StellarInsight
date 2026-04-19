@@ -1,305 +1,686 @@
-<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>XYLON - EVE Overview</title>
-  {# IMPORTANT: Static is mounted under APP_PREFIX (/app). url_for resolves correct prefixed path. #}
-  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}?v=11" />
-</head>
-<body>
-<div class="topbar">
-  <div class="brand">XYLON</div>
-  <nav class="nav">
-    <a href="/app/home">Home</a>
-    <a href="/app/console">Console</a>
-    <a class="active" href="/app/eve_online">EVE Overview</a>
-    <a href="/app/console/eve">EVE Console</a>
-    <a href="/app/notifications">Feed</a>
-    <a href="/app/reminders">Reminders</a>
-  </nav>
-  <div class="right">
-    <span class="user">{{ username }}</span>
-    <a class="btn" href="/app/logout">Logout</a>
+{% extends "base.html" %}
+{% block content %}
+<style>
+/* Force full-width layout */
+main.wrap { max-width: 100% !important; padding: 0 !important; }
+body:not(.sidebar-open) main.wrap { padding-left: 0 !important; }
+
+/* ── Char bar ───────────────────────────────────────────── */
+#char-bar {
+  position: sticky; top: 0; z-index: 40;
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 14px; background: rgba(6,10,20,.95);
+  border-bottom: 1px solid #1e2d45; flex-wrap: wrap;
+  backdrop-filter: blur(10px);
+}
+#char-cards { display: flex; gap: 7px; flex-wrap: wrap; }
+.char-card {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 12px 4px 7px; border-radius: 7px; cursor: pointer;
+  border: 1px solid #1e2d45; background: #0d1628; transition: all .14s;
+  font-size: 13px; color: #9ab;
+}
+.char-card.active { border-color: #3a8fff; background: #0f2044; color: #c8d4e0; }
+.char-card:hover  { border-color: #3a8fff; }
+.char-portrait    { width: 26px; height: 26px; border-radius: 50%; object-fit: cover; background: #0d1c30; }
+.char-status      { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: #334; }
+.char-status.online  { background: #3ef07e; box-shadow: 0 0 4px #3ef07e88; }
+#btn-add-widget {
+  padding: 4px 14px; border-radius: 7px; font-size: 12px; cursor: pointer;
+  border: 1px solid #3a8fff; background: #0f2044; color: #8bbfff; transition: all .14s;
+}
+#btn-add-widget:hover { background: #163060; }
+#btn-reset-layout {
+  padding: 4px 10px; border-radius: 7px; font-size: 11px; cursor: pointer;
+  border: 1px solid #1e2d45; background: transparent; color: #445; transition: all .14s;
+}
+#btn-reset-layout:hover { color: #8bbfff; border-color: #3a8fff; }
+#dash-refresh-msg { font-size: 11px; color: #334; }
+
+/* ── Widget grid ────────────────────────────────────────── */
+#widget-grid {
+  display: flex; flex-wrap: wrap; gap: 12px;
+  padding: 14px; align-items: flex-start;
+}
+
+/* ── Widget ─────────────────────────────────────────────── */
+.widget {
+  background: #0a1628; border: 1px solid #1a2a40;
+  border-radius: 9px; overflow: hidden; transition: border-color .14s;
+  display: flex; flex-direction: column; min-width: 0; box-sizing: border-box;
+}
+.widget:hover { border-color: #253a58; }
+.widget.drag-source { opacity: .45; border-style: dashed; border-color: #3a8fff; }
+.widget.drag-over   { border-color: #3a8fff; background: #0d1f38; box-shadow: 0 0 0 2px #3a8fff44; }
+.widget.pinned > .widget-header { cursor: default; }
+.widget.collapsed > .widget-body { display: none; }
+.widget[data-size="sm"] { width: calc(25%   - 9px);  min-width: 185px; }
+.widget[data-size="md"] { width: calc(33.33% - 8px); min-width: 245px; }
+.widget[data-size="lg"] { width: calc(50%   - 6px);  min-width: 310px; }
+.widget[data-size="xl"] { width: 100%; }
+
+/* ── Widget header ──────────────────────────────────────── */
+.widget-header {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 11px; cursor: grab; user-select: none;
+  border-bottom: 1px solid #141e2e;
+  background: linear-gradient(180deg, #0d1c30 0%, #0a1628 100%);
+  flex-shrink: 0;
+}
+.widget-header:active { cursor: grabbing; }
+.widget-hicon  { font-size: 13px; line-height: 1; }
+.widget-title  { font-size: 11px; font-weight: 600; color: #8bbfff; flex: 1;
+                 letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.widget-meta   { font-size: 10px; color: #334; flex-shrink: 0; margin-right: 2px; }
+.widget-ctrl   { display: flex; gap: 1px; flex-shrink: 0; }
+.widget-ctrl button {
+  background: none; border: none; color: #334; cursor: pointer;
+  font-size: 11px; padding: 2px 5px; border-radius: 3px; line-height: 1; transition: color .1s, background .1s;
+}
+.widget-ctrl button:hover { color: #8bbfff; background: #122040; }
+.widget-ctrl .w-pin.active { color: #3a8fff; }
+
+/* ── Widget body ────────────────────────────────────────── */
+.widget-body { padding: 11px; flex: 1; overflow: hidden; font-size: 13px; }
+
+/* ── Inner components ───────────────────────────────────── */
+.stat-label { font-size: 10px; color: #445; text-transform: uppercase; letter-spacing: .6px; }
+.stat-val   { font-size: 19px; font-weight: 700; color: #e0ecff; }
+.stat-sub   { font-size: 11px; color: #4a6a8a; margin-top: 2px; }
+.pbar-bg  { background: #0d1c30; border-radius: 4px; height: 5px; overflow: hidden; margin: 3px 0 10px; }
+.pbar     { height: 5px; border-radius: 4px; background: #3a8fff; }
+.pbar.warn { background: #f0c050; }
+.pbar.crit { background: #f07e7e; }
+.tiny-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tiny-table th { color: #334; font-weight: 500; text-align: left; padding: 2px 5px;
+                 border-bottom: 1px solid #141e2e; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+.tiny-table td { padding: 4px 5px; color: #9ab; border-bottom: 1px solid #0e1624; vertical-align: middle; }
+.tiny-table tr:last-child td { border-bottom: none; }
+.wbadge  { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.wbg     { background: #0a2818; color: #3ef07e; border: 1px solid #1a5030; }
+.wbr     { background: #280a0a; color: #f07e7e; border: 1px solid #501a1a; }
+.wby     { background: #281a00; color: #f0c050; border: 1px solid #503000; }
+.wbb     { background: #0a1828; color: #7ebff0; border: 1px solid #1a3050; }
+.sparkwrap { margin: 6px 0 2px; line-height: 0; }
+.wno-data  { color: #2a3a50; font-size: 12px; text-align: center; padding: 14px 0; }
+.isk-pos   { color: #3ef07e; }
+.isk-neg   { color: #f07e7e; }
+
+/* ── Widget picker modal ────────────────────────────────── */
+#wgt-picker {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.78); align-items: center; justify-content: center;
+}
+#wgt-picker.open { display: flex; }
+.picker-box {
+  background: #0d1628; border: 1px solid #2a4060; border-radius: 12px;
+  padding: 20px; width: 560px; max-width: 95vw; max-height: 80vh; overflow-y: auto;
+}
+.picker-box h2 { margin: 0 0 12px; font-size: 14px; color: #8bbfff; }
+.picker-grid   { display: grid; grid-template-columns: repeat(3,1fr); gap: 7px; }
+.wgt-tile {
+  display: flex; flex-direction: column; gap: 3px; padding: 9px; border-radius: 6px;
+  border: 1px solid #1a2840; cursor: pointer; background: #09111e; transition: all .12s;
+}
+.wgt-tile:hover   { border-color: #3a8fff; background: #0d1f38; }
+.wgt-tile.enabled { border-color: #1a4030; background: #091810; }
+.wt-icon  { font-size: 16px; line-height: 1; }
+.wt-name  { font-size: 11px; font-weight: 600; color: #8bbfff; }
+.wt-desc  { font-size: 10px; color: #334; }
+.wt-state { font-size: 10px; margin-top: 2px; }
+#picker-close {
+  margin-top: 14px; padding: 6px 20px; border-radius: 6px;
+  background: #0f2044; border: 1px solid #3a8fff; color: #8bbfff; cursor: pointer; font-size: 12px;
+}
+</style>
+
+<!-- ── Char bar ─────────────────────────────────────────────────────── -->
+<div id="char-bar">
+  <div id="char-cards"></div>
+  <div style="flex:1"></div>
+  <span id="dash-refresh-msg"></span>
+  <button id="btn-add-widget" onclick="openPicker()">&#xff0b; Widgets</button>
+  <button id="btn-reset-layout" onclick="resetLayout()" title="Reset widget layout to default">&#x21ba; Reset</button>
+</div>
+
+<!-- ── Widget grid ──────────────────────────────────────────────────── -->
+<div id="widget-grid"></div>
+
+<!-- ── Widget picker modal ─────────────────────────────────────────── -->
+<div id="wgt-picker">
+  <div class="picker-box">
+    <h2>Manage Widgets</h2>
+    <div id="picker-grid" class="picker-grid"></div>
+    <br/>
+    <button id="picker-close" onclick="closePicker()">Done</button>
   </div>
 </div>
 
-<div class="shell">
-  <div class="bg-blur"></div>
-  <main class="page">
-    <section class="hero">
-      <div>
-        <h1>EVE Overview</h1>
-        <p class="sub">Live dashboard for the selected character. No tools here. Use <a href="/app/console/eve">EVE Console</a> for on-demand commands and raw output.</p>
-      </div>
-      <div class="hero-right">
-        <div class="pill" id="dashStatus">Loading…</div>
-      </div>
-    </section>
-
-    <section class="controls card">
-      <div class="control-row">
-<label class="chip">
-          <span>Character</span>
-          <select id="charSelect"></select>
-        </label>
-        <div class="pill" id="lastUpdated">Last updated: —</div>
-        <div class="spacer"></div>
-        <div class="pill" id="onlinePill">—</div>
-      </div>
-    </section>
-
-    <section class="grid">
-      <div class="stat card">
-        <div class="k">Wallet</div>
-        <div class="v" id="walletPretty">—</div>
-        <div class="s" id="walletRaw">Raw: —</div>
-      </div>
-      <div class="stat card">
-        <div class="k">Skill Queue</div>
-        <div class="v" id="sqCount">—</div>
-        <div class="s" id="sqNext">Next: —</div>
-      </div>
-      <div class="stat card">
-        <div class="k">Industry Jobs</div>
-        <div class="v" id="ijCount">—</div>
-        <div class="s" id="ijSoon">Soonest: —</div>
-      </div>
-      <div class="stat card">
-        <div class="k">PI Planets</div>
-        <div class="v" id="piCount">—</div>
-        <div class="s" id="piHint">—</div>
-      </div>
-      <div class="stat card">
-        <div class="k">Location</div>
-        <div class="v" id="locSystem">—</div>
-        <div class="s" id="locType">—</div>
-      </div>
-      <div class="stat card">
-        <div class="k">Ship</div>
-        <div class="v" id="shipName">—</div>
-        <div class="s" id="shipType">—</div>
-      </div>
-    </section>
-
-    <section class="two">
-      <div class="card">
-        <h2>Identity</h2>
-        <div class="two-cols">
-          <div>
-            <div class="row"><span class="label">Character</span><span class="value" id="idChar">—</span></div>
-            <div class="row"><span class="label">Security</span><span class="value" id="idSec">—</span></div>
-          </div>
-          <div>
-            <div class="row"><span class="label">Corporation</span><span class="value" id="idCorp">—</span></div>
-            <div class="row"><span class="label">Scopes</span></div>
-            <pre class="mono scopes" id="idScopes">—</pre>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Assets Overview</h2>
-      <div class="mini">
-        <div class="mini-item"><div class="k">Total stacks</div><div class="v" id="aTotal">—</div></div>
-        <div class="mini-item"><div class="k">Top location</div><div class="v" id="aTop">—</div></div>
-        <div class="mini-item"><div class="k">Sample</div><div class="v" id="aSample">—</div></div>
-      </div>
-      <div class="tablewrap">
-        <table class="tbl">
-          <thead><tr><th>Item</th><th>Qty</th><th>Where</th><th>Location</th></tr></thead>
-          <tbody id="assetsBody"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Industry Jobs</h2>
-      <div class="tablewrap">
-        <table class="tbl">
-          <thead><tr><th>Status</th><th>Activity</th><th>Runs</th><th>Ends</th></tr></thead>
-          <tbody id="jobsBody"><tr><td colspan="4" class="muted">Loading…</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Planetary Interaction</h2>
-      <div class="tablewrap">
-        <table class="tbl">
-          <thead><tr><th>Planet</th><th>Type</th><th>Last update</th></tr></thead>
-          <tbody id="piBody"><tr><td colspan="3" class="muted">Loading…</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <footer class="footer">XYLON WebUI <span class="muted">/app</span></footer>
-  </main>
-</div>
-
 <script>
-  const API_PREFIX = '/app/api';
-  const APP_PREFIX = '/app';
+'use strict';
+var API='/app/api', IMG='https://images.evetech.net';
 
-  const el = (id) => document.getElementById(id);
-  const fmtISK = (n) => {
-    if (n == null || isNaN(n)) return '—';
-    const abs = Math.abs(n);
-    if (abs >= 1e12) return (n/1e12).toFixed(2) + 'T ISK';
-    if (abs >= 1e9)  return (n/1e9).toFixed(2)  + 'B ISK';
-    if (abs >= 1e6)  return (n/1e6).toFixed(2)  + 'M ISK';
-    return Math.round(n).toLocaleString() + ' ISK';
-  };
+function fmtISK(n){
+  if(n==null||isNaN(n))return '\u2014';
+  var a=Math.abs(n),s=n<0?'-':'';
+  if(a>=1e12)return s+(a/1e12).toFixed(2)+' T';
+  if(a>=1e9) return s+(a/1e9).toFixed(2)+' B';
+  if(a>=1e6) return s+(a/1e6).toFixed(2)+' M';
+  if(a>=1e3) return s+(a/1e3).toFixed(1)+' K';
+  return s+Math.round(a).toLocaleString();
+}
+function fmtDate(s){
+  if(!s)return '\u2014';
+  try{return new Date(s).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});}
+  catch(e){return s;}
+}
+function fmtCountdown(iso){
+  if(!iso)return '\u2014';
+  var ms=new Date(iso)-Date.now();
+  if(ms<=0)return '<span class="wbadge wbg">Done</span>';
+  var h=Math.floor(ms/3600000),m=Math.floor((ms%3600000)/60000);
+  if(h>24)return Math.floor(h/24)+'d '+(h%24)+'h';
+  return h>0?h+'h '+m+'m':m+'m';
+}
+async function jget(url){
+  var r=await fetch(url,{credentials:'include'});
+  if(!r.ok){var t=await r.text();throw new Error(r.status+': '+t.slice(0,100));}
+  return r.json();
+}
+function esc(s){
+  return String(s==null?'':s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function secColor(v){var n=parseFloat(v||0);return n<0?'#f07e7e':n<0.5?'#f0c050':'#3ef07e';}
 
-  async function jget(url){
-    const r = await fetch(url, {credentials:'include'});
-    if(!r.ok){
-      const t = await r.text();
-      throw new Error(`${r.status} ${r.statusText}: ${t}`);
-    }
-    return await r.json();
+/* SVG sparkline */
+function sparkline(pts,w,h){
+  w=w||220;h=h||42;
+  if(!pts||pts.length<2)return '<div class="wno-data" style="padding:6px 0">No history</div>';
+  var vals=pts.map(function(p){return p.delta!=null?p.delta:(p.value||0);});
+  var min=Math.min.apply(null,vals),max=Math.max.apply(null,vals),range=max-min||1;
+  var color=vals.every(function(v){return v<=0;})?'#f07e7e':'#3a8fff';
+  var xs=pts.map(function(_,i){return(i/(pts.length-1))*w;});
+  var ys=vals.map(function(v){return h-((v-min)/range)*(h-6)-3;});
+  var d=xs.map(function(x,i){return(i===0?'M':'L')+x.toFixed(1)+','+ys[i].toFixed(1);}).join(' ');
+  var fill=d+' L'+w+','+h+' L0,'+h+' Z';
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" style="display:block;overflow:visible">'
+    +'<defs><linearGradient id="dsg" x1="0" y1="0" x2="0" y2="1">'
+    +'<stop offset="0%" stop-color="'+color+'" stop-opacity=".3"/>'
+    +'<stop offset="100%" stop-color="'+color+'" stop-opacity="0"/>'
+    +'</linearGradient></defs>'
+    +'<path d="'+fill+'" fill="url(#dsg)"/>'
+    +'<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linejoin="round"/>'
+    +'</svg>';
+}
+
+/* ══ WIDGET REGISTRY ══════════════════════════════════════════════════ */
+var WIDGET_DEFS={
+  char_bio:      {title:'Character',       icon:'👤',size:'md',desc:'Portrait, corp, online status'},
+  wallet:        {title:'Wallet',          icon:'💰',size:'md',desc:'Balance + 7-day sparkline'},
+  skill_queue:   {title:'Skill Queue',     icon:'📚',size:'lg',desc:'Training progress bars'},
+  industry:      {title:'Industry Jobs',   icon:'🏭',size:'lg',desc:'Active job countdowns'},
+  pi:            {title:'Planetary Int.',  icon:'🌍',size:'md',desc:'PI planets & extractor status'},
+  market_orders: {title:'Market Orders',   icon:'📈',size:'md',desc:'Active buy/sell orders'},
+  notifications: {title:'Notifications',   icon:'🔔',size:'md',desc:'ESI notification feed'},
+  location:      {title:'Location',        icon:'📍',size:'md',desc:'Current system & ship'},
+  relay:         {title:'Corp Relay',      icon:'📡',size:'md',desc:'Online corp members'},
+  assets:        {title:'Assets Summary',  icon:'📦',size:'sm',desc:'Quick stat counters'},
+  structures:    {title:'Structures',      icon:'🏗️',size:'md',desc:'Fuel & timers (coming soon)'},
+};
+var DEFAULT_ORDER=['char_bio','wallet','skill_queue','industry','pi','market_orders','notifications','location','relay','assets','structures'];
+var SIZE_CYCLE=['sm','md','lg','xl'];
+
+/* ══ CONFIG (localStorage) ═══════════════════════════════════════════ */
+function cfgKey(alias){return 'stellar_dash2_'+alias;}
+function loadCfg(alias){
+  try{var r=localStorage.getItem(cfgKey(alias));if(r){var p=JSON.parse(r);if(Array.isArray(p)&&p.length)return p;}}catch(e){}
+  return buildDefaultCfg();
+}
+function saveCfg(alias,cfg){try{localStorage.setItem(cfgKey(alias),JSON.stringify(cfg));}catch(e){}}
+function buildDefaultCfg(){
+  return DEFAULT_ORDER.map(function(id){
+    return{id:id,visible:true,pinned:false,collapsed:false,size:(WIDGET_DEFS[id]?WIDGET_DEFS[id].size:'md')};
+  });
+}
+function resetLayout(){
+  if(!_alias)return;
+  if(!confirm('Reset all widget positions and visibility to default?'))return;
+  saveCfg(_alias,buildDefaultCfg());renderGrid(_alias,_dash);
+}
+
+/* ══ DRAG & DROP ══════════════════════════════════════════════════════ */
+var _dragId=null;
+function attachDrag(el,alias){
+  el.addEventListener('dragstart',function(e){
+    if(el.classList.contains('pinned')){e.preventDefault();return;}
+    _dragId=el.dataset.id;el.classList.add('drag-source');
+    e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',_dragId);
+  });
+  el.addEventListener('dragend',function(){
+    el.classList.remove('drag-source');
+    document.querySelectorAll('.drag-over').forEach(function(w){w.classList.remove('drag-over');});
+    _dragId=null;
+  });
+  el.addEventListener('dragover',function(e){
+    e.preventDefault();
+    if(!_dragId||_dragId===el.dataset.id||el.classList.contains('pinned'))return;
+    document.querySelectorAll('.drag-over').forEach(function(w){w.classList.remove('drag-over');});
+    el.classList.add('drag-over');
+  });
+  el.addEventListener('dragleave',function(){el.classList.remove('drag-over');});
+  el.addEventListener('drop',function(e){
+    e.preventDefault();el.classList.remove('drag-over');
+    if(!_dragId||_dragId===el.dataset.id||el.classList.contains('pinned'))return;
+    var grid=document.getElementById('widget-grid');
+    var items=[].slice.call(grid.children);
+    var from=null,to=el,fi,ti;
+    for(var i=0;i<items.length;i++){if(items[i].dataset.id===_dragId)from=items[i];}
+    if(!from)return;fi=items.indexOf(from);ti=items.indexOf(to);
+    if(fi<ti)grid.insertBefore(from,to.nextSibling);else grid.insertBefore(from,to);
+    _saveDomOrder(alias);
+  });
+}
+function _saveDomOrder(alias){
+  var cfg=loadCfg(alias);
+  var dom=[].slice.call(document.querySelectorAll('#widget-grid .widget')).map(function(w){return w.dataset.id;});
+  var vis=dom.map(function(id){var ex=cfg.find(function(c){return c.id===id;});return ex||{id:id,visible:true,pinned:false,collapsed:false,size:(WIDGET_DEFS[id]?WIDGET_DEFS[id].size:'md')};});
+  var hid=cfg.filter(function(c){return!c.visible&&!vis.find(function(v){return v.id===c.id;});});
+  saveCfg(alias,vis.concat(hid));
+}
+
+/* ══ WIDGET BUILDER ═══════════════════════════════════════════════════ */
+function buildWidgetEl(id,state,alias){
+  var def=WIDGET_DEFS[id];if(!def)return null;
+  var sz=state.size||def.size;
+  var el=document.createElement('div');
+  el.className='widget'+(state.pinned?' pinned':'')+(state.collapsed?' collapsed':'');
+  el.dataset.id=id;el.setAttribute('data-size',sz);el.setAttribute('draggable',state.pinned?'false':'true');
+  el.innerHTML=
+    '<div class="widget-header">'
+    +'<span class="widget-hicon">'+def.icon+'</span>'
+    +'<span class="widget-title">'+esc(def.title)+'</span>'
+    +'<span class="widget-meta" id="wm-'+id+'"></span>'
+    +'<div class="widget-ctrl">'
+    +'<button class="w-sz" title="Cycle size" onclick="cycleSize(\''+id+'\',\''+alias+'\',this)">&#x229F;</button>'
+    +'<button class="w-col" title="Collapse/Expand" onclick="toggleCollapse(\''+id+'\',\''+alias+'\',this)">'+(state.collapsed?'&#xff0b;':'&#xff0d;')+'</button>'
+    +'<button class="w-pin'+(state.pinned?' active':'')+'" title="Pin/Unpin" onclick="togglePin(\''+id+'\',\''+alias+'\',this)">&#x1F4CC;</button>'
+    +'<button class="w-del" title="Remove widget" onclick="removeWidget(\''+id+'\',\''+alias+'\')">&#xd7;</button>'
+    +'</div></div>'
+    +'<div class="widget-body" id="wb-'+id+'"><div class="wno-data">Loading\u2026</div></div>';
+  attachDrag(el,alias);
+  return el;
+}
+function cycleSize(id,alias){
+  var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});if(!item)return;
+  var idx=SIZE_CYCLE.indexOf(item.size||'md');item.size=SIZE_CYCLE[(idx+1)%SIZE_CYCLE.length];
+  saveCfg(alias,cfg);
+  var el=document.querySelector('.widget[data-id="'+id+'"]');if(el)el.setAttribute('data-size',item.size);
+}
+function toggleCollapse(id,alias,btn){
+  var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});if(!item)return;
+  item.collapsed=!item.collapsed;saveCfg(alias,cfg);
+  var el=document.querySelector('.widget[data-id="'+id+'"]');
+  if(el){el.classList.toggle('collapsed',item.collapsed);btn.textContent=item.collapsed?'\uff0b':'\uff0d';}
+}
+function togglePin(id,alias,btn){
+  var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});if(!item)return;
+  item.pinned=!item.pinned;saveCfg(alias,cfg);
+  var el=document.querySelector('.widget[data-id="'+id+'"]');
+  if(el){el.classList.toggle('pinned',item.pinned);el.setAttribute('draggable',item.pinned?'false':'true');btn.classList.toggle('active',item.pinned);}
+}
+function removeWidget(id,alias){
+  var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});
+  if(item){item.visible=false;saveCfg(alias,cfg);}
+  var el=document.querySelector('.widget[data-id="'+id+'"]');if(el)el.remove();
+  if(document.getElementById('wgt-picker').classList.contains('open'))renderPicker(alias);
+}
+
+/* ══ PICKER ═══════════════════════════════════════════════════════════ */
+function openPicker(){document.getElementById('wgt-picker').classList.add('open');renderPicker(_alias);}
+function closePicker(){document.getElementById('wgt-picker').classList.remove('open');}
+function renderPicker(alias){
+  var cfg=loadCfg(alias);
+  document.getElementById('picker-grid').innerHTML=Object.keys(WIDGET_DEFS).map(function(id){
+    var def=WIDGET_DEFS[id];
+    var state=cfg.find(function(c){return c.id===id;});
+    var on=!!(state&&state.visible);
+    return '<div class="wgt-tile'+(on?' enabled':'')+'" onclick="toggleWidget(\''+id+'\',\''+alias+'\')">'
+      +'<span class="wt-icon">'+def.icon+'</span>'
+      +'<span class="wt-name">'+esc(def.title)+'</span>'
+      +'<span class="wt-desc">'+esc(def.desc)+'</span>'
+      +'<span class="wt-state wbadge '+(on?'wbg':'wbb')+'">'+(on?'\u25cf Visible':'\u25cb Hidden')+'</span>'
+      +'</div>';
+  }).join('');
+}
+function toggleWidget(id,alias){
+  var cfg=loadCfg(alias),ex=cfg.find(function(c){return c.id===id;});
+  if(ex){
+    ex.visible=!ex.visible;saveCfg(alias,cfg);
+    if(ex.visible)addWidgetToGrid(id,ex,alias);
+    else{var el=document.querySelector('.widget[data-id="'+id+'"]');if(el)el.remove();}
+  } else {
+    var s={id:id,visible:true,pinned:false,collapsed:false,size:(WIDGET_DEFS[id]?WIDGET_DEFS[id].size:'md')};
+    cfg.push(s);saveCfg(alias,cfg);addWidgetToGrid(id,s,alias);
   }
+  renderPicker(alias);
+}
 
-  function setStatus(msg, kind='ok'){
-    const s = el('dashStatus');
-    s.textContent = msg;
-    s.classList.toggle('bad', kind==='bad');
-    s.classList.toggle('ok', kind==='ok');
-  }
+/* ══ GRID RENDER ══════════════════════════════════════════════════════ */
+var _alias=null,_dash=null;
+function renderGrid(alias,dash){
+  _alias=alias;_dash=dash;
+  var grid=document.getElementById('widget-grid');grid.innerHTML='';
+  loadCfg(alias).filter(function(c){return c.visible;}).forEach(function(state){
+    var el=buildWidgetEl(state.id,state,alias);
+    if(el){grid.appendChild(el);fillWidget(state.id,alias,dash);}
+  });
+}
+function addWidgetToGrid(id,state,alias){
+  var el=buildWidgetEl(id,state,alias);if(!el)return;
+  document.getElementById('widget-grid').appendChild(el);fillWidget(id,alias,_dash);
+}
 
-  function rowsToBody(tbody, rows, cols){
-    if(!rows || !rows.length){
-      tbody.innerHTML = `<tr><td colspan="${cols}" class="muted">No data</td></tr>`;
-      return;
+/* ══ FILL DISPATCHER ══════════════════════════════════════════════════ */
+async function fillWidget(id,alias,dash){
+  var body=document.getElementById('wb-'+id);if(!body)return;
+  try{
+    var html;
+    switch(id){
+      case 'char_bio':      html=renderCharBio(dash,alias);break;
+      case 'wallet':        html=await renderWallet(alias,dash);break;
+      case 'skill_queue':   html=renderSkillQueue(dash);break;
+      case 'industry':      html=renderIndustry(dash);break;
+      case 'pi':            html=renderPI(dash);break;
+      case 'market_orders': html=await renderMarketOrders(alias);break;
+      case 'notifications': html=await renderNotifications(alias);break;
+      case 'location':      html=renderLocation(dash);break;
+      case 'relay':         html=await renderRelay();break;
+      case 'assets':        html=renderAssets(dash);break;
+      case 'structures':    html=renderStructures();break;
+      default:              html='<div class="wno-data">Unknown widget</div>';
     }
-    tbody.innerHTML = rows.map(r => `<tr>${r.map(c=>`<td>${c ?? '—'}</td>`).join('')}</tr>`).join('');
-  }
+    body.innerHTML=html;
+  }catch(e){body.innerHTML='<div class="wno-data">Error: '+esc(e.message)+'</div>';console.error('Widget '+id+':',e);}
+}
 
-  function pickDefaultAlias(list){
-    if(!Array.isArray(list) || !list.length) return null;
-    const d = list.find(x => x && x.is_default);
-    return (d && (d.alias || d.character_name)) || (list[0].alias || list[0].character_name);
-  }
+/* ══ CHARACTER BIO ════════════════════════════════════════════════════ */
+function renderCharBio(dash,alias){
+  var ch=dash.character||{};
+  var corpObj=(dash.corp&&dash.corp.corp)||{};
+  var cid=ch.character_id;
+  var corpId=ch.corporation_id||(dash.corp&&dash.corp.corporation_id);
+  var alliId=corpObj.alliance_id;
+  var online=!!(dash.is_online||(dash.online&&dash.online.online));
+  var sec=parseFloat(ch.security_status!=null?ch.security_status:(dash.security||0));
+  var ticker=corpObj.ticker?' <span style="color:#445">['+esc(corpObj.ticker)+']</span>':'';
+  return '<div style="display:flex;gap:12px;align-items:flex-start">'
+    +'<div style="position:relative;flex-shrink:0">'
+    +'<img src="'+IMG+'/characters/'+cid+'/portrait?size=128" width="76" height="76"'
+    +' style="border-radius:7px;border:1px solid #1e2d45;display:block;background:#0d1c30"'
+    +' onerror="this.src=\'\';this.style.background=\'#0d1c30\'"/>'
+    +'<div style="position:absolute;bottom:3px;right:3px;width:10px;height:10px;border-radius:50%;'
+    +'background:'+(online?'#3ef07e':'#334')+';border:2px solid #0a1628;'
+    +'box-shadow:'+(online?'0 0 4px #3ef07e88':'')+'" title="'+(online?'Online':'Offline')+'"></div></div>'
+    +'<div style="flex:1;min-width:0;overflow:hidden">'
+    +'<div style="font-size:14px;font-weight:700;color:#e0ecff;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ch.character_name||alias)+'</div>'
+    +'<div style="font-size:11px;margin-bottom:7px">Sec: <span style="color:'+secColor(sec)+';font-weight:600">'+sec.toFixed(2)+'</span></div>'
+    +(corpId?'<div style="display:flex;align-items:center;gap:5px;margin-bottom:3px">'
+      +'<img src="'+IMG+'/corporations/'+corpId+'/logo?size=32" width="16" height="16"'
+      +' style="border-radius:3px;background:#0d1c30" onerror="this.style.display=\'none\'"/>'
+      +'<span style="font-size:11px;color:#9ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(ch.corporation_name||corpObj.name||'')+ticker+'</span></div>':'')
+    +(alliId?'<div style="display:flex;align-items:center;gap:5px">'
+      +'<img src="'+IMG+'/alliances/'+alliId+'/logo?size=32" width="14" height="14"'
+      +' style="border-radius:2px;background:#0d1c30" onerror="this.style.display=\'none\'"/>'
+      +'<span style="font-size:10px;color:#556">'+esc(corpObj.alliance_name||'')+'</span></div>':'')
+    +'</div></div>'
+    +'<div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap">'
+    +'<span class="wbadge '+(online?'wbg':'wbb')+'">'+(online?'\u25cf Online':'\u25cb Offline')+'</span>'
+    +(dash.location&&dash.location.system_name?'<span class="wbadge wbb">\uD83D\uDCCD '+esc(dash.location.system_name)+'</span>':'')
+    +(dash.ship&&dash.ship.ship_type_name?'<span class="wbadge wby">\uD83D\uDE80 '+esc(dash.ship.ship_type_name)+'</span>':'')
+    +'</div>';
+}
 
-  async function loadCharacters(){
-    // expects your app has /api/eve/linked returning list; fallback to dashboard alias list.
-    try{
-      const data = await jget(`${API_PREFIX}/eve/linked`);
-      return data.characters || data || [];
-    }catch(_){
-      // If linked endpoint isn't present, the dashboard call still works when alias known.
-      return [];
+/* ══ WALLET ═══════════════════════════════════════════════════════════ */
+async function renderWallet(alias,dash){
+  var balance=dash.wallet?dash.wallet.balance:(dash.wallet_balance!=null?dash.wallet_balance:null);
+  var cls=balance!=null&&balance>=0?'isk-pos':'isk-neg';
+  var spk='',net7=null;
+  try{
+    var wj=await jget(API+'/eve/dashboard/wallet_journal?alias='+encodeURIComponent(alias));
+    if(wj.ok&&wj.sparkline&&wj.sparkline.length){
+      net7=wj.sparkline.reduce(function(s,p){return s+(p.delta||0);},0);
+      spk='<div class="sparkwrap">'+sparkline(wj.sparkline)+'</div>'
+        +'<div style="display:flex;justify-content:space-between;font-size:10px;color:#223;margin-top:1px"><span>7d ago</span><span>Today</span></div>';
+      var meta=document.getElementById('wm-wallet');
+      if(meta)meta.textContent=(net7>=0?'\u25b2':'\u25bc')+' '+fmtISK(Math.abs(net7))+' 7d';
     }
+  }catch(e){}
+  return '<div style="margin-bottom:10px">'
+    +'<div class="stat-label">Balance</div>'
+    +'<div class="stat-val '+cls+'">'+(balance!=null?fmtISK(balance)+' ISK':'\u2014')+'</div>'
+    +(net7!=null?'<div class="stat-sub '+(net7>=0?'isk-pos':'isk-neg')+'">'+(net7>=0?'\u25b2 +':'\u25bc ')+fmtISK(net7)+' ISK this week</div>':'')
+    +'</div>'+(spk||'<div class="wno-data" style="padding:6px 0">Journal unavailable</div>');
+}
+
+/* ══ SKILL QUEUE ══════════════════════════════════════════════════════ */
+function renderSkillQueue(dash){
+  var q=Array.isArray(dash.skill_queue)?dash.skill_queue:[];
+  if(!q.length)return '<div class="wno-data">No active skill training</div>';
+  var now=Date.now(),LVL=['I','II','III','IV','V'];
+  var rows=q.slice(0,8).map(function(s){
+    var lvl=s.finished_level?(LVL[s.finished_level-1]||s.finished_level):'';
+    var name=esc((s.skill_name||('Skill '+s.skill_id))+(lvl?' '+lvl:''));
+    var end=s.finish_date?new Date(s.finish_date):null;
+    var st=s.start_date?new Date(s.start_date):null;
+    var tot=end&&st?end-st:0;
+    var elp=end?Math.max(0,Math.min(tot,now-(st||now))):0;
+    var pct=tot>0?Math.min(100,elp/tot*100):0;
+    var barCls=pct>90?'pbar crit':pct>60?'pbar warn':'pbar';
+    return '<div style="margin-bottom:8px">'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px">'
+      +'<span style="color:#c8d4e0">'+name+'</span>'
+      +'<span style="color:#334;font-size:10px">'+fmtCountdown(s.finish_date)+'</span></div>'
+      +'<div class="pbar-bg"><div class="'+barCls+'" style="width:'+pct.toFixed(1)+'%"></div></div></div>';
+  }).join('');
+  var meta=document.getElementById('wm-skill_queue');if(meta)meta.textContent=q.length+' in queue';
+  return rows+(q.length>8?'<div style="font-size:11px;color:#334;text-align:center">+'+(q.length-8)+' more</div>':'');
+}
+
+/* ══ INDUSTRY ═════════════════════════════════════════════════════════ */
+function renderIndustry(dash){
+  var jobs=Array.isArray(dash.industry_jobs)?dash.industry_jobs:[];
+  if(!jobs.length)return '<div class="wno-data">No active industry jobs</div>';
+  var ACT={1:'Manufacturing',3:'TE Research',4:'ME Research',5:'Copying',8:'Invention',9:'Reactions'};
+  var meta=document.getElementById('wm-industry');if(meta)meta.textContent=jobs.length+' active';
+  var rows=jobs.slice(0,10).map(function(j){
+    var act=ACT[j.activity_id]||('Activity '+j.activity_id);
+    var done=j.status==='delivered'||j.status==='ready';
+    var cd=done?'<span class="wbadge wbg">Ready</span>':'<span style="color:#f0c050;font-size:11px">'+fmtCountdown(j.end_date)+'</span>';
+    return '<tr><td>'+esc(act)+'</td><td>'+(j.runs!=null?j.runs:'\u2014')+'</td><td>'+cd+'</td></tr>';
+  }).join('');
+  return '<table class="tiny-table"><thead><tr><th>Activity</th><th>Runs</th><th>Time</th></tr></thead><tbody>'+rows
+    +(jobs.length>10?'<tr><td colspan="3" style="color:#334;font-size:11px;text-align:center">+'+(jobs.length-10)+' more</td></tr>':'')
+    +'</tbody></table>';
+}
+
+/* ══ PI ═══════════════════════════════════════════════════════════════ */
+function renderPI(dash){
+  var planets=Array.isArray(dash.pi_planets)?dash.pi_planets:[];
+  if(!planets.length)return '<div class="wno-data">No PI colonies</div>';
+  var ICO={Barren:'\uD83D\uDFE4',Gas:'\uD83D\uDFE1',Ice:'\uD83D\uDD35',Lava:'\uD83D\uDD34',Oceanic:'\uD83C\uDF0A',Plasma:'\uD83D\uDFE0',Storm:'\u26AB',Temperate:'\uD83D\uDFE2'};
+  var meta=document.getElementById('wm-pi');if(meta)meta.textContent=planets.length+' planets';
+  var rows=planets.slice(0,10).map(function(p){
+    var type=p.planet_type||p.type||'';
+    return '<tr><td>'+(ICO[type]||'\uD83E\uDE90')+' '+esc(p.planet_name||p.system_name||('Planet '+p.planet_id))+'</td>'
+      +'<td style="color:#556">'+esc(type||'\u2014')+'</td>'
+      +'<td style="color:#334;font-size:11px">'+(p.last_update?fmtDate(p.last_update):'\u2014')+'</td></tr>';
+  }).join('');
+  return '<table class="tiny-table"><thead><tr><th>Planet</th><th>Type</th><th>Updated</th></tr></thead><tbody>'+rows+'</tbody></table>';
+}
+
+/* ══ MARKET ORDERS ════════════════════════════════════════════════════ */
+async function renderMarketOrders(alias){
+  var d;
+  try{d=await jget(API+'/eve/dashboard/market_orders?alias='+encodeURIComponent(alias));}
+  catch(e){return '<div class="wno-data">Error: '+esc(e.message)+'</div>';}
+  if(!d.ok)return '<div class="wno-data">'+esc(d.detail||'Unavailable')+'</div>';
+  var meta=document.getElementById('wm-market_orders');if(meta)meta.textContent=d.sell_count+'S / '+d.buy_count+'B';
+  var orders=d.orders||[];
+  var sellRows=orders.filter(function(o){return!o.is_buy_order;}).slice(0,5).map(function(o){
+    return '<tr><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+      +'<img src="'+esc(o.icon_url)+'" width="16" height="16" style="vertical-align:middle;border-radius:2px;margin-right:3px" onerror="this.style.display=\'none\'"/>'
+      +esc(o.type_name)+'</td><td class="isk-pos">'+fmtISK(o.price)+'</td>'
+      +'<td style="color:#445">'+((o.volume_remain||0).toLocaleString())+'</td></tr>';
+  }).join('');
+  var buyRows=orders.filter(function(o){return o.is_buy_order;}).slice(0,3).map(function(o){
+    return '<tr><td>'+esc(o.type_name)+'</td><td class="isk-neg">'+fmtISK(o.price)+'</td>'
+      +'<td style="color:#445">'+((o.volume_remain||0).toLocaleString())+'</td></tr>';
+  }).join('');
+  return '<div style="display:flex;gap:12px;margin-bottom:9px">'
+    +'<div><div class="stat-label">Sell value</div><div style="font-size:14px;color:#3ef07e;font-weight:700">'+fmtISK(d.sell_value)+' ISK</div></div>'
+    +'<div><div class="stat-label">Buy escrow</div><div style="font-size:14px;color:#f07e7e;font-weight:700">'+fmtISK(d.buy_escrow)+' ISK</div></div>'
+    +'</div>'
+    +(sellRows?'<div style="font-size:10px;color:#334;letter-spacing:.3px;margin-bottom:2px">SELL</div>'
+      +'<table class="tiny-table"><thead><tr><th>Item</th><th>Price</th><th>Vol</th></tr></thead><tbody>'+sellRows+'</tbody></table>':'')
+    +(buyRows?'<div style="font-size:10px;color:#334;letter-spacing:.3px;margin:7px 0 2px">BUY</div>'
+      +'<table class="tiny-table"><tbody>'+buyRows+'</tbody></table>':'');
+}
+
+/* ══ NOTIFICATIONS ════════════════════════════════════════════════════ */
+async function renderNotifications(alias){
+  var d;
+  try{d=await jget(API+'/eve/dashboard/notifications?alias='+encodeURIComponent(alias));}
+  catch(e){return '<div class="wno-data">Error: '+esc(e.message)+'</div>';}
+  if(!d.ok)return '<div class="wno-data">'+esc(d.detail||'Unavailable')+'</div>';
+  var notifs=d.notifications||[];
+  if(!notifs.length)return '<div class="wno-data">No recent notifications</div>';
+  var ICONS={StructureUnderAttack:'\u2694\uFE0F',StructureLostArmor:'\uD83D\uDD25',StructureLostShields:'\uD83D\uDEE1\uFE0F',StructureDestroyed:'\uD83D\uDCA5',StructureOnlineAboutToEnd:'\u26FD',SovStructureDestroyed:'\uD83D\uDCA5',SovAllClaimAquiredMsg:'\uD83C\uDFF4',AllWarDeclaredMsg:'\u26A0\uFE0F',CorpWarDeclaredMsg:'\u26A0\uFE0F',CharLeftCorpMsg:'\uD83D\uDEAA',CharAppAcceptMsg:'\u2705',BillOutOfMoneyMsg:'\uD83D\uDCB8',IHubDestroyedByBillFailure:'\uD83D\uDCA5',KillReportVictim:'\u2620\uFE0F',KillReportFinalBlow:'\u2694\uFE0F'};
+  var unread=notifs.filter(function(n){return!n.is_read;}).length;
+  var meta=document.getElementById('wm-notifications');if(meta&&unread)meta.textContent=unread+' unread';
+  var rows=notifs.slice(0,12).map(function(n){
+    var icon=ICONS[n.type]||'\uD83D\uDCE8';
+    var dim=n.is_read?'color:#556':'color:#c8d4e0';
+    return '<div style="display:flex;gap:7px;padding:4px 0;border-bottom:1px solid #0e1624;align-items:flex-start">'
+      +'<span style="font-size:12px;margin-top:1px;flex-shrink:0">'+icon+'</span>'
+      +'<div style="flex:1;min-width:0">'
+      +'<div style="font-size:11px;'+dim+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(n.type||'Notification')+'</div>'
+      +'<div style="font-size:10px;color:#334;margin-top:1px">'+(n.timestamp?fmtDate(n.timestamp):'\u2014')+'</div></div>'
+      +(!n.is_read?'<div style="width:5px;height:5px;border-radius:50%;background:#3a8fff;margin-top:5px;flex-shrink:0"></div>':'')
+      +'</div>';
+  }).join('');
+  return '<div style="max-height:280px;overflow-y:auto">'+rows+'</div>';
+}
+
+/* ══ LOCATION ═════════════════════════════════════════════════════════ */
+function renderLocation(dash){
+  var loc=dash.location||{},ship=dash.ship||{};
+  var sys=esc(loc.system_name||loc.solar_system_name||'\u2014');
+  var ltype=esc(loc.location_type||'');
+  var tid=ship.ship_type_id;
+  return '<div style="display:flex;gap:11px;align-items:flex-start">'
+    +(tid?'<img src="'+IMG+'/types/'+tid+'/icon?size=64" width="48" height="48"'
+      +' style="border-radius:5px;border:1px solid #1e2d45;background:#0d1c30;flex-shrink:0"'
+      +' onerror="this.style.display=\'none\'"/>':'')
+    +'<div style="min-width:0">'
+    +'<div style="font-size:15px;font-weight:700;color:#e0ecff;margin-bottom:2px">'+sys+'</div>'
+    +(ltype?'<div style="font-size:11px;color:#445;margin-bottom:7px">'+ltype+'</div>':'')
+    +'<div style="font-size:12px;color:#8bbfff;margin-bottom:2px">'+esc(ship.ship_name||'\u2014')+'</div>'
+    +'<div style="font-size:11px;color:#445">'+esc(ship.ship_type_name||'\u2014')+'</div>'
+    +'</div></div>';
+}
+
+/* ══ RELAY ════════════════════════════════════════════════════════════ */
+async function renderRelay(){
+  try{
+    var d=await jget(API+'/corp/relay/members');
+    var members=d.members||d.pilots||[];
+    if(!members.length)throw new Error('empty');
+    var meta=document.getElementById('wm-relay');if(meta)meta.textContent=members.length+' online';
+    var rows=members.slice(0,10).map(function(m){
+      return '<tr><td>'+esc(m.character_name||m.name||'?')+'</td>'
+        +'<td style="color:#445">'+esc(m.system||m.location||'\u2014')+'</td>'
+        +'<td style="color:#334">'+esc(m.ship||'\u2014')+'</td></tr>';
+    }).join('');
+    return '<table class="tiny-table"><thead><tr><th>Pilot</th><th>System</th><th>Ship</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }catch(e){
+    return '<div class="wno-data">Relay not connected<div style="font-size:11px;color:#223;margin-top:3px">Settings \u2192 Corp Sharing</div></div>';
   }
+}
 
-  async function loadDashboard(alias){
-    // Request the full dashboard payload (detail + assets + corp) so the page can render human-readable data.
-    const dash = await jget(`${API_PREFIX}/eve/dashboard?alias=${encodeURIComponent(alias||'')}&detail=true&include_assets=true&include_corp=true`);
-    const d = dash.dashboard || dash;
+/* ══ ASSETS SUMMARY ═══════════════════════════════════════════════════ */
+function renderAssets(dash){
+  var pi=dash.pi&&dash.pi.planet_count!=null?dash.pi.planet_count:(Array.isArray(dash.pi_planets)?dash.pi_planets.length:null);
+  var jobs=Array.isArray(dash.industry_jobs)?dash.industry_jobs.length:(dash.industry&&dash.industry.active_count!=null?dash.industry.active_count:0);
+  var sqLen=Array.isArray(dash.skill_queue)?dash.skill_queue.length:(dash.skills&&dash.skills.queue_len!=null?dash.skills.queue_len:0);
+  var next=Array.isArray(dash.skill_queue)&&dash.skill_queue[0]?fmtCountdown(dash.skill_queue[0].finish_date):'\u2014';
+  var tile='style="text-align:center;padding:8px;background:#08121e;border-radius:5px;border:1px solid #141e2e"';
+  return '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
+    +'<div '+tile+'><div class="stat-label">Industry</div><div style="font-size:20px;font-weight:700;color:#e0ecff">'+jobs+'</div><div style="font-size:10px;color:#334">active</div></div>'
+    +'<div '+tile+'><div class="stat-label">PI</div><div style="font-size:20px;font-weight:700;color:#e0ecff">'+(pi!=null?pi:'\u2014')+'</div><div style="font-size:10px;color:#334">colonies</div></div>'
+    +'<div '+tile+'><div class="stat-label">Skills</div><div style="font-size:20px;font-weight:700;color:#e0ecff">'+sqLen+'</div><div style="font-size:10px;color:#334">in queue</div></div>'
+    +'<div '+tile+'><div class="stat-label">Next skill</div><div style="font-size:13px;font-weight:700;color:#8bbfff;margin-top:3px">'+next+'</div></div>'
+    +'</div>';
+}
 
-    // header
-    el('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+/* ══ STRUCTURES (stub) ════════════════════════════════════════════════ */
+function renderStructures(){
+  return '<div class="wno-data">Structures module coming soon.<div style="font-size:11px;color:#223;margin-top:3px">Fuel tracking, timers &amp; vulnerability windows</div></div>';
+}
 
-    // identity
-    el('idChar').textContent = (d.character && (d.character.character_name || d.character_name)) || '—';
-    el('idSec').textContent = (d.security ?? '—');
-    el('idCorp').textContent = (d.corp && (d.corp.corporation_name || d.corp_name)) || d.corp_name || '—';
-    el('idScopes').textContent = (d.character && d.character.scopes) || d.scopes || '—';
+/* ══ CHARACTER SWITCHER + INIT ════════════════════════════════════════ */
+var _chars=[],_refreshTimer=null;
+async function loadCharacters(){
+  try{var d=await jget(API+'/eve/linked');return Array.isArray(d)?d:(d.characters||[]);}
+  catch(e){return [];}
+}
+function _safeId(s){return String(s).replace(/\W/g,'_');}
 
-    // wallet
-    const w = d.wallet;
-    el('walletRaw').textContent = `Raw: ${(w && w.balance != null) ? w.balance : (d.wallet_balance ?? '—')}`;
-    const wb = (w && w.balance != null) ? w.balance : d.wallet_balance;
-    el('walletPretty').textContent = fmtISK(wb);
+async function buildCharBar(chars,activeAlias){
+  _chars=chars;var bar=document.getElementById('char-cards');bar.innerHTML='';
+  chars.forEach(function(c){
+    var alias=c.alias||c.character_name,cid=c.character_id;
+    var card=document.createElement('div');
+    card.className='char-card'+(alias===activeAlias?' active':'');
+    card.innerHTML='<img class="char-portrait" src="'+IMG+'/characters/'+cid+'/portrait?size=64" alt="" onerror="this.style.display=\'none\'"/>'
+      +'<div class="char-status" id="cst-'+_safeId(alias)+'"></div>'
+      +'<span>'+esc(c.character_name)+'</span>';
+    card.onclick=(function(a){return function(){switchChar(a);};})(alias);
+    bar.appendChild(card);
+  });
+}
 
-    // online / location / ship
-    const online = (d.online && (d.online.online ?? d.online.is_online)) ?? d.is_online;
-    el('onlinePill').textContent = online ? 'Online' : 'Offline';
+async function switchChar(alias){
+  _alias=alias;
+  document.querySelectorAll('.char-card').forEach(function(c){c.classList.remove('active');});
+  var ch=_chars.find(function(c){return(c.alias||c.character_name)===alias;});
+  if(ch){document.querySelectorAll('.char-card span').forEach(function(sp){
+    if(sp.textContent.trim()===ch.character_name)sp.closest('.char-card').classList.add('active');
+  });}
+  if(_refreshTimer){clearInterval(_refreshTimer);_refreshTimer=null;}
+  await loadDash(alias);
+  _refreshTimer=setInterval(function(){loadDash(alias);},60000);
+}
 
-    if(d.location){
-      el('locSystem').textContent = d.location.system_name || d.location.system || '—';
-      el('locType').textContent = d.location.location_type || '—';
-    }
-    if(d.ship){
-      el('shipName').textContent = d.ship.ship_name || '—';
-      el('shipType').textContent = d.ship.ship_type_name || d.ship.ship_type || '—';
-    }
+async function loadDash(alias){
+  var msg=document.getElementById('dash-refresh-msg');if(msg)msg.textContent='Refreshing\u2026';
+  try{
+    var d=await jget(API+'/eve/dashboard?alias='+encodeURIComponent(alias)+'&include_corp=true');
+    _dash=d.dashboard||d;
+    var pill=document.getElementById('cst-'+_safeId(alias));
+    if(pill){var on=!!(_dash.is_online||(_dash.online&&_dash.online.online));pill.className='char-status '+(on?'online':'offline');}
+    renderGrid(alias,_dash);
+    if(msg)msg.textContent='Updated '+new Date().toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'});
+  }catch(e){if(msg)msg.textContent='Error';console.error('Dashboard error:',e);}
+}
 
-    // skill queue
-    const sq = d.skill_queue || [];
-    el('sqCount').textContent = Array.isArray(sq) ? String(sq.length) : '—';
-    el('sqNext').textContent = Array.isArray(sq) && sq[0] && sq[0].finish_date ? `Next: ${sq[0].finish_date}` : 'Next: —';
-
-    // industry
-    const jobs = d.industry_jobs || [];
-    el('ijCount').textContent = Array.isArray(jobs) ? String(jobs.length) : '—';
-    const soon = Array.isArray(jobs) ? jobs.map(j=>j.end_date).filter(Boolean).sort()[0] : null;
-    el('ijSoon').textContent = soon ? `Soonest: ${soon}` : 'Soonest: —';
-
-    // PI
-    const planets = d.pi_planets || [];
-    el('piCount').textContent = Array.isArray(planets) ? String(planets.length) : '—';
-    el('piHint').textContent = Array.isArray(planets) && planets.length ? 'Routes on console' : '—';
-
-    // assets + jobs + planets tables (separate endpoints)
-    try{
-      const a = await jget(`${API_PREFIX}/eve/character/assets?alias=${encodeURIComponent(alias||'')}`);
-      const items = a.items || a.assets || [];
-      el('aTotal').textContent = (a.total_stacks ?? (Array.isArray(items) ? items.length : '—'));
-      el('aTop').textContent = a.top_location || '—';
-      el('aSample').textContent = a.sample || '—';
-      const rows = (a.sample_items || items || []).slice(0, 12).map(it => [it.type_name||it.name||it.type_id||'—', it.qty||it.quantity||it.quantity||'—', it.where||it.flag||'—', it.location||it.location_id||'—']);
-      rowsToBody(el('assetsBody'), rows, 4);
-    }catch(err){
-      el('assetsBody').innerHTML = `<tr><td colspan="4" class="muted">Assets unavailable</td></tr>`;
-    }
-
-    // industry jobs table from dashboard payload
-    const jobRows = (Array.isArray(jobs) ? jobs : []).slice(0, 12).map(j => [j.status || j.state || '—', j.activity || j.activity_id || '—', j.runs ?? '—', j.end_date || '—']);
-    rowsToBody(el('jobsBody'), jobRows, 4);
-
-    // planets table
-    const piRows = (Array.isArray(planets) ? planets : []).slice(0, 12).map(p => [p.planet_name || p.planet_id || '—', p.planet_type || p.type || '—', p.last_update || '—']);
-    rowsToBody(el('piBody'), piRows, 3);
-
-    setStatus('Dashboard ready', 'ok');
-  }
-
-  async function init(){
-    try{
-      setStatus('Loading…','ok');
-      const sel = el('charSelect');
-
-      // try to populate from server-provided characters (preferred)
-      const chars = await loadCharacters();
-      const serverChars = Array.isArray(chars) && chars.length;
-
-      if(serverChars){
-        sel.innerHTML = chars.map(c => {
-          const label = `${c.character_name}${c.is_default ? ' [default]' : ''}`;
-          const value = c.alias || c.character_name;
-          return `<option value="${value}">${label}</option>`;
-        }).join('');
-        sel.value = pickDefaultAlias(chars) || sel.value;
-      } else {
-        // fallback: at least keep the currently selected name from cookie/session if server injected it
-        sel.innerHTML = `<option value="{{ default_alias }}">{{ default_alias }} [default]</option>`;
-      }
-
-      await loadDashboard(sel.value);
-
-      sel.addEventListener('change', async () => {
-        setStatus('Loading…','ok');
-        await loadDashboard(sel.value);
-      });
-
-    }catch(e){
-      console.error(e);
-      setStatus('Error loading dashboard','bad');
-    }
-  }
-  init();
+async function init(){
+  var chars=await loadCharacters();
+  var def=chars.length?((chars.find(function(c){return c.is_default;})||chars[0])):null;
+  var defaultAlias=def?(def.alias||def.character_name):'{{ default_alias }}';
+  await buildCharBar(chars,defaultAlias);
+  await switchChar(defaultAlias);
+}
+init();
 </script>
-</body>
-</html>
+{% endblock %}

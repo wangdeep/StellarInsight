@@ -211,7 +211,7 @@ def _zkill_parse_response(zkills: list) -> dict:
         "top_corps":          [cid for cid, _ in corp_presence.most_common(5)],
         "top_ship_types":     [sid for sid, _ in ship_types.most_common(5)],
         "peak_hour":          hour_kills.most_common(1)[0][0] if hour_kills else None,
-        "danger":             danger,
+        "danger_level":       danger,
     }
 
 
@@ -962,7 +962,7 @@ def create_app() -> FastAPI:
         # First-run: if SDE is missing, send user to the download page first.
         if not sde_available():
             return RedirectResponse(url="/app/setup", status_code=302)
-        return RedirectResponse(url=f"{APP_PREFIX}/eve_online", status_code=302)
+        return RedirectResponse(url=f"{APP_PREFIX}/home", status_code=302)
 
     # ── First-run SDE download page ─────────────────────────────────────────────
 
@@ -1122,6 +1122,18 @@ def create_app() -> FastAPI:
         return {"ok": True}
 
     # ── EVE page routes ─────────────────────────────────────────────────────────
+
+    @app.get(f"{APP_PREFIX}/home", response_class=HTMLResponse)
+    def home_page(request: Request, user=Depends(require_user)):
+        chars = eve_list_characters(LOCAL_USER_ID)
+        default_alias = ""
+        if chars:
+            default = next((c for c in chars if c.get("is_default")), chars[0])
+            default_alias = default.get("alias") or default.get("character_name") or ""
+        return templates.TemplateResponse(
+            request, "eve_dashboard.html",
+            {"user": user, "theme": get_theme_vars(), "chars": chars, "default_alias": default_alias},
+        )
 
     @app.get(f"{APP_PREFIX}/eve_online", response_class=HTMLResponse)
     def eve_online_page(request: Request, user=Depends(require_user)):
@@ -1974,6 +1986,96 @@ def create_app() -> FastAPI:
             "online": online_data,
         }
 
+    @app.get(f"{API_PREFIX}/eve/dashboard/wallet_journal")
+    async def api_dashboard_wallet_journal(alias: str, user=Depends(require_user)):
+        """Last 30 wallet journal entries for sparkline + income breakdown."""
+        try:
+            from eve.eve_esi import get_wallet_journal
+            token = await eve_access_token_for(LOCAL_USER_ID, alias)
+            cid = int(token["character"]["character_id"])
+            at = token["access_token"]
+            _ck = f"resp:dash_wj:{cid}"
+            if (cached := _resp_cache_get(_ck, _TTL_WALLET)):
+                return cached
+            entries = await get_wallet_journal(cid, access_token=at, page=1) or []
+            entries.sort(key=lambda e: e.get("date", ""), reverse=True)
+            entries = entries[:30]
+            from datetime import datetime, timezone, timedelta
+            now = datetime.now(timezone.utc)
+            day_totals: dict = {}
+            for e in entries:
+                raw_date = e.get("date", "")
+                try:
+                    day = raw_date[:10]
+                    day_totals[day] = day_totals.get(day, 0) + float(e.get("amount", 0))
+                except Exception:
+                    pass
+            sparkline = [
+                {"date": (now - timedelta(days=i)).strftime("%Y-%m-%d"),
+                 "delta": day_totals.get((now - timedelta(days=i)).strftime("%Y-%m-%d"), 0)}
+                for i in range(6, -1, -1)
+            ]
+            result = {"ok": True, "entries": entries, "sparkline": sparkline}
+            _resp_cache_set(_ck, result, _TTL_WALLET)
+            return result
+        except Exception as e:
+            return {"ok": False, "detail": str(e), "entries": [], "sparkline": []}
+
+    @app.get(f"{API_PREFIX}/eve/dashboard/notifications")
+    async def api_dashboard_notifications(alias: str, user=Depends(require_user)):
+        """Last 20 ESI notifications."""
+        try:
+            from eve.eve_esi import get_notifications
+            token = await eve_access_token_for(LOCAL_USER_ID, alias)
+            cid = int(token["character"]["character_id"])
+            at = token["access_token"]
+            _ck = f"resp:dash_notif:{cid}"
+            if (cached := _resp_cache_get(_ck, _TTL_FAST)):
+                return cached
+            notifs = await get_notifications(cid, access_token=at)
+            notifs.sort(key=lambda n: n.get("timestamp", ""), reverse=True)
+            notifs = notifs[:20]
+            result = {"ok": True, "notifications": notifs}
+            _resp_cache_set(_ck, result, _TTL_FAST)
+            return result
+        except Exception as e:
+            return {"ok": False, "detail": str(e), "notifications": []}
+
+    @app.get(f"{API_PREFIX}/eve/dashboard/market_orders")
+    async def api_dashboard_market_orders(alias: str, user=Depends(require_user)):
+        """Active market orders for a character."""
+        try:
+            token = await eve_access_token_for(LOCAL_USER_ID, alias)
+            cid = int(token["character"]["character_id"])
+            at = token["access_token"]
+            _ck = f"resp:dash_orders:{cid}"
+            if (cached := _resp_cache_get(_ck, _TTL_FAST)):
+                return cached
+            orders = await esi_get_json(f"/characters/{cid}/orders/", access_token=at) or []
+            sell = [o for o in orders if not o.get("is_buy_order")]
+            buys = [o for o in orders if o.get("is_buy_order")]
+            sell_value = sum(float(o.get("price", 0)) * int(o.get("volume_remain", 0)) for o in sell)
+            buy_escrow = sum(float(o.get("escrow", 0)) for o in buys)
+            type_ids = list({int(o["type_id"]) for o in orders[:20] if o.get("type_id")})
+            names = await _resolve_entity_names(type_ids) if type_ids else {}
+            for o in orders:
+                tid = o.get("type_id")
+                o["type_name"] = names.get(int(tid), f"Type {tid}") if tid else "—"
+                o["icon_url"] = f"https://images.evetech.net/types/{tid}/icon?size=32" if tid else ""
+            result = {
+                "ok": True,
+                "orders": orders,
+                "sell_count": len(sell),
+                "buy_count": len(buys),
+                "sell_value": sell_value,
+                "buy_escrow": buy_escrow,
+                "total_orders": len(orders),
+            }
+            _resp_cache_set(_ck, result, _TTL_FAST)
+            return result
+        except Exception as e:
+            return {"ok": False, "detail": str(e), "orders": [], "sell_count": 0, "buy_count": 0}
+
     # ── Corp API ─────────────────────────────────────────────────────────────────
 
     @app.get(f"{API_PREFIX}/eve/corp/summary")
@@ -2346,37 +2448,8 @@ def create_app() -> FastAPI:
         # Return flat {str(typeId): {"typeID": id, "typeName": name}} for industry template compatibility
         return {str(k): {"typeID": k, "typeName": v} for k, v in names.items()}
 
-    @app.get("/app/api/sde/market_groups")
-    async def api_sde_market_groups():
-        if not sde_available():
-            return JSONResponse(status_code=503, content={"error": "SDE not available"})
-        try:
-            return get_market_groups()
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": str(e)})
-
-    @app.get("/app/api/sde/market_group_items/{group_id}")
-    async def api_sde_market_group_items(group_id: int):
-        if not sde_available():
-            return []
-        try:
-            return get_market_group_items(group_id)
-        except Exception as e:
-            return JSONResponse(status_code=500, content={"error": str(e)})
-
-    @app.get("/app/api/sde/market_group_items_unused/{group_id}")
-    async def api_sde_market_group_items_esi(group_id: int):
-        key = f"sde:mg_items:{group_id}"
-        cached = _sde_cache_get(key)
-        if cached:
-            return cached
-        try:
-            data = await esi_get_public_json(f"/markets/groups/{group_id}/")
-            result = {"ok": True, "group": data}
-            _sde_cache_set(key, result)
-            return result
-        except Exception as e:
-            return {"ok": False, "error": str(e)}
+    # NOTE: /app/api/sde/market_groups and /app/api/sde/market_group_items are
+    # registered at module level (below create_app). Removed duplicates here.
 
     @app.get("/app/api/sde/market_prices/{type_id}")
     async def api_sde_market_prices_inner(type_id: int):
@@ -3267,8 +3340,9 @@ except Exception as _je:
 
 # ── Sovereignty + FW caches ───────────────────────────────────────────────────
 
-_sov_cache: dict = {"data": {}, "ts": 0.0}
-_fw_cache: dict = {"data": {}, "ts": 0.0}
+_sov_cache: dict  = {"data": {}, "ts": 0.0}
+_fw_cache: dict   = {"data": {}, "ts": 0.0}
+_star_cache: dict = {}   # star_id → {spectral_class, temperature, luminosity, radius, age, type_name}
 
 
 async def _refresh_sov_cache():
@@ -3329,6 +3403,31 @@ def _get_system_sov(system_id: int) -> Optional[dict]:
 def _get_system_fw(system_id: int) -> Optional[dict]:
     asyncio.ensure_future(_refresh_fw_cache())
     return _fw_cache["data"].get(system_id)
+
+
+async def _fetch_star_info(star_id: int) -> dict:
+    """Fetch and cache ESI star data (spectral class, temp, luminosity, radius, age)."""
+    if star_id in _star_cache:
+        return _star_cache[star_id]
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=8)) as s:
+            async with s.get(f"https://esi.evetech.net/latest/universe/stars/{star_id}/") as r:
+                if r.status == 200:
+                    d = await r.json()
+                    info = {
+                        "name":           d.get("name", ""),
+                        "spectral_class": d.get("spectral_class", ""),
+                        "temperature":    d.get("temperature"),
+                        "luminosity":     round(d.get("luminosity", 0), 4),
+                        "radius":         d.get("radius"),
+                        "age":            d.get("age"),
+                        "type_id":        d.get("type_id"),
+                    }
+                    _star_cache[star_id] = info
+                    return info
+    except Exception:
+        pass
+    return {}
 
 
 # ── Region map + system stats caches ─────────────────────────────────────────
@@ -3733,11 +3832,16 @@ async def api_nav_system_detail(system_id: int, request: Request):
     system_info = {}
     kills = {}
     jumps_count = 0
+    star_info: dict = {}
     try:
         async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
             async with session.get(f"https://esi.evetech.net/latest/universe/systems/{system_id}/") as resp:
                 if resp.status == 200:
                     system_info = await resp.json()
+        # Fetch star data (cached indefinitely — stars don't change)
+        star_id = system_info.get("star_id")
+        if star_id:
+            star_info = await _fetch_star_info(star_id)
     except Exception:
         pass
 
@@ -3898,7 +4002,21 @@ async def api_nav_system_detail(system_id: int, request: Request):
 
     fw_info = None
     if not is_jspace:
-        fw_info = _get_system_fw(system_id)
+        fw_raw = _get_system_fw(system_id)
+        if fw_raw:
+            _FW_FACTION_NAMES = {
+                500001: "Caldari State", 500002: "Minmatar Republic",
+                500003: "Amarr Empire",  500004: "Gallente Federation",
+            }
+            fw_info = dict(fw_raw)
+            occ = fw_info.get("occupier_faction_id")
+            own = fw_info.get("owner_faction_id")
+            fw_info["occupier_faction_name"] = _FW_FACTION_NAMES.get(occ, f"Faction {occ}")
+            fw_info["owner_faction_name"]    = _FW_FACTION_NAMES.get(own, f"Faction {own}")
+            # VP percentage
+            vp    = fw_info.get("victory_points", 0)
+            vp_th = fw_info.get("victory_points_threshold", 1) or 1
+            fw_info["vp_pct"] = round(min(vp / vp_th * 100, 100), 1)
 
     # Resolve region_id and region_name for nebula imagery
     region_id_out = None
@@ -3942,7 +4060,15 @@ async def api_nav_system_detail(system_id: int, request: Request):
         "wh_connections": [{"id": w.get("id"), "from": w["from_system"], "to": w["to_system"], "type": w.get("wh_type"), "status": w.get("mass_status")} for w in wh_conns],
         "recent_visitors": visitors,
         "signatures": [{"id": s.get("id"), "sig_id": s.get("sig_id"), "group": s.get("sig_group"), "info": s.get("sig_info"), "scanned_by": s.get("scanned_by_name")} for s in sigs],
-        "celestials": celestials, "planets_detail": planets_detail,
+        "star": star_info,
+        "celestials": celestials,
+        "planets":       celestials.get("planets", planets_detail),
+        "moons_count":   celestials.get("moons_count", 0),
+        "belts":         celestials.get("belts", []),
+        "belts_count":   celestials.get("belts_count", 0),
+        "ice_belts":     celestials.get("ice_belts", 0),
+        "npc_stations_sde": celestials.get("stations", []),
+        "planets_detail": planets_detail,
         "neighbors": neighbors, "hub_distances": hub_distances,
         "nearest_highsec": nearest_hs, "nearest_lowsec": nearest_ls,
         "npc_stations": npc_stations,
