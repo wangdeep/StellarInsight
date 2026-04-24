@@ -945,6 +945,24 @@ def create_app() -> FastAPI:
                     )
                 _upd["status"] = "done"
 
+                # BUG-01: Give the frontend one polling cycle to see "done",
+                # then bust the update-check cache (BUG-02) and exit so the
+                # Inno Setup installer can replace the running binary cleanly.
+                # The installer's /RESTARTAPPLICATIONS flag will relaunch us.
+                import time as _time
+                _time.sleep(2.0)
+                try:
+                    _resp_cache_set("__update_check__", {
+                        "update_available": False,
+                        "latest": "0.0.0",
+                        "current": "0.0.0",
+                        "release_url": "",
+                        "installer_url": None,
+                    }, 3600)
+                except Exception:
+                    pass
+                os._exit(0)
+
             except Exception as exc:
                 logger.error("Update download failed: %s", exc)
                 _upd["status"] = "error"
@@ -1889,8 +1907,36 @@ def create_app() -> FastAPI:
         sys_id = location.get("solar_system_id")
         ship_type_id = ship.get("ship_type_id")
         corp_id = pub.get("corporation_id")
-        ids_to_resolve = [i for i in [sys_id, ship_type_id, corp_id] if i]
-        names = await _resolve_entity_names(ids_to_resolve) if ids_to_resolve else {}
+
+        # BUG-04: Collect every ID we need resolved in one batch so widgets
+        # show readable names instead of raw numeric IDs.
+
+        # Industry — blueprint/product type IDs + facility IDs
+        ind_type_ids = list({
+            int(j[k]) for j in active_jobs
+            for k in ("blueprint_type_id", "product_type_id") if j.get(k)
+        })
+        ind_fac_ids = list({int(j["facility_id"]) for j in active_jobs if j.get("facility_id")})
+
+        # PI — planet IDs + solar system IDs
+        planet_ids = [int(p["planet_id"]) for p in planets if p.get("planet_id")]
+        pi_sys_ids = list({int(p["solar_system_id"]) for p in planets if p.get("solar_system_id")})
+
+        # Skill queue — skill IDs (resolved via SDE, not ESI)
+        skill_ids = list({int(s["skill_id"]) for s in skillqueue if s.get("skill_id")})
+
+        # Fire all ESI name lookups in parallel
+        ids_to_resolve = list({i for i in [sys_id, ship_type_id, corp_id] if i} | set(ind_type_ids) | set(pi_sys_ids))
+        names_task = _resolve_entity_names(ids_to_resolve) if ids_to_resolve else None
+        planet_names_task = _resolve_planet_names(planet_ids) if planet_ids else None
+        fac_names_task = _resolve_facility_names(ind_fac_ids, at) if ind_fac_ids else None
+
+        names: dict = await names_task if names_task else {}
+        planet_names: dict = await planet_names_task if planet_names_task else {}
+        fac_names: dict = await fac_names_task if fac_names_task else {}
+
+        # Skill names come from the local SDE (no ESI call needed)
+        skill_name_map: dict = get_skill_names(skill_ids) if skill_ids else {}
 
         portrait = f"https://images.evetech.net/characters/{cid}/portrait?size=128"
 
@@ -1898,6 +1944,24 @@ def create_app() -> FastAPI:
         sys_name = names.get(sys_id) if sys_id else None
         ship_type_name = names.get(ship_type_id) if ship_type_id else None
         security_status = pub.get("security_status")
+
+        # BUG-04: Annotate raw ESI arrays with resolved human-readable names
+        # so the dashboard widgets never have to display raw numeric IDs.
+        for j in active_jobs:
+            j["blueprint_type_name"] = names.get(int(j.get("blueprint_type_id") or 0), "")
+            j["product_type_name"]   = names.get(int(j.get("product_type_id")   or 0), "")
+            j["facility_name"]       = fac_names.get(int(j.get("facility_id")   or 0), "")
+
+        for p in planets:
+            pid = int(p.get("planet_id") or 0)
+            sid = int(p.get("solar_system_id") or 0)
+            p["planet_name"] = planet_names.get(pid, "")
+            p["system_name"] = names.get(sid, "")
+
+        active_sq = [
+            {**s, "skill_name": skill_name_map.get(int(s.get("skill_id") or 0)) or f"Skill {s.get('skill_id', '?')}"}
+            for s in active_sq
+        ]
 
         # Optionally fetch full corp ESI data (ticker, member count, etc.)
         corp_esi_data: dict = {}

@@ -2,7 +2,9 @@
 {% block content %}
 <style>
 /* Force full-width layout */
-main.wrap { max-width: 100% !important; padding: 0 !important; }
+/* BUG-03: Do NOT use padding shorthand here — it would override the      */
+/* sidebar-open padding-left rule in base.html. Set sides individually.   */
+main.wrap { max-width: 100% !important; padding-top: 0 !important; padding-right: 0 !important; padding-bottom: 0 !important; }
 body:not(.sidebar-open) main.wrap { padding-left: 0 !important; }
 
 /* ── Char bar ───────────────────────────────────────────── */
@@ -46,18 +48,30 @@ body:not(.sidebar-open) main.wrap { padding-left: 0 !important; }
 /* ── Widget ─────────────────────────────────────────────── */
 .widget {
   background: #0a1628; border: 1px solid #1a2a40;
-  border-radius: 9px; overflow: hidden; transition: border-color .14s;
+  border-radius: 9px; overflow: visible; transition: border-color .14s, box-shadow .14s;
   display: flex; flex-direction: column; min-width: 0; box-sizing: border-box;
+  position: relative;  /* needed for resize handle */
 }
 .widget:hover { border-color: #253a58; }
-.widget.drag-source { opacity: .45; border-style: dashed; border-color: #3a8fff; }
-.widget.drag-over   { border-color: #3a8fff; background: #0d1f38; box-shadow: 0 0 0 2px #3a8fff44; }
-.widget.pinned > .widget-header { cursor: default; }
+/* BUG-05: drag classes applied by mouse-event drag (no HTML5 drag) */
+.widget.drag-ghost { opacity: .45; border-style: dashed; border-color: #3a8fff; pointer-events: none; }
+.widget.drop-target { border-color: #3a8fff; background: #0d1f38; box-shadow: 0 0 0 2px #3a8fff44; }
+.widget.pinned > .widget-header { cursor: default !important; }
 .widget.collapsed > .widget-body { display: none; }
 .widget[data-size="sm"] { width: calc(25%   - 9px);  min-width: 185px; }
 .widget[data-size="md"] { width: calc(33.33% - 8px); min-width: 245px; }
 .widget[data-size="lg"] { width: calc(50%   - 6px);  min-width: 310px; }
 .widget[data-size="xl"] { width: 100%; }
+/* Custom pixel width set by drag-resize (overrides data-size) */
+.widget[data-custom-w] { width: var(--widget-custom-w); }
+
+/* Floating drag clone */
+#widget-drag-clone {
+  position: fixed; pointer-events: none; z-index: 9000;
+  opacity: .82; box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  border: 1px dashed #3a8fff; border-radius: 9px;
+  background: #0d1f38; transition: none;
+}
 
 /* ── Widget header ──────────────────────────────────────── */
 .widget-header {
@@ -65,10 +79,12 @@ body:not(.sidebar-open) main.wrap { padding-left: 0 !important; }
   padding: 8px 11px; cursor: grab; user-select: none;
   border-bottom: 1px solid #141e2e;
   background: linear-gradient(180deg, #0d1c30 0%, #0a1628 100%);
-  flex-shrink: 0;
+  flex-shrink: 0; border-radius: 9px 9px 0 0;
 }
 .widget-header:active { cursor: grabbing; }
-.widget-hicon  { font-size: 13px; line-height: 1; }
+/* BUG-06: SVG icon in header */
+.widget-hicon { width: 16px; height: 16px; flex-shrink: 0; color: #3a8fff; display: flex; align-items: center; justify-content: center; }
+.widget-hicon svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; display: block; }
 .widget-title  { font-size: 11px; font-weight: 600; color: #8bbfff; flex: 1;
                  letter-spacing: .3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .widget-meta   { font-size: 10px; color: #334; flex-shrink: 0; margin-right: 2px; }
@@ -79,9 +95,25 @@ body:not(.sidebar-open) main.wrap { padding-left: 0 !important; }
 }
 .widget-ctrl button:hover { color: #8bbfff; background: #122040; }
 .widget-ctrl .w-pin.active { color: #3a8fff; }
+/* Pin icon as SVG via pseudo */
+.w-pin::before { content: ''; display: inline-block; }
 
 /* ── Widget body ────────────────────────────────────────── */
 .widget-body { padding: 11px; flex: 1; overflow: hidden; font-size: 13px; }
+
+/* ── BUG-05: Resize handle ──────────────────────────────── */
+.widget-resize-handle {
+  position: absolute; right: -4px; top: 20%; bottom: 20%;
+  width: 8px; cursor: ew-resize; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+}
+.widget-resize-handle::after {
+  content: ''; display: block; width: 3px; height: 24px;
+  background: rgba(58,143,255,.0); border-radius: 2px;
+  transition: background .15s;
+}
+.widget-resize-handle:hover::after,
+.widget-resize-handle.resizing::after { background: rgba(58,143,255,.6); }
 
 /* ── Inner components ───────────────────────────────────── */
 .stat-label { font-size: 10px; color: #445; text-transform: uppercase; letter-spacing: .6px; }
@@ -215,18 +247,32 @@ function sparkline(pts,w,h){
 }
 
 /* ══ WIDGET REGISTRY ══════════════════════════════════════════════════ */
+/* BUG-06: SVG icon strings for each widget — consistent with app's icon style */
+var WIDGET_ICONS={
+  char_bio:      '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>',
+  wallet:        '<svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M16 14a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" stroke="none"/><path d="M2 10h20M7 3l5 4 5-4"/></svg>',
+  skill_queue:   '<svg viewBox="0 0 24 24"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>',
+  industry:      '<svg viewBox="0 0 24 24"><path d="M2 20h20M4 20V10l6-4v4l6-4v4l4-2v12"/></svg>',
+  pi:            '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><line x1="3" y1="12" x2="21" y2="12"/></svg>',
+  market_orders: '<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+  notifications: '<svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>',
+  location:      '<svg viewBox="0 0 24 24"><path d="M12 22s-8-5.686-8-12a8 8 0 1116 0c0 6.314-8 12-8 12z"/><circle cx="12" cy="10" r="3"/></svg>',
+  relay:         '<svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114.08 0M1.42 9a16 16 0 0121.16 0M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1" fill="currentColor" stroke="none"/></svg>',
+  assets:        '<svg viewBox="0 0 24 24"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>',
+  structures:    '<svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="1"/><path d="M4 10l8-7 8 7"/><rect x="9" y="14" width="6" height="7"/></svg>',
+};
 var WIDGET_DEFS={
-  char_bio:      {title:'Character',       icon:'👤',size:'md',desc:'Portrait, corp, online status'},
-  wallet:        {title:'Wallet',          icon:'💰',size:'md',desc:'Balance + 7-day sparkline'},
-  skill_queue:   {title:'Skill Queue',     icon:'📚',size:'lg',desc:'Training progress bars'},
-  industry:      {title:'Industry Jobs',   icon:'🏭',size:'lg',desc:'Active job countdowns'},
-  pi:            {title:'Planetary Int.',  icon:'🌍',size:'md',desc:'PI planets & extractor status'},
-  market_orders: {title:'Market Orders',   icon:'📈',size:'md',desc:'Active buy/sell orders'},
-  notifications: {title:'Notifications',   icon:'🔔',size:'md',desc:'ESI notification feed'},
-  location:      {title:'Location',        icon:'📍',size:'md',desc:'Current system & ship'},
-  relay:         {title:'Corp Relay',      icon:'📡',size:'md',desc:'Online corp members'},
-  assets:        {title:'Assets Summary',  icon:'📦',size:'sm',desc:'Quick stat counters'},
-  structures:    {title:'Structures',      icon:'🏗️',size:'md',desc:'Fuel & timers (coming soon)'},
+  char_bio:      {title:'Character',       size:'md',desc:'Portrait, corp, online status'},
+  wallet:        {title:'Wallet',          size:'md',desc:'Balance + 7-day sparkline'},
+  skill_queue:   {title:'Skill Queue',     size:'lg',desc:'Training progress bars'},
+  industry:      {title:'Industry Jobs',   size:'lg',desc:'Active job countdowns'},
+  pi:            {title:'Planetary Int.',  size:'md',desc:'PI planets & extractor status'},
+  market_orders: {title:'Market Orders',   size:'md',desc:'Active buy/sell orders'},
+  notifications: {title:'Notifications',   size:'md',desc:'ESI notification feed'},
+  location:      {title:'Location',        size:'md',desc:'Current system & ship'},
+  relay:         {title:'Corp Relay',      size:'md',desc:'Online corp members'},
+  assets:        {title:'Assets Summary',  size:'sm',desc:'Quick stat counters'},
+  structures:    {title:'Structures',      size:'md',desc:'Fuel & timers (coming soon)'},
 };
 var DEFAULT_ORDER=['char_bio','wallet','skill_queue','industry','pi','market_orders','notifications','location','relay','assets','structures'];
 var SIZE_CYCLE=['sm','md','lg','xl'];
@@ -249,85 +295,220 @@ function resetLayout(){
   saveCfg(_alias,buildDefaultCfg());renderGrid(_alias,_dash);
 }
 
-/* ══ DRAG & DROP ══════════════════════════════════════════════════════ */
-var _dragId=null;
-function attachDrag(el,alias){
-  el.addEventListener('dragstart',function(e){
-    if(el.classList.contains('pinned')){e.preventDefault();return;}
-    _dragId=el.dataset.id;el.classList.add('drag-source');
-    e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',_dragId);
-  });
-  el.addEventListener('dragend',function(){
-    el.classList.remove('drag-source');
-    document.querySelectorAll('.drag-over').forEach(function(w){w.classList.remove('drag-over');});
-    _dragId=null;
-  });
-  el.addEventListener('dragover',function(e){
-    e.preventDefault();
-    if(!_dragId||_dragId===el.dataset.id||el.classList.contains('pinned'))return;
-    document.querySelectorAll('.drag-over').forEach(function(w){w.classList.remove('drag-over');});
-    el.classList.add('drag-over');
-  });
-  el.addEventListener('dragleave',function(){el.classList.remove('drag-over');});
-  el.addEventListener('drop',function(e){
-    e.preventDefault();el.classList.remove('drag-over');
-    if(!_dragId||_dragId===el.dataset.id||el.classList.contains('pinned'))return;
-    var grid=document.getElementById('widget-grid');
-    var items=[].slice.call(grid.children);
-    var from=null,to=el,fi,ti;
-    for(var i=0;i<items.length;i++){if(items[i].dataset.id===_dragId)from=items[i];}
-    if(!from)return;fi=items.indexOf(from);ti=items.indexOf(to);
-    if(fi<ti)grid.insertBefore(from,to.nextSibling);else grid.insertBefore(from,to);
-    _saveDomOrder(alias);
-  });
-}
+/* ══ BUG-05: MOUSE-EVENT DRAG-TO-REORDER ═════════════════════════════ */
+/* Replaces HTML5 dragstart/dragover/drop which is unreliable in WebView2 */
+var _drag={active:false,id:null,clone:null,alias:null,startX:0,startY:0,moved:false};
+
 function _saveDomOrder(alias){
   var cfg=loadCfg(alias);
   var dom=[].slice.call(document.querySelectorAll('#widget-grid .widget')).map(function(w){return w.dataset.id;});
-  var vis=dom.map(function(id){var ex=cfg.find(function(c){return c.id===id;});return ex||{id:id,visible:true,pinned:false,collapsed:false,size:(WIDGET_DEFS[id]?WIDGET_DEFS[id].size:'md')};});
+  var vis=dom.map(function(wid){var ex=cfg.find(function(c){return c.id===wid;});return ex||{id:wid,visible:true,pinned:false,collapsed:false,size:(WIDGET_DEFS[wid]?WIDGET_DEFS[wid].size:'md')};});
   var hid=cfg.filter(function(c){return!c.visible&&!vis.find(function(v){return v.id===c.id;});});
   saveCfg(alias,vis.concat(hid));
 }
 
+function _widgetFromPoint(x,y,skipId){
+  var els=document.querySelectorAll('#widget-grid .widget');
+  for(var i=0;i<els.length;i++){
+    var w=els[i];
+    if(w.dataset.id===skipId||w.classList.contains('pinned'))continue;
+    var r=w.getBoundingClientRect();
+    if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)return w;
+  }
+  return null;
+}
+
+function attachDrag(el,alias){
+  var header=el.querySelector('.widget-header');
+  if(!header)return;
+  header.addEventListener('mousedown',function(e){
+    if(e.button!==0)return;
+    if(el.classList.contains('pinned'))return;
+    // Don't start drag on control buttons
+    if(e.target.closest('.widget-ctrl'))return;
+    e.preventDefault();
+    _drag.active=false;_drag.moved=false;
+    _drag.id=el.dataset.id;_drag.alias=alias;
+    _drag.startX=e.clientX;_drag.startY=e.clientY;
+    _drag.el=el;
+    document.addEventListener('mousemove',_onDragMove);
+    document.addEventListener('mouseup',_onDragEnd);
+  });
+}
+
+function _onDragMove(e){
+  if(!_drag.id)return;
+  var dx=e.clientX-_drag.startX,dy=e.clientY-_drag.startY;
+  if(!_drag.active&&(Math.abs(dx)>5||Math.abs(dy)>5)){
+    // Drag threshold crossed — create floating clone
+    _drag.active=true;_drag.moved=true;
+    var r=_drag.el.getBoundingClientRect();
+    var clone=document.createElement('div');
+    clone.id='widget-drag-clone';
+    clone.style.cssText='width:'+r.width+'px;height:'+r.height+'px;left:'+r.left+'px;top:'+r.top+'px;';
+    clone.innerHTML='<div class="widget-header" style="border-radius:9px;padding:8px 11px;background:linear-gradient(180deg,#0d1c30,#0a1628);display:flex;align-items:center;gap:7px">'
+      +(_drag.el.querySelector('.widget-header').innerHTML)+'</div>';
+    document.body.appendChild(clone);
+    _drag.clone=clone;
+    _drag.el.classList.add('drag-ghost');
+  }
+  if(_drag.active&&_drag.clone){
+    var r=_drag.el.getBoundingClientRect();
+    _drag.clone.style.left=(r.left+dx)+'px';
+    _drag.clone.style.top=(r.top+dy)+'px';
+    // Highlight drop target
+    document.querySelectorAll('.drop-target').forEach(function(w){w.classList.remove('drop-target');});
+    var target=_widgetFromPoint(e.clientX,e.clientY,_drag.id);
+    if(target)target.classList.add('drop-target');
+  }
+}
+
+function _onDragEnd(e){
+  document.removeEventListener('mousemove',_onDragMove);
+  document.removeEventListener('mouseup',_onDragEnd);
+  if(_drag.clone){_drag.clone.remove();_drag.clone=null;}
+  document.querySelectorAll('.drop-target').forEach(function(w){w.classList.remove('drop-target');});
+  if(_drag.el)_drag.el.classList.remove('drag-ghost');
+  if(_drag.active&&_drag.moved){
+    var target=_widgetFromPoint(e.clientX,e.clientY,_drag.id);
+    if(target){
+      var grid=document.getElementById('widget-grid');
+      var items=[].slice.call(grid.children);
+      var from=_drag.el,fi=items.indexOf(from),ti=items.indexOf(target);
+      if(fi!==ti){
+        if(fi<ti)grid.insertBefore(from,target.nextSibling);else grid.insertBefore(from,target);
+        _saveDomOrder(_drag.alias);
+      }
+    }
+  }
+  _drag={active:false,id:null,clone:null,alias:null,startX:0,startY:0,moved:false,el:null};
+}
+
+/* ══ BUG-05: DRAG-TO-RESIZE ══════════════════════════════════════════ */
+var _resize={active:false,el:null,startX:0,startW:0,alias:null};
+var _SIZE_BREAKPOINTS={sm:185,md:245,lg:310,xl:99999};
+
+function attachResize(el,alias){
+  var handle=el.querySelector('.widget-resize-handle');
+  if(!handle)return;
+  handle.addEventListener('mousedown',function(e){
+    if(e.button!==0)return;
+    e.preventDefault();e.stopPropagation();
+    _resize.active=true;_resize.el=el;_resize.alias=alias;
+    _resize.startX=e.clientX;_resize.startW=el.getBoundingClientRect().width;
+    handle.classList.add('resizing');
+    document.addEventListener('mousemove',_onResizeMove);
+    document.addEventListener('mouseup',_onResizeEnd);
+  });
+}
+
+function _onResizeMove(e){
+  if(!_resize.active)return;
+  var newW=Math.max(160,_resize.startW+(e.clientX-_resize.startX));
+  _resize.el.style.setProperty('--widget-custom-w',newW+'px');
+  _resize.el.setAttribute('data-custom-w','1');
+  _resize.el.style.width=newW+'px';
+}
+
+function _onResizeEnd(e){
+  document.removeEventListener('mousemove',_onResizeMove);
+  document.removeEventListener('mouseup',_onResizeEnd);
+  var handle=_resize.el?_resize.el.querySelector('.widget-resize-handle'):null;
+  if(handle)handle.classList.remove('resizing');
+  if(!_resize.active)return;
+  // Snap to nearest named size based on final pixel width
+  var finalW=_resize.el.getBoundingClientRect().width;
+  var best='xl',bestDist=Infinity;
+  var grid=document.getElementById('widget-grid');
+  var gridW=grid?grid.getBoundingClientRect().width:window.innerWidth;
+  var sizeMap={sm:gridW*0.25,md:gridW*0.3333,lg:gridW*0.50,xl:gridW};
+  Object.keys(sizeMap).forEach(function(sz){
+    var d=Math.abs(finalW-sizeMap[sz]);if(d<bestDist){bestDist=d;best=sz;}
+  });
+  // Apply named size (remove custom override)
+  _resize.el.style.width='';
+  _resize.el.removeAttribute('data-custom-w');
+  _resize.el.style.removeProperty('--widget-custom-w');
+  _resize.el.setAttribute('data-size',best);
+  // Persist
+  var cfg=loadCfg(_resize.alias);
+  var wid=_resize.el.dataset.id;
+  var item=cfg.find(function(c){return c.id===wid;});
+  if(item){item.size=best;saveCfg(_resize.alias,cfg);}
+  _resize={active:false,el:null,startX:0,startW:0,alias:null};
+}
+
 /* ══ WIDGET BUILDER ═══════════════════════════════════════════════════ */
+/* BUG-06: SVG icons; BUG-05: pointer-event drag + resize handle        */
+/* BUG-05: pin button now correctly locks drag and persists state        */
 function buildWidgetEl(id,state,alias){
   var def=WIDGET_DEFS[id];if(!def)return null;
   var sz=state.size||def.size;
+  var icon=WIDGET_ICONS[id]||'<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>';
   var el=document.createElement('div');
   el.className='widget'+(state.pinned?' pinned':'')+(state.collapsed?' collapsed':'');
-  el.dataset.id=id;el.setAttribute('data-size',sz);el.setAttribute('draggable',state.pinned?'false':'true');
+  el.dataset.id=id;el.setAttribute('data-size',sz);
   el.innerHTML=
     '<div class="widget-header">'
-    +'<span class="widget-hicon">'+def.icon+'</span>'
+    +'<span class="widget-hicon">'+icon+'</span>'
     +'<span class="widget-title">'+esc(def.title)+'</span>'
     +'<span class="widget-meta" id="wm-'+id+'"></span>'
     +'<div class="widget-ctrl">'
-    +'<button class="w-sz" title="Cycle size" onclick="cycleSize(\''+id+'\',\''+alias+'\',this)">&#x229F;</button>'
-    +'<button class="w-col" title="Collapse/Expand" onclick="toggleCollapse(\''+id+'\',\''+alias+'\',this)">'+(state.collapsed?'&#xff0b;':'&#xff0d;')+'</button>'
-    +'<button class="w-pin'+(state.pinned?' active':'')+'" title="Pin/Unpin" onclick="togglePin(\''+id+'\',\''+alias+'\',this)">&#x1F4CC;</button>'
-    +'<button class="w-del" title="Remove widget" onclick="removeWidget(\''+id+'\',\''+alias+'\')">&#xd7;</button>'
+    +'<button class="w-sz" title="Cycle size" onclick="cycleSize(\''+id+'\',\''+alias+'\')">'
+      +'<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="14" height="6" rx="1"/></svg>'
+    +'</button>'
+    +'<button class="w-col" title="Collapse/Expand" onclick="toggleCollapse(\''+id+'\',\''+alias+'\',this)">'
+      +(state.collapsed
+        ?'<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>'
+        :'<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="8" x2="14" y2="8"/></svg>'
+      )
+    +'</button>'
+    +'<button class="w-pin'+(state.pinned?' active':'')+'" title="Pin (locks position)"'
+      +' onclick="togglePin(\''+id+'\',\''+alias+'\',this)">'
+      +'<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 2l4 4-2 2-3-1-4 4v2H3v-2L7 7 6 4l4-2z"/><line x1="6" y1="10" x2="2" y2="14"/></svg>'
+    +'</button>'
+    +'<button class="w-del" title="Remove widget" onclick="removeWidget(\''+id+'\',\''+alias+'\')">'
+      +'<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="2" x2="14" y2="14"/><line x1="14" y1="2" x2="2" y2="14"/></svg>'
+    +'</button>'
     +'</div></div>'
-    +'<div class="widget-body" id="wb-'+id+'"><div class="wno-data">Loading\u2026</div></div>';
+    +'<div class="widget-body" id="wb-'+id+'"><div class="wno-data">Loading\u2026</div></div>'
+    +'<div class="widget-resize-handle" title="Drag to resize"></div>';
   attachDrag(el,alias);
+  attachResize(el,alias);
   return el;
 }
 function cycleSize(id,alias){
   var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});if(!item)return;
   var idx=SIZE_CYCLE.indexOf(item.size||'md');item.size=SIZE_CYCLE[(idx+1)%SIZE_CYCLE.length];
   saveCfg(alias,cfg);
-  var el=document.querySelector('.widget[data-id="'+id+'"]');if(el)el.setAttribute('data-size',item.size);
+  var el=document.querySelector('.widget[data-id="'+id+'"]');
+  if(el){el.setAttribute('data-size',item.size);el.style.width='';el.removeAttribute('data-custom-w');}
 }
 function toggleCollapse(id,alias,btn){
   var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});if(!item)return;
   item.collapsed=!item.collapsed;saveCfg(alias,cfg);
   var el=document.querySelector('.widget[data-id="'+id+'"]');
-  if(el){el.classList.toggle('collapsed',item.collapsed);btn.textContent=item.collapsed?'\uff0b':'\uff0d';}
+  if(el){
+    el.classList.toggle('collapsed',item.collapsed);
+    // Swap collapse icon
+    btn.innerHTML=item.collapsed
+      ?'<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="2" x2="8" y2="14"/><line x1="2" y1="8" x2="14" y2="8"/></svg>'
+      :'<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><line x1="2" y1="8" x2="14" y2="8"/></svg>';
+  }
 }
 function togglePin(id,alias,btn){
   var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});if(!item)return;
   item.pinned=!item.pinned;saveCfg(alias,cfg);
   var el=document.querySelector('.widget[data-id="'+id+'"]');
-  if(el){el.classList.toggle('pinned',item.pinned);el.setAttribute('draggable',item.pinned?'false':'true');btn.classList.toggle('active',item.pinned);}
+  if(el){
+    el.classList.toggle('pinned',item.pinned);
+    // BUG-05: pinned state is purely managed by the .pinned CSS class;
+    // the mouse-drag handler checks classList before starting a drag.
+    btn.classList.toggle('active',item.pinned);
+    // Update header cursor via CSS (pointer vs grab)
+    var hdr=el.querySelector('.widget-header');
+    if(hdr)hdr.style.cursor=item.pinned?'default':'grab';
+  }
 }
 function removeWidget(id,alias){
   var cfg=loadCfg(alias),item=cfg.find(function(c){return c.id===id;});
@@ -345,8 +526,9 @@ function renderPicker(alias){
     var def=WIDGET_DEFS[id];
     var state=cfg.find(function(c){return c.id===id;});
     var on=!!(state&&state.visible);
+    var icon=WIDGET_ICONS[id]||'';
     return '<div class="wgt-tile'+(on?' enabled':'')+'" onclick="toggleWidget(\''+id+'\',\''+alias+'\')">'
-      +'<span class="wt-icon">'+def.icon+'</span>'
+      +'<span class="wt-icon" style="display:flex;align-items:center;color:#3a8fff">'+icon+'</span>'
       +'<span class="wt-name">'+esc(def.title)+'</span>'
       +'<span class="wt-desc">'+esc(def.desc)+'</span>'
       +'<span class="wt-state wbadge '+(on?'wbg':'wbb')+'">'+(on?'\u25cf Visible':'\u25cb Hidden')+'</span>'
@@ -495,12 +677,17 @@ function renderIndustry(dash){
   var meta=document.getElementById('wm-industry');if(meta)meta.textContent=jobs.length+' active';
   var rows=jobs.slice(0,10).map(function(j){
     var act=ACT[j.activity_id]||('Activity '+j.activity_id);
+    // BUG-04: show blueprint/product name resolved server-side; fall back to activity
+    var itemName=j.product_type_name||j.blueprint_type_name||act;
     var done=j.status==='delivered'||j.status==='ready';
     var cd=done?'<span class="wbadge wbg">Ready</span>':'<span style="color:#f0c050;font-size:11px">'+fmtCountdown(j.end_date)+'</span>';
-    return '<tr><td>'+esc(act)+'</td><td>'+(j.runs!=null?j.runs:'\u2014')+'</td><td>'+cd+'</td></tr>';
+    return '<tr><td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(itemName)+'">'
+      +esc(itemName)+'</td>'
+      +'<td style="color:#445;font-size:10px">'+esc(act)+'</td>'
+      +'<td>'+(j.runs!=null?j.runs:'\u2014')+'</td><td>'+cd+'</td></tr>';
   }).join('');
-  return '<table class="tiny-table"><thead><tr><th>Activity</th><th>Runs</th><th>Time</th></tr></thead><tbody>'+rows
-    +(jobs.length>10?'<tr><td colspan="3" style="color:#334;font-size:11px;text-align:center">+'+(jobs.length-10)+' more</td></tr>':'')
+  return '<table class="tiny-table"><thead><tr><th>Item</th><th>Type</th><th>Runs</th><th>Time</th></tr></thead><tbody>'+rows
+    +(jobs.length>10?'<tr><td colspan="4" style="color:#334;font-size:11px;text-align:center">+'+(jobs.length-10)+' more</td></tr>':'')
     +'</tbody></table>';
 }
 

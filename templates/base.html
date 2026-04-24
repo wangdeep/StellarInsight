@@ -250,8 +250,9 @@
       }
 
       /* ── Shift main content when sidebar open ────────────── */
+      /* BUG-03: !important ensures this beats per-page padding overrides   */
       body.sidebar-open main.wrap {
-        padding-left: calc(var(--sidebar-w) + 14px);
+        padding-left: calc(var(--sidebar-w) + 14px) !important;
       }
       main.wrap {
         transition: padding-left .22s cubic-bezier(.4,0,.2,1);

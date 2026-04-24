@@ -238,6 +238,46 @@ def _run_tray(window_ref: list) -> None:
 
 
 # ── Webview start (platform-aware backend selection) ─────────────────────────
+def _webview2_installed() -> bool:
+    """
+    BUG-07: Check the Windows registry to confirm WebView2 is already
+    installed before pywebview tries to download a bootstrapper every run.
+
+    Returns True if any per-machine or per-user WebView2 entry is found.
+    This prevents the spurious download-then-fail-to-detect loop.
+    """
+    if _PLATFORM != "Windows":
+        return False
+    try:
+        import winreg
+        # Microsoft documents these as the canonical detection keys.
+        # The per-machine evergreen key is the most common install location.
+        keys_to_check = [
+            # Machine-wide evergreen (most common)
+            (winreg.HKEY_LOCAL_MACHINE,
+             r"SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients"
+             r"\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+            (winreg.HKEY_LOCAL_MACHINE,
+             r"SOFTWARE\Microsoft\EdgeUpdate\Clients"
+             r"\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+            # Per-user install
+            (winreg.HKEY_CURRENT_USER,
+             r"SOFTWARE\Microsoft\EdgeUpdate\Clients"
+             r"\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"),
+        ]
+        for hive, subkey in keys_to_check:
+            try:
+                k = winreg.OpenKey(hive, subkey)
+                winreg.CloseKey(k)
+                logger.info("WebView2 detected in registry: %s", subkey)
+                return True
+            except OSError:
+                continue
+    except Exception as exc:
+        logger.warning("WebView2 registry check failed: %s", exc)
+    return False
+
+
 def _start_webview(window) -> None:
     """
     Start pywebview on the main thread.
@@ -249,6 +289,18 @@ def _start_webview(window) -> None:
     import webview  # already imported before this is called
 
     if _PLATFORM == "Windows":
+        if not _webview2_installed():
+            # WebView2 is genuinely missing — tell the user clearly rather
+            # than letting pywebview attempt a broken silent download.
+            _fatal(
+                "Stellar Insight - WebView2 Required",
+                "Microsoft Edge WebView2 Runtime is not installed.\n\n"
+                "Please download and install it from:\n"
+                "  https://developer.microsoft.com/en-us/microsoft-edge/webview2/\n\n"
+                "Choose the 'Evergreen Standalone Installer' and re-launch "
+                "Stellar Insight.\n\n"
+                f"Log: {_log_file}",
+            )
         try:
             webview.start(gui="edgechromium", debug=False)
             return
