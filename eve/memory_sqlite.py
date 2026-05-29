@@ -21,11 +21,13 @@ class MemoryStore:
 
     @contextmanager
     def _conn(self):
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=15)
         conn.row_factory = sqlite3.Row
-        # Help schema migrations succeed even if another task is briefly using the DB.
+        # WAL mode: readers and writers coexist without blocking each other.
         try:
-            conn.execute("PRAGMA busy_timeout = 3000;")
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA busy_timeout = 10000;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
         except Exception:
             pass
         try:
@@ -505,6 +507,10 @@ class MemoryStore:
                 );
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_nav_intel_sys ON nav_intel(system_id, timestamp DESC);")
+            try:
+                conn.execute("ALTER TABLE nav_intel ADD COLUMN source TEXT DEFAULT 'manual'")
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -540,6 +546,30 @@ class MemoryStore:
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_nav_sig_sys ON nav_signatures(system_id);")
             conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_nav_sig_unique ON nav_signatures(system_id, sig_id);")
+
+            # WH enrichment columns on nav_signatures
+            for _col, _defn in [
+                ("first_seen_ts",     "REAL"),
+                ("last_confirmed_ts", "REAL"),
+                ("wh_type_code",      "TEXT"),
+                ("wh_dest_class",     "TEXT"),
+                ("wh_max_jump_kg",    "REAL"),
+                ("wh_total_kg",       "REAL"),
+                ("wh_lifetime_h",     "INTEGER"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE nav_signatures ADD COLUMN {_col} {_defn}")
+                except Exception:
+                    pass
+            try:
+                conn.execute("""
+                    UPDATE nav_signatures
+                    SET first_seen_ts = created_ts,
+                        last_confirmed_ts = updated_ts
+                    WHERE first_seen_ts IS NULL
+                """)
+            except Exception:
+                pass
 
             # r140: Manufacturing calculator presets
             conn.execute("""
@@ -580,6 +610,23 @@ class MemoryStore:
                     saved_by_name TEXT,
                     saved_ts DATETIME DEFAULT CURRENT_TIMESTAMP
                 );
+            """)
+        except Exception:
+            pass
+
+        # WH mass tracking per connection
+        try:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS nav_wh_mass (
+                    conn_id       TEXT PRIMARY KEY,
+                    total_mass_kg REAL NOT NULL DEFAULT 2000000000,
+                    used_mass_kg  REAL NOT NULL DEFAULT 0,
+                    manual_state  TEXT,
+                    last_jump_ts  REAL,
+                    last_ship_name TEXT,
+                    last_ship_mass_kg REAL,
+                    updated_ts    REAL NOT NULL DEFAULT 0
+                )
             """)
         except Exception:
             pass
@@ -1096,6 +1143,7 @@ class MemoryStore:
                 ('region_name', 'TEXT'),
                 ('is_wh',       'INTEGER NOT NULL DEFAULT 0'),
                 ('region_id',   'INTEGER'),
+                ('tag',         'TEXT'),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE map_systems ADD COLUMN {col} {defn}")
@@ -1116,6 +1164,24 @@ class MemoryStore:
         import time as _t
         self._ensure_map_tables()
         with self._conn() as conn:
+            # Prevent name-based duplicates: if same name exists patch missing fields instead.
+            existing = conn.execute(
+                "SELECT * FROM map_systems WHERE map_id=? AND LOWER(system_name)=LOWER(?)",
+                (map_id, str(system_name))
+            ).fetchone()
+            if existing:
+                row = dict(existing)
+                updates = {}
+                if sec_status is not None and (row.get("sec_status") is None or row.get("sec_status") == 0.0):
+                    updates["sec_status"] = sec_status
+                if region_name and not row.get("region_name"):
+                    updates["region_name"] = region_name
+                if updates:
+                    sets = ", ".join(f'"{k}"=?' for k in updates)
+                    conn.execute(f"UPDATE map_systems SET {sets} WHERE map_id=? AND system_id=?",
+                                 list(updates.values()) + [map_id, row["system_id"]])
+                return {"id": row["id"], "system_id": row["system_id"], "system_name": system_name,
+                        "x_pos": row["x_pos"], "y_pos": row["y_pos"], "action": "exists"}
             try:
                 cur = conn.execute(
                     """INSERT INTO map_systems
@@ -1130,7 +1196,7 @@ class MemoryStore:
                 return {"error": "already_exists"}
 
     def map_update_system(self, system_id: int, map_id: str = 'corp', **kwargs) -> bool:
-        allowed = {'x_pos', 'y_pos', 'temp_name', 'locked', 'color', 'sec_status', 'region_name', 'region_id', 'is_wh'}
+        allowed = {'x_pos', 'y_pos', 'temp_name', 'locked', 'color', 'sec_status', 'region_name', 'region_id', 'is_wh', 'tag'}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -1311,11 +1377,12 @@ class MemoryStore:
         return [dict(zip(cols, r)) for r in rows]
 
     def nav_add_intel(self, system_id: int, content: str,
-                      character_id: int = None, character_name: str = None) -> int:
+                      character_id: int = None, character_name: str = None,
+                      source: str = 'manual') -> int:
         with self._conn() as conn:
             cur = conn.execute(
-                "INSERT INTO nav_intel (system_id, character_id, character_name, content) VALUES (?,?,?,?)",
-                (int(system_id), int(character_id) if character_id else None, character_name, str(content))
+                "INSERT INTO nav_intel (system_id, character_id, character_name, content, source) VALUES (?,?,?,?,?)",
+                (int(system_id), int(character_id) if character_id else None, character_name, str(content), str(source))
             )
             return cur.lastrowid
 
@@ -1379,6 +1446,7 @@ class MemoryStore:
                 ('region_name', 'TEXT'),
                 ('is_wh',       'INTEGER NOT NULL DEFAULT 0'),
                 ('region_id',   'INTEGER'),
+                ('tag',         'TEXT'),
             ]:
                 try:
                     conn.execute(f"ALTER TABLE map_systems ADD COLUMN {col} {defn}")
@@ -1399,6 +1467,24 @@ class MemoryStore:
         import time as _t
         self._ensure_map_tables()
         with self._conn() as conn:
+            # Prevent name-based duplicates: if same name exists patch missing fields instead.
+            existing = conn.execute(
+                "SELECT * FROM map_systems WHERE map_id=? AND LOWER(system_name)=LOWER(?)",
+                (map_id, str(system_name))
+            ).fetchone()
+            if existing:
+                row = dict(existing)
+                updates = {}
+                if sec_status is not None and (row.get("sec_status") is None or row.get("sec_status") == 0.0):
+                    updates["sec_status"] = sec_status
+                if region_name and not row.get("region_name"):
+                    updates["region_name"] = region_name
+                if updates:
+                    sets = ", ".join(f'"{k}"=?' for k in updates)
+                    conn.execute(f"UPDATE map_systems SET {sets} WHERE map_id=? AND system_id=?",
+                                 list(updates.values()) + [map_id, row["system_id"]])
+                return {"id": row["id"], "system_id": row["system_id"], "system_name": system_name,
+                        "x_pos": row["x_pos"], "y_pos": row["y_pos"], "action": "exists"}
             try:
                 cur = conn.execute(
                     """INSERT INTO map_systems
@@ -1413,7 +1499,7 @@ class MemoryStore:
                 return {"error": "already_exists"}
 
     def map_update_system(self, system_id: int, map_id: str = 'corp', **kwargs) -> bool:
-        allowed = {'x_pos', 'y_pos', 'temp_name', 'locked', 'color', 'sec_status', 'region_name', 'region_id', 'is_wh'}
+        allowed = {'x_pos', 'y_pos', 'temp_name', 'locked', 'color', 'sec_status', 'region_name', 'region_id', 'is_wh', 'tag'}
         updates = {k: v for k, v in kwargs.items() if k in allowed}
         if not updates:
             return False
@@ -1558,18 +1644,20 @@ class MemoryStore:
                 new_desc = description or (existing[3] if existing else None)
                 conn.execute(
                     """UPDATE nav_signatures SET sig_group=?, sig_info=?, description=?,
-                       scanned_by=?, scanned_by_name=?, updated_ts=? WHERE system_id=? AND sig_id=?""",
-                    (new_group, new_info, new_desc, scanned_by, scanned_by_name, now,
+                       scanned_by=?, scanned_by_name=?, updated_ts=?, last_confirmed_ts=?
+                       WHERE system_id=? AND sig_id=?""",
+                    (new_group, new_info, new_desc, scanned_by, scanned_by_name, now, now,
                      int(system_id), sig_id)
                 )
                 return {"action": "updated", "sig_id": sig_id, "group": new_group, "info": new_info}
             else:
                 conn.execute(
                     """INSERT INTO nav_signatures (system_id, system_name, sig_id, sig_group, sig_info,
-                       description, scanned_by, scanned_by_name, created_ts, updated_ts)
-                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                       description, scanned_by, scanned_by_name, created_ts, updated_ts,
+                       first_seen_ts, last_confirmed_ts)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (int(system_id), system_name, sig_id, sig_group, sig_info, description,
-                     scanned_by, scanned_by_name, now, now)
+                     scanned_by, scanned_by_name, now, now, now, now)
                 )
                 return {"action": "new", "sig_id": sig_id, "group": sig_group, "info": sig_info}
 
@@ -1581,7 +1669,9 @@ class MemoryStore:
                 (int(system_id),)
             ).fetchall()
         cols = ["id", "system_id", "system_name", "sig_id", "sig_group", "sig_info",
-                "description", "scanned_by", "scanned_by_name", "created_ts", "updated_ts"]
+                "description", "scanned_by", "scanned_by_name", "created_ts", "updated_ts",
+                "first_seen_ts", "last_confirmed_ts", "wh_type_code", "wh_dest_class",
+                "wh_max_jump_kg", "wh_total_kg", "wh_lifetime_h"]
         return [dict(zip(cols, r)) for r in rows]
 
     def nav_delete_sig(self, sig_db_id: int) -> bool:
@@ -1595,6 +1685,115 @@ class MemoryStore:
         with self._conn() as conn:
             conn.execute("DELETE FROM nav_signatures WHERE system_id=?", (int(system_id),))
             return conn.execute("SELECT changes()").fetchone()[0]
+
+    def nav_sig_confirm(self, sig_db_id: int) -> bool:
+        """Reset last_confirmed_ts to now for a sig."""
+        now = time.time()
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE nav_signatures SET last_confirmed_ts=?, updated_ts=? WHERE id=?",
+                (now, now, int(sig_db_id))
+            )
+            return conn.execute("SELECT changes()").fetchone()[0] > 0
+
+    def nav_sig_set_wh_type(self, sig_db_id: int, wh_type_code: str,
+                             wh_dest_class: str = None, wh_max_jump_kg: float = None,
+                             wh_total_kg: float = None, wh_lifetime_h: int = None) -> bool:
+        """Set WH enrichment data on a sig row."""
+        now = time.time()
+        with self._conn() as conn:
+            conn.execute(
+                """UPDATE nav_signatures
+                   SET wh_type_code=?, wh_dest_class=?, wh_max_jump_kg=?,
+                       wh_total_kg=?, wh_lifetime_h=?, updated_ts=?
+                   WHERE id=?""",
+                (wh_type_code, wh_dest_class, wh_max_jump_kg,
+                 wh_total_kg, wh_lifetime_h, now, int(sig_db_id))
+            )
+            return conn.execute("SELECT changes()").fetchone()[0] > 0
+
+    def nav_sig_version(self, system_id: int) -> int:
+        """Return an integer version counter for sigs in a system."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT MAX(updated_ts) FROM nav_signatures WHERE system_id=?",
+                (int(system_id),)
+            ).fetchone()
+        val = row[0] if row and row[0] else 0
+        return int(float(val) * 1000) if val else 0
+
+    # WH Mass Tracking
+    def wh_mass_get(self, conn_id: str) -> Optional[Dict]:
+        """Return the mass record for a connection or None."""
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT * FROM nav_wh_mass WHERE conn_id=?", (conn_id,)
+            ).fetchone()
+        if not row:
+            return None
+        cols = ["conn_id", "total_mass_kg", "used_mass_kg", "manual_state",
+                "last_jump_ts", "last_ship_name", "last_ship_mass_kg", "updated_ts"]
+        return dict(zip(cols, row))
+
+    def wh_mass_upsert(self, conn_id: str, *, total_mass_kg: float = None,
+                       used_mass_kg: float = None, manual_state: str = None,
+                       last_ship_name: str = None, last_ship_mass_kg: float = None) -> Dict:
+        """Create or update a mass record. Partial update — only non-None args change."""
+        import time as _time
+        now = _time.time()
+        with self._conn() as conn:
+            existing = conn.execute(
+                "SELECT total_mass_kg, used_mass_kg FROM nav_wh_mass WHERE conn_id=?",
+                (conn_id,)
+            ).fetchone()
+            if existing is None:
+                total = total_mass_kg if total_mass_kg is not None else 2_000_000_000.0
+                used  = used_mass_kg  if used_mass_kg  is not None else 0.0
+                conn.execute(
+                    """INSERT INTO nav_wh_mass
+                       (conn_id, total_mass_kg, used_mass_kg, manual_state,
+                        last_jump_ts, last_ship_name, last_ship_mass_kg, updated_ts)
+                       VALUES (?,?,?,?,?,?,?,?)""",
+                    (conn_id, total, used, manual_state,
+                     now if last_ship_name else None,
+                     last_ship_name, last_ship_mass_kg, now)
+                )
+            else:
+                updates = {"updated_ts": now}
+                if total_mass_kg  is not None: updates["total_mass_kg"]  = total_mass_kg
+                if used_mass_kg   is not None: updates["used_mass_kg"]   = used_mass_kg
+                if manual_state   is not None: updates["manual_state"]   = manual_state
+                if last_ship_name is not None:
+                    updates["last_ship_name"]    = last_ship_name
+                    updates["last_ship_mass_kg"] = last_ship_mass_kg
+                    updates["last_jump_ts"]      = now
+                set_clause = ", ".join(f"{k}=?" for k in updates)
+                conn.execute(
+                    f"UPDATE nav_wh_mass SET {set_clause} WHERE conn_id=?",
+                    list(updates.values()) + [conn_id]
+                )
+        return self.wh_mass_get(conn_id)
+
+    def wh_mass_reset(self, conn_id: str) -> bool:
+        """Delete mass record (e.g. when connection is re-mapped as a new hole)."""
+        with self._conn() as conn:
+            conn.execute("DELETE FROM nav_wh_mass WHERE conn_id=?", (conn_id,))
+            return conn.execute("SELECT changes()").fetchone()[0] > 0
+
+    def wh_mass_state(self, conn_id: str) -> str:
+        """Return computed mass state string: fresh|halflife|critical|collapsed."""
+        rec = self.wh_mass_get(conn_id)
+        if not rec:
+            return "fresh"
+        if rec.get("manual_state"):
+            return rec["manual_state"]
+        total = rec["total_mass_kg"] or 1
+        used  = rec["used_mass_kg"]  or 0
+        pct   = used / total
+        if pct >= 1.0:  return "collapsed"
+        if pct >= 0.9:  return "critical"
+        if pct >= 0.5:  return "halflife"
+        return "fresh"
 
     def nav_parse_and_upsert_sigs(self, system_id: int, raw_text: str, *,
                                    system_name: str = None, scanned_by: int = None,
@@ -2653,7 +2852,7 @@ class MemoryStore:
                     UNIQUE(map_id, system_id)
                 )""")
             # Migration: add new columns if table already exists
-            for col, defn in [('sec_status','REAL'), ('region_name','TEXT'), ('is_wh','INTEGER DEFAULT 0')]:
+            for col, defn in [('sec_status','REAL'), ('region_name','TEXT'), ('is_wh','INTEGER DEFAULT 0'), ('tag','TEXT')]:
                 try:
                     conn.execute(f"ALTER TABLE map_systems ADD COLUMN {col} {defn}")
                 except Exception:

@@ -1,27 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-  /* Force wide layout */
   main.wrap{max-width:100% !important;padding-right:8px !important;}
   body:not(.sidebar-open) main.wrap{padding-left:8px !important;}
 
   .mkt-wrap{display:grid;grid-template-columns:clamp(240px,20vw,320px) 1fr;gap:0;margin-top:0;height:calc(100vh - var(--topbar-h) - var(--ticker-h) - 60px);min-height:500px;}
   @media(max-width:900px){.mkt-wrap{grid-template-columns:1fr;height:auto;}}
-  .mkt-left{border-right:1px solid rgba(60,80,110,0.22);display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
-  .mkt-right{display:flex;flex-direction:column;overflow:hidden;background: rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+  .mkt-left{border-right:1px solid rgba(60,80,110,0.22);display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+  .mkt-right{display:flex;flex-direction:column;overflow:hidden;background:rgba(0,0,0,0.4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
   .mkt-tree-scroll{flex:1 1 0;overflow-y:auto;font-size:clamp(11px,1vw,13px);min-height:80px;}
   .mkt-tree-scroll.hidden{display:none;}
   .mkt-item-list{overflow-y:auto;flex:1;}
   .mkt-item-row{display:flex;align-items:center;gap:5px;padding:3px 7px;cursor:pointer;transition:background 0.08s;border-bottom:1px solid rgba(46,51,59,0.3);font-size:clamp(11px,1vw,13px);}
   .mkt-item-row:hover{background:rgba(50,160,220,0.06);}
   .mkt-item-row.selected{background:rgba(50,160,220,0.14);}
-  .mkt-item-row img{width:26px;height:26px;border:1px solid rgba(60,80,110,0.28);background: rgba(0,0,0,0.6);}
-  .mkt-detail-hdr{display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid rgba(60,80,110,0.22);background: rgba(0,0,0,0.4);}
-  .mkt-detail-hdr img{width:52px;height:52px;border:1px solid rgba(60,80,110,0.35);background: rgba(0,0,0,0.6);}
+  .mkt-item-row img{width:26px;height:26px;border:1px solid rgba(60,80,110,0.28);background:rgba(0,0,0,0.6);}
+  .mkt-detail-hdr{display:flex;align-items:center;gap:10px;padding:8px;border-bottom:1px solid rgba(60,80,110,0.22);background:rgba(0,0,0,0.4);}
+  .mkt-detail-hdr img{width:52px;height:52px;border:1px solid rgba(60,80,110,0.35);background:rgba(0,0,0,0.6);}
   .mkt-detail-scroll{flex:1;overflow-y:auto;}
-  .order-hdr{padding:4px 8px;font-size:clamp(10px,0.9vw,12px);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(60,80,110,0.22);color:#8b939e;}
+  .order-hdr{padding:4px 8px;font-size:clamp(10px,0.9vw,12px);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(60,80,110,0.22);color:#8b939e;}
   .order-table{width:100%;border-collapse:collapse;font-size:10px;}
-  .order-table thead th{background: rgba(0,0,0,0.4);border:1px solid rgba(60,80,110,0.28);padding:2px 6px;font-size:clamp(9px,0.8vw,11px);font-weight:700;text-transform:uppercase;color:#6b7280;text-align:left;}
+  .order-table thead th{background:rgba(0,0,0,0.4);border:1px solid rgba(60,80,110,0.28);padding:2px 6px;font-size:clamp(9px,0.8vw,11px);font-weight:700;text-transform:uppercase;color:#6b7280;text-align:left;}
   .order-table tbody td{padding:2px 6px;border-bottom:1px solid rgba(46,51,59,0.4);font-family:'Consolas','Monaco',monospace;}
   .order-table tbody tr:hover{background:rgba(50,160,220,0.04);}
   .best-prices{display:flex;gap:0;border-bottom:1px solid rgba(60,80,110,0.22);}
@@ -38,8 +37,6 @@
   .hist-fill{width:100%;background:linear-gradient(180deg,rgba(74,168,232,0.6) 0%,rgba(74,168,232,0.15) 100%);min-height:1px;}
   .hist-lbl{font-size:clamp(7px,0.65vw,9px);color:#4a5060;margin-top:1px;}
   .hist-range.active{background:rgba(74,168,232,0.18);border-color:rgba(74,168,232,0.5);color:#4aa8e8;}
-  #mktHistory{background: rgba(0,0,0,0.4);}
-  /* Tree nodes */
   .tn{padding:0;}
   .tl{padding:3px 4px 3px 0;cursor:pointer;display:flex;align-items:center;gap:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background 0.08s;}
   .tl:hover{background:rgba(50,160,220,0.08);}
@@ -47,9 +44,23 @@
   .tt{width:12px;text-align:center;color:#6b7280;font-size:clamp(9px,0.8vw,11px);flex-shrink:0;cursor:pointer;}
   .tc{margin-left:12px;display:none;}
   .tc.open{display:block;}
+  /* ── Chart toolbar */
+  .chart-toolbar{display:flex;align-items:center;gap:4px;padding:5px 8px;flex-shrink:0;flex-wrap:wrap;border-bottom:1px solid rgba(60,80,110,0.22);background:rgba(0,0,0,0.35);}
+  .tb-sep{width:1px;height:14px;background:rgba(60,80,110,0.4);margin:0 3px;flex-shrink:0;}
+  .tb-lbl{font-size:8px;font-weight:700;text-transform:uppercase;color:#6b7280;letter-spacing:0.05em;white-space:nowrap;}
+  .ind-btn{font-size:8px;padding:2px 7px;border:1px solid rgba(60,80,110,0.35);background:transparent;color:#6b7280;border-radius:2px;cursor:pointer;text-transform:uppercase;letter-spacing:0.04em;font-family:inherit;transition:all 0.12s;}
+  .ind-btn:hover{border-color:rgba(74,168,232,0.4);color:#9ca3af;}
+  .ind-btn.active{background:rgba(74,168,232,0.16);border-color:rgba(74,168,232,0.55);color:#4aa8e8;}
+  .draw-btn{font-size:9px;padding:2px 7px;border:1px solid rgba(60,80,110,0.35);background:transparent;color:#6b7280;border-radius:2px;cursor:pointer;letter-spacing:0.04em;font-family:inherit;transition:all 0.12s;}
+  .draw-btn:hover{border-color:rgba(239,180,47,0.4);color:#9ca3af;}
+  .draw-btn.active{background:rgba(239,180,47,0.14);border-color:rgba(239,180,47,0.55);color:#efb42f;}
+  .draw-btn.clr:hover{border-color:rgba(239,47,47,0.5);color:#ef4444;}
+  /* ── Sub-pane wrappers */
+  .pane-wrap{position:relative;flex-shrink:0;border-top:1px solid rgba(60,80,110,0.15);}
+  .pane-lbl{position:absolute;top:3px;left:6px;font-size:8px;font-weight:700;text-transform:uppercase;color:rgba(107,114,128,0.55);letter-spacing:0.04em;pointer-events:none;z-index:5;}
 </style>
 
-<div class="eve-window" style="margin-top:0;background: rgba(0,0,0,0.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(50,182,255,.12);">
+<div class="eve-window" style="margin-top:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(50,182,255,.12);">
   <div class="eve-window-title">
     <span>REGIONAL MARKET</span>
     <span style="flex:1;"></span>
@@ -65,7 +76,7 @@
         <div style="padding:4px;"><input id="mktSearch" class="eve-input" placeholder="Search items…" style="width:100%;font-size:12px;padding:4px 7px;" oninput="searchItems()"/></div>
         <div id="catTree" class="mkt-tree-scroll eve-scroll"><div style="padding:12px;color:#6b7280;font-size:10px;">Loading market tree…</div></div>
         <div id="itemResultsWrap" style="display:none;flex:1;min-height:0;overflow:hidden;flex-direction:column;border-top:1px solid rgba(60,80,110,0.22);">
-          <div id="itemResultsHdr" style="padding:3px 8px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;background: rgba(0,0,0,0.4);border-bottom:1px solid rgba(60,80,110,0.18);flex-shrink:0;">ITEMS</div>
+          <div id="itemResultsHdr" style="padding:3px 8px;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;background:rgba(0,0,0,0.4);border-bottom:1px solid rgba(60,80,110,0.18);flex-shrink:0;">ITEMS</div>
           <div id="itemResults" class="mkt-item-list eve-scroll" style="flex:1;overflow-y:auto;"></div>
         </div>
       </div>
@@ -78,22 +89,75 @@
         <div id="mktDetail" class="mkt-detail-scroll eve-scroll">
           <div style="padding:20px;text-align:center;color:#4a5060;font-size:11px;">Browse categories or search for an item to view market data.</div>
         </div>
-        <div id="mktHistory" style="display:none;flex-direction:column;flex:1;overflow:hidden;padding:8px;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-shrink:0;">
-            <span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#8b939e;letter-spacing:0.05em;">Range</span>
-            <button class="eve-btn hist-range active" data-days="7"  onclick="setHistRange(7,this)"  style="font-size:9px;padding:2px 8px;">7D</button>
-            <button class="eve-btn hist-range"        data-days="30" onclick="setHistRange(30,this)" style="font-size:9px;padding:2px 8px;">30D</button>
-            <button class="eve-btn hist-range"        data-days="90" onclick="setHistRange(90,this)" style="font-size:9px;padding:2px 8px;">90D</button>
+
+        <!-- ── Price History pane ──────────────────────────────────────── -->
+        <div id="mktHistory" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+
+          <!-- Toolbar -->
+          <div class="chart-toolbar">
+            <span class="tb-lbl">Range</span>
+            <button class="eve-btn hist-range active" data-days="7"   onclick="setHistRange(7,this)"    style="font-size:9px;padding:2px 7px;">7D</button>
+            <button class="eve-btn hist-range"        data-days="30"  onclick="setHistRange(30,this)"   style="font-size:9px;padding:2px 7px;">30D</button>
+            <button class="eve-btn hist-range"        data-days="90"  onclick="setHistRange(90,this)"   style="font-size:9px;padding:2px 7px;">90D</button>
+            <button class="eve-btn hist-range"        data-days="365" onclick="setHistRange(365,this)"  style="font-size:9px;padding:2px 7px;">1Y</button>
+            <button class="eve-btn hist-range"        data-days="9999" onclick="setHistRange(9999,this)" style="font-size:9px;padding:2px 7px;">ALL</button>
+            <div class="tb-sep"></div>
+            <span class="tb-lbl">Overlay</span>
+            <button class="ind-btn" id="ind-ma"   onclick="toggleInd('ma',this)"  title="Simple Moving Average 20/50/200">MA</button>
+            <button class="ind-btn" id="ind-ema"  onclick="toggleInd('ema',this)" title="Exponential Moving Average 20/50/200">EMA</button>
+            <button class="ind-btn" id="ind-bb"   onclick="toggleInd('bb',this)"  title="Bollinger Bands (20,2)">BB</button>
+            <div class="tb-sep"></div>
+            <span class="tb-lbl">Pane</span>
+            <button class="ind-btn active" id="ind-vol"  onclick="toggleInd('vol',this)"  title="Volume">Vol</button>
+            <button class="ind-btn" id="ind-rsi"  onclick="toggleInd('rsi',this)"  title="RSI (14)">RSI</button>
+            <button class="ind-btn" id="ind-macd" onclick="toggleInd('macd',this)" title="MACD (12,26,9)">MACD</button>
+            <div class="tb-sep"></div>
+            <span class="tb-lbl">Scale</span>
+            <button class="ind-btn" id="ind-log" onclick="toggleLog(this)" title="Logarithmic price scale">Log</button>
+            <div class="tb-sep"></div>
+            <span class="tb-lbl">Draw</span>
+            <button class="draw-btn active" id="draw-cursor"    onclick="setDrawMode('cursor',this)"    title="Select / Pan">↖</button>
+            <button class="draw-btn"        id="draw-trendline" onclick="setDrawMode('trendline',this)" title="Trend Line">╱</button>
+            <button class="draw-btn"        id="draw-hline"     onclick="setDrawMode('hline',this)"     title="Horizontal Level">─</button>
+            <button class="draw-btn"        id="draw-fib"       onclick="setDrawMode('fib',this)"       title="Fibonacci Retracement">F</button>
+            <button class="draw-btn clr"                        onclick="clearDrawings()"               title="Clear all drawings">✕</button>
             <span id="histStatus" style="font-size:9px;color:#6b7280;margin-left:4px;"></span>
           </div>
-          <div style="flex:1;position:relative;min-height:0;">
-            <canvas id="histChart"></canvas>
+
+          <!-- Main chart -->
+          <div id="lwChartWrap" style="flex:1;min-height:0;position:relative;">
+            <div id="lwChartMain" style="width:100%;height:100%;"></div>
+            <svg id="drawOverlay" width="0" height="0"
+                 style="position:absolute;top:0;left:0;pointer-events:none;overflow:visible;"></svg>
+            <div id="drawCapture"
+                 style="position:absolute;top:0;left:0;width:100%;height:100%;display:none;z-index:10;cursor:crosshair;"></div>
           </div>
+
+          <!-- Volume sub-pane -->
+          <div class="pane-wrap" id="paneVol" style="height:68px;display:none;">
+            <div class="pane-lbl">Volume</div>
+            <div id="lwChartVol" style="width:100%;height:100%;"></div>
+          </div>
+
+          <!-- RSI sub-pane -->
+          <div class="pane-wrap" id="paneRsi" style="height:80px;display:none;">
+            <div class="pane-lbl">RSI (14)</div>
+            <div id="lwChartRsi" style="width:100%;height:100%;"></div>
+          </div>
+
+          <!-- MACD sub-pane -->
+          <div class="pane-wrap" id="paneMacd" style="height:80px;display:none;">
+            <div class="pane-lbl">MACD (12,26,9)</div>
+            <div id="lwChartMacd" style="width:100%;height:100%;"></div>
+          </div>
+
         </div>
+        <!-- ── End Price History ──────────────────────────────────────── -->
+
       </div>
     </div>
-    <!-- My Orders panel — sibling of mkt-wrap inside eve-window-body -->
-    <div id="ordersPanel" style="display:none;flex:1;overflow-y:auto;padding:8px;background: rgba(0,0,0,0.4);">
+    <!-- My Orders panel -->
+    <div id="ordersPanel" style="display:none;flex:1;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.4);">
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding:4px 0;border-bottom:1px solid rgba(60,80,110,0.22);">
         <span style="font-size:9px;font-weight:700;text-transform:uppercase;color:#8b939e;">Character</span>
         <select id="ordersCharSelect" class="eve-select" style="font-size:10px;" onchange="loadMyOrders()">
@@ -107,7 +171,7 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script>
 const API='/app/api',SDE=API+'/sde';
 const EVE_IMG='https://images.evetech.net/types';
@@ -124,19 +188,18 @@ function fmtFullISK(v){const n=parseFloat(v);if(isNaN(n))return'—';return n.to
 
 let _searchTimer=null,_allGroups=[],_groupsByParent={};
 let _currentItem={typeID:null,name:'',history:[],hubs:{}};
-let _histRange=7,_histChart=null;
+let _histRange=7;
 
+// ── Market tree ────────────────────────────────────────────────────────────
 async function loadTree(){
   const el=document.getElementById('catTree');
   try{
     const r=await fetch(SDE+'/market_groups',{credentials:'include'});
-    if(!r.ok){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">API ${r.status}. <a href="/app/api/sde/diag" style="color:#4aa8e8;">Diagnostics</a></div>`;return;}
+    if(!r.ok){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">API ${r.status}. <a href="/eve/setup" style="color:#4aa8e8;">Go to Setup to download SDE</a></div>`;return;}
     const data=await r.json();
-    // Handle error object
-    if(data&&data.error){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">SDE error: ${data.error}. Run: <code>bash scripts/download_sde.sh</code></div>`;return;}
+    if(data&&data.error){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">SDE not downloaded. <a href="/eve/setup" style="color:#4aa8e8;">Go to Setup →</a></div>`;return;}
     _allGroups=Array.isArray(data)?data:Object.values(data);
     if(!_allGroups.length){el.innerHTML='<div style="padding:8px;color:#6b7280;font-size:10px;">Empty market groups.</div>';return;}
-    // Build parent map — root groups have parentGroupID of null/None/0
     _groupsByParent={};
     _allGroups.forEach(g=>{
       const pid=g.parentGroupID;
@@ -147,7 +210,7 @@ async function loadTree(){
     Object.values(_groupsByParent).forEach(arr=>arr.sort((a,b)=>(a.marketGroupName||'').localeCompare(b.marketGroupName||'')));
     const html=renderTreeLevel('root');
     if(html){el.innerHTML=html;}
-    else{el.innerHTML='<div style="padding:8px;color:#6b7280;">No root categories found. Check SDE data.</div>';}
+    else{el.innerHTML='<div style="padding:8px;color:#6b7280;">No root categories found.</div>';}
   }catch(e){el.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">Error: ${e.message}</div>`;}
 }
 
@@ -158,15 +221,14 @@ function renderTreeLevel(parentKey){
     const gid=g.marketGroupID;
     const hasKids=(_groupsByParent[String(gid)]||[]).length>0;
     const toggle=hasKids?`<span class="tt" onclick="event.stopPropagation();togCat(this,${gid})">&#9656;</span>`:`<span class="tt" style="visibility:hidden;">&#9656;</span>`;
-    const onclickAttr = hasKids
-      ? `onclick="event.stopPropagation();togCat(this.querySelector('.tt'),${gid});loadCatItems(${gid},'${_esc(g.marketGroupName||'').replace(/'/g,"\\'")}',event)"`
-      : `onclick="loadCatItems(${gid},'${_esc(g.marketGroupName||'').replace(/'/g,"\\'")}',event)"`;
-    const childSlot = hasKids ? `<div class="tc" id="cat-${gid}"></div>` : '';
+    const onclickAttr=hasKids
+      ?`onclick="event.stopPropagation();togCat(this.querySelector('.tt'),${gid});loadCatItems(${gid},'${_esc(g.marketGroupName||'').replace(/'/g,"\\'")}',event)"`
+      :`onclick="loadCatItems(${gid},'${_esc(g.marketGroupName||'').replace(/'/g,"\\'")}',event)"`;
+    const childSlot=hasKids?`<div class="tc" id="cat-${gid}"></div>`:'';
     return `<div class="tn" data-gid="${gid}"><div class="tl" ${onclickAttr}>${toggle}<span>${_esc(g.marketGroupName||'?')}</span></div>${childSlot}</div>`;
   }).join('');
 }
 
-// Lazy expand: render children into the container only on first open
 function togCat(el,gid){
   if(!el)return;
   const tn=el.closest('.tn');
@@ -175,21 +237,15 @@ function togCat(el,gid){
   const opening=!cd.classList.contains('open');
   cd.classList.toggle('open');
   el.innerHTML=cd.classList.contains('open')?'&#9662;':'&#9656;';
-  if(opening&&!cd.dataset.rendered){
-    cd.innerHTML=renderTreeLevel(String(gid));
-    cd.dataset.rendered='1';
-  }
+  if(opening&&!cd.dataset.rendered){cd.innerHTML=renderTreeLevel(String(gid));cd.dataset.rendered='1';}
 }
 
 async function loadCatItems(groupID,groupName,evt){
-  // If user clicks a category while searching, clear the search and restore the tree
   const searchInp=document.getElementById('mktSearch');
-  if(searchInp.value.trim().length>=2){ searchInp.value=''; _searchToggle(false); }
+  if(searchInp.value.trim().length>=2){searchInp.value='';_searchToggle(false);}
   const wrap=document.getElementById('itemResultsWrap');
-  // Show items panel below tree (not full-height search mode)
   document.getElementById('catTree').classList.remove('hidden');
-  wrap.style.display='flex';
-  wrap.style.flex='0 1 38%';
+  wrap.style.display='flex';wrap.style.flex='0 1 38%';
   const el=document.getElementById('itemResults');
   document.getElementById('itemResultsHdr').textContent=groupName||'ITEMS';
   el.innerHTML='<div style="padding:6px;color:#6b7280;font-size:10px;">Loading…</div>';
@@ -205,20 +261,11 @@ async function loadCatItems(groupID,groupName,evt){
 }
 
 function searchItems(){clearTimeout(_searchTimer);_searchTimer=setTimeout(doSearch,350);}
-
 function _searchToggle(searching){
-  const tree = document.getElementById('catTree');
-  const wrap = document.getElementById('itemResultsWrap');
-  if(searching){
-    tree.classList.add('hidden');
-    wrap.style.flex = '1';      // take full height when tree is hidden
-    wrap.style.display = 'flex';
-    document.getElementById('itemResultsHdr').textContent='SEARCH RESULTS';
-  } else {
-    tree.classList.remove('hidden');
-    wrap.style.display = 'none';
-    wrap.style.flex = '0 1 38%'; // restore partial height for category browse
-  }
+  const tree=document.getElementById('catTree');
+  const wrap=document.getElementById('itemResultsWrap');
+  if(searching){tree.classList.add('hidden');wrap.style.flex='1';wrap.style.display='flex';document.getElementById('itemResultsHdr').textContent='SEARCH RESULTS';}
+  else{tree.classList.remove('hidden');wrap.style.display='none';wrap.style.flex='0 1 38%';}
 }
 
 async function doSearch(){
@@ -240,8 +287,7 @@ async function selectItem(typeID,name){
   const s=document.querySelector(`.mkt-item-row[data-tid="${typeID}"]`);if(s)s.classList.add('selected');
   document.getElementById('mktHeader').style.display='block';
   document.getElementById('itemTabs').style.display='flex';
-  // Reset to Market Data tab on new item selection
-  switchItemTab('market', document.getElementById('itemTabMarket'));
+  switchItemTab('market',document.getElementById('itemTabMarket'));
   document.getElementById('mktHeader').innerHTML=`<div class="mkt-detail-hdr">${typeImg(typeID,64)}<div><div style="font-size:14px;font-weight:700;color:#e8ecf2;">${_esc(name)}</div><div style="font-size:10px;color:#6b7280;margin-top:2px;">Type ID: ${typeID}</div></div></div>`;
   const det=document.getElementById('mktDetail');det.innerHTML='<div style="padding:12px;color:#6b7280;font-size:10px;">Loading prices…</div>';
   try{
@@ -253,295 +299,377 @@ async function selectItem(typeID,name){
     const srcBadge=priceSource==='esi_fallback'?`<div style="font-size:9px;color:#f59e0b;margin-bottom:4px;">⚠ Fuzzwork unavailable — ESI regional prices</div>`:'';
     let html=`${srcBadge}<div class="best-prices"><div class="best-stat"><div class="best-label">Best Sell</div><div class="best-val sell">${fmtISK(bestSell===Infinity?0:bestSell)} ISK</div><div class="best-hub">${_esc(bestSellHub)}</div></div><div class="best-stat"><div class="best-label">Best Buy</div><div class="best-val buy">${fmtISK(bestBuy)} ISK</div><div class="best-hub">${_esc(bestBuyHub)}</div></div>${bestSell<Infinity&&bestBuy>0?`<div class="best-stat"><div class="best-label">Margin</div><div class="best-val" style="color:#4aa8e8;">${((bestSell-bestBuy)/bestSell*100).toFixed(1)}%</div></div>`:''}</div>`;
     Object.entries(hubs).forEach(([hub,d])=>{
-      const sell = d?.sell || {};
-      const buy  = d?.buy  || {};
-      const hasSell = parseFloat(sell.min) > 0;
-      const hasBuy  = parseFloat(buy.max)  > 0;
-      html += `<div class="order-hdr">${_esc(hub)}</div>`;
-      if(!hasSell && !hasBuy){
-        html += `<div style="padding:4px 8px 6px;font-size:9px;color:#4a5060;font-style:italic;">No active orders in this hub</div>`;
-        return;
-      }
-      html += `<table class="order-table"><thead><tr><th>Type</th><th>Volume</th><th>Price</th></tr></thead><tbody>`;
-      if(hasSell) html += `<tr><td class="sell">Sell Min</td><td>${fmtNum(sell.volume||0)}</td><td class="sell">${fmtFullISK(sell.min)}</td></tr>`;
-      if(hasBuy)  html += `<tr><td class="buy">Buy Max</td><td>${fmtNum(buy.volume||0)}</td><td class="buy">${fmtFullISK(buy.max)}</td></tr>`;
-      html += `</tbody></table>`;
+      const sell=d?.sell||{};const buy=d?.buy||{};
+      const hasSell=parseFloat(sell.min)>0;const hasBuy=parseFloat(buy.max)>0;
+      html+=`<div class="order-hdr">${_esc(hub)}</div>`;
+      if(!hasSell&&!hasBuy){html+=`<div style="padding:4px 8px 6px;font-size:9px;color:#4a5060;font-style:italic;">No active orders in this hub</div>`;return;}
+      html+=`<table class="order-table"><thead><tr><th>Type</th><th>Volume</th><th>Price</th></tr></thead><tbody>`;
+      if(hasSell)html+=`<tr><td class="sell">Sell Min</td><td>${fmtNum(sell.volume||0)}</td><td class="sell">${fmtFullISK(sell.min)}</td></tr>`;
+      if(hasBuy)html+=`<tr><td class="buy">Buy Max</td><td>${fmtNum(buy.volume||0)}</td><td class="buy">${fmtFullISK(buy.max)}</td></tr>`;
+      html+=`</tbody></table>`;
     });
     if(history.length){const maxAvg=Math.max(...history.map(h=>h.average||0));html+=`<div class="hist-wrap"><div class="hist-title">Price History (The Forge, ${history.length}d)</div><div class="hist-bar">${history.map(h=>{const pct=maxAvg>0?(h.average/maxAvg*100):0;return `<div class="hist-col"><div class="hist-fill" style="height:${pct}%;"></div><div class="hist-lbl">${(h.date||'').slice(5,10)}</div></div>`;}).join('')}</div><div style="font-size:9px;color:#6b7280;margin-top:4px;">Latest: ${fmtISK(history[history.length-1]?.average||0)} avg · ${fmtNum(history[history.length-1]?.volume||0)} vol</div></div>`;}
     det.innerHTML=html||'<div style="padding:12px;color:#6b7280;">No market data available.</div>';
   }catch(e){det.innerHTML=`<div style="padding:12px;color:#ef2f2f;font-size:10px;">${e.message}</div>`;}
 }
 
-document.addEventListener('DOMContentLoaded', loadTree);
+document.addEventListener('DOMContentLoaded',loadTree);
 
-// ── Tab switching ─────────────────────────────────────────────────────────
-function switchMktTab(tab, btn) {
-  document.querySelectorAll('#mktTopTabs .eve-tab').forEach(b => b.classList.remove('active'));
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchMktTab(tab,btn){
+  document.querySelectorAll('#mktTopTabs .eve-tab').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  const browseWrap = document.querySelector('.mkt-wrap');
-  const ordersPanel = document.getElementById('ordersPanel');
-  if (tab === 'browse') {
-    browseWrap.style.display = 'grid';
-    ordersPanel.style.display = 'none';
-  } else {
-    browseWrap.style.display = 'none';
-    ordersPanel.style.display = 'flex';
-    loadMyOrders();
-  }
+  const browseWrap=document.querySelector('.mkt-wrap');
+  const ordersPanel=document.getElementById('ordersPanel');
+  if(tab==='browse'){browseWrap.style.display='grid';ordersPanel.style.display='none';}
+  else{browseWrap.style.display='none';ordersPanel.style.display='flex';loadMyOrders();}
 }
 
-// ── My Orders ─────────────────────────────────────────────────────────────
-function fmtDate(ts) {
-  if (!ts) return '—';
-  return new Date(ts).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'2-digit'});
-}
+function fmtDate(ts){if(!ts)return'—';return new Date(ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'2-digit'});}
 
-async function loadMyOrders() {
-  const sel = document.getElementById('ordersCharSelect');
-  const alias = sel ? sel.value : '';
-  const status = document.getElementById('ordersStatus');
-  const list = document.getElementById('ordersList');
-  if (!alias) { list.innerHTML = '<span style="color:#6b7280;font-size:10px;">No character selected.</span>'; return; }
-  status.textContent = 'Loading…';
-  list.innerHTML = '<div style="padding:12px;color:#6b7280;font-size:10px;">Loading orders…</div>';
-  try {
-    const r = await fetch(API + '/eve/character/orders?alias=' + encodeURIComponent(alias), {credentials:'include'});
-    const d = await r.json();
-    if (!d.ok) { list.innerHTML = `<div style="padding:8px;color:#ef2f2f;font-size:10px;">${d.error||'Error loading orders'}</div>`; status.textContent=''; return; }
-    const orders = d.orders || [];
-    if (!orders.length) { list.innerHTML = '<div style="padding:12px;color:#6b7280;font-size:10px;">No active market orders.</div>'; status.textContent='0 orders'; return; }
-
-    const sells = orders.filter(o => !o.is_buy_order).sort((a,b) => a.type_id - b.type_id);
-    const buys  = orders.filter(o =>  o.is_buy_order).sort((a,b) => a.type_id - b.type_id);
-    status.textContent = orders.length + ' orders';
-
-    // Type and location names come from the API response directly
-    const nameMap = d.type_names || {};
-    const locMap = d.location_names || {};
-
-    function orderTable(rows, isBuy) {
-      if (!rows.length) return '<div style="padding:4px 0;color:#6b7280;font-size:9px;">None</div>';
-      return `<table style="width:100%;border-collapse:collapse;font-size:10px;">
-        <thead><tr style="background: rgba(0,0,0,0.6);">
-          <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Item</th>
-          <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Qty</th>
-          <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Price</th>
-          <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Total</th>
-          <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Location</th>
-          <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Expires</th>
-        </tr></thead>
-        <tbody>${rows.map(o => {
-          const name = nameMap[o.type_id] || ('Type ' + o.type_id);
-          const pct = o.volume_total > 0 ? Math.round((1 - o.volume_remain/o.volume_total)*100) : 0;
-          const total = (o.price * o.volume_remain).toFixed(0);
-          const priceCol = isBuy ? '#efef2f' : '#2fef2f';
-          const fillBar = pct > 0 ? `<div style="width:${pct}%;height:2px;background:${priceCol};opacity:0.6;margin-top:1px;border-radius:1px;"></div>` : '';
-          const locationName = locMap[String(o.location_id)] || (o.location_id > 1e12 ? 'Player Structure' : 'Unknown');
+async function loadMyOrders(){
+  const sel=document.getElementById('ordersCharSelect');
+  const alias=sel?sel.value:'';
+  const status=document.getElementById('ordersStatus');
+  const list=document.getElementById('ordersList');
+  if(!alias){list.innerHTML='<span style="color:#6b7280;font-size:10px;">No character selected.</span>';return;}
+  status.textContent='Loading…';
+  list.innerHTML='<div style="padding:12px;color:#6b7280;font-size:10px;">Loading orders…</div>';
+  try{
+    const r=await fetch(API+'/eve/character/orders?alias='+encodeURIComponent(alias),{credentials:'include'});
+    const d=await r.json();
+    if(!d.ok){list.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">${d.error||'Error loading orders'}</div>`;status.textContent='';return;}
+    const orders=d.orders||[];
+    if(!orders.length){list.innerHTML='<div style="padding:12px;color:#6b7280;font-size:10px;">No active market orders.</div>';status.textContent='0 orders';return;}
+    const sells=orders.filter(o=>!o.is_buy_order).sort((a,b)=>a.type_id-b.type_id);
+    const buys=orders.filter(o=>o.is_buy_order).sort((a,b)=>a.type_id-b.type_id);
+    status.textContent=orders.length+' orders';
+    const nameMap=d.type_names||{};const locMap=d.location_names||{};
+    function orderTable(rows,isBuy){
+      if(!rows.length)return'<div style="padding:4px 0;color:#6b7280;font-size:9px;">None</div>';
+      return `<table style="width:100%;border-collapse:collapse;font-size:10px;"><thead><tr style="background:rgba(0,0,0,0.6);">
+        <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Item</th>
+        <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Qty</th>
+        <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Price</th>
+        <th style="padding:3px 6px;text-align:right;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Total</th>
+        <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Location</th>
+        <th style="padding:3px 6px;text-align:left;font-size:9px;color:#8b939e;font-weight:700;text-transform:uppercase;border-bottom:1px solid rgba(60,80,110,0.22);">Expires</th>
+        </tr></thead><tbody>${rows.map(o=>{
+          const name=nameMap[o.type_id]||('Type '+o.type_id);
+          const pct=o.volume_total>0?Math.round((1-o.volume_remain/o.volume_total)*100):0;
+          const total=(o.price*o.volume_remain).toFixed(0);
+          const priceCol=isBuy?'#efef2f':'#2fef2f';
+          const fillBar=pct>0?`<div style="width:${pct}%;height:2px;background:${priceCol};opacity:0.6;margin-top:1px;border-radius:1px;"></div>`:'';
+          const locationName=locMap[String(o.location_id)]||(o.location_id>1e12?'Player Structure':'Unknown');
           return `<tr style="border-bottom:1px solid rgba(46,51,59,0.3);" onmouseenter="this.style.background='rgba(50,160,220,0.05)'" onmouseleave="this.style.background=''">
             <td style="padding:3px 6px;"><div style="display:flex;align-items:center;gap:5px;">${typeImg(o.type_id,32)}<div><div>${_esc(name)}</div>${fillBar}<div style="font-size:8px;color:#6b7280;">${pct}% filled</div></div></div></td>
             <td style="padding:3px 6px;text-align:right;font-family:monospace;">${fmtNum(o.volume_remain)} / ${fmtNum(o.volume_total)}</td>
             <td style="padding:3px 6px;text-align:right;font-family:monospace;color:${priceCol};">${fmtISK(o.price)} ISK</td>
             <td style="padding:3px 6px;text-align:right;font-family:monospace;">${fmtISK(parseInt(total))} ISK</td>
             <td style="padding:3px 6px;color:#8b939e;font-size:9px;">${locationName}</td>
-            <td style="padding:3px 6px;color:#8b939e;font-size:9px;">${fmtDate(o.issued)}</td>
-          </tr>`;
-        }).join('')}</tbody>
-      </table>`;
+            <td style="padding:3px 6px;color:#8b939e;font-size:9px;">${fmtDate(o.issued)}</td></tr>`;
+        }).join('')}</tbody></table>`;
     }
-
-    list.innerHTML = `
+    list.innerHTML=`
       <div style="margin-bottom:10px;">
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#2fef2f;letter-spacing:0.05em;padding:4px 0;border-bottom:1px solid rgba(47,239,47,0.15);margin-bottom:4px;">
-          📤 SELL ORDERS (${sells.length})
-        </div>
-        ${orderTable(sells, false)}
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#2fef2f;letter-spacing:0.05em;padding:4px 0;border-bottom:1px solid rgba(47,239,47,0.15);margin-bottom:4px;">📤 SELL ORDERS (${sells.length})</div>
+        ${orderTable(sells,false)}
       </div>
       <div>
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#efef2f;letter-spacing:0.05em;padding:4px 0;border-bottom:1px solid rgba(239,239,47,0.15);margin-bottom:4px;">
-          📥 BUY ORDERS (${buys.length})
-        </div>
-        ${orderTable(buys, true)}
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#efef2f;letter-spacing:0.05em;padding:4px 0;border-bottom:1px solid rgba(239,239,47,0.15);margin-bottom:4px;">📥 BUY ORDERS (${buys.length})</div>
+        ${orderTable(buys,true)}
       </div>`;
-
-  } catch(e) { list.innerHTML = `<div style="padding:8px;color:#ef2f2f;font-size:10px;">Error: ${e.message}</div>`; status.textContent=''; }
+  }catch(e){list.innerHTML=`<div style="padding:8px;color:#ef2f2f;font-size:10px;">Error: ${e.message}</div>`;status.textContent='';}
 }
 
-// ── Item tab switching (Market Data / Price History) ──────────────────────
-function switchItemTab(tab, btn) {
-  document.querySelectorAll('#itemTabs .eve-tab').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  const det = document.getElementById('mktDetail');
-  const hist = document.getElementById('mktHistory');
-  if (tab === 'market') {
-    det.style.display = 'block';
-    hist.style.display = 'none';
-  } else {
-    det.style.display = 'none';
-    hist.style.display = 'flex';
-    renderHistChart(_histRange);
-  }
+// ── Item tab switching ─────────────────────────────────────────────────────
+function switchItemTab(tab,btn){
+  document.querySelectorAll('#itemTabs .eve-tab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  const det=document.getElementById('mktDetail');
+  const hist=document.getElementById('mktHistory');
+  if(tab==='market'){det.style.display='block';hist.style.display='none';}
+  else{det.style.display='none';hist.style.display='flex';renderHistChart(_histRange);}
 }
 
-function setHistRange(days, btn) {
-  _histRange = days;
-  document.querySelectorAll('.hist-range').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+function setHistRange(days,btn){
+  _histRange=days;
+  document.querySelectorAll('.hist-range').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
   renderHistChart(days);
 }
 
-function renderHistChart(days) {
-  const statusEl = document.getElementById('histStatus');
-  const history = _currentItem.history || [];
-  const hubs = _currentItem.hubs || {};
 
-  const slice = history.slice(-days);
-  if (!slice.length) {
-    statusEl.textContent = 'No history data.';
-    if (_histChart) { _histChart.destroy(); _histChart = null; }
-    return;
+// ══════════════════════════════════════════════════════════════════════════════
+// PRICE HISTORY CHART — Lightweight Charts v4
+// ══════════════════════════════════════════════════════════════════════════════
+let _lwMain=null,_lwVol=null,_lwRsi=null,_lwMacd=null;
+let _lwSeries={},_candleData=[];
+const _activeInd=new Set(['vol']);
+let _logScale=false,_drawMode='cursor',_drawings=[],_drawIP=null;
+
+const LWC_MONO="Consolas,Monaco,'Courier New',monospace";
+const LWC_BASE={
+  layout:{background:{type:'solid',color:'transparent'},textColor:'#6b7280',fontFamily:LWC_MONO,fontSize:10},
+  grid:{vertLines:{color:'rgba(60,80,110,0.12)'},horzLines:{color:'rgba(60,80,110,0.12)'}},
+  crosshair:{mode:LightweightCharts.CrosshairMode.Normal},
+  rightPriceScale:{borderColor:'rgba(60,80,110,0.22)'},
+  timeScale:{borderColor:'rgba(60,80,110,0.22)',fixLeftEdge:true,fixRightEdge:true},
+  handleScroll:{mouseWheel:true,pressedMouseMove:true},
+  handleScale:{mouseWheel:true,pinch:true},
+};
+function makeLWC(el,extra){
+  return LightweightCharts.createChart(el,Object.assign({},LWC_BASE,{autoSize:true},extra||{}));
+}
+function calcSMA(arr,n){
+  return arr.map(function(_,i){if(i<n-1)return null;return arr.slice(i-n+1,i+1).reduce(function(s,v){return s+v;},0)/n;});
+}
+function calcEMA(arr,n){
+  var k=2/(n+1),out=new Array(arr.length).fill(null),ema=null;
+  for(var i=0;i<arr.length;i++){
+    if(ema===null){if(i===n-1){ema=arr.slice(0,n).reduce(function(s,v){return s+v;},0)/n;out[i]=ema;}}
+    else{ema=arr[i]*k+ema*(1-k);out[i]=ema;}
   }
-
-  // Build OHLC candle data from ESI daily history
-  // ESI gives: date, average, highest, lowest, order_count, volume
-  // Approximate open/close from average with slight variance for visual clarity
-  const candles = slice.map((d, i) => {
-    const avg = parseFloat(d.average) || 0;
-    const high = parseFloat(d.highest) || avg;
-    const low  = parseFloat(d.lowest)  || avg;
-    const prev = i > 0 ? (parseFloat(slice[i-1].average) || avg) : avg;
-    // open = previous day average, close = this day average
-    const open  = prev;
-    const close = avg;
-    return { x: d.date, o: open, h: high, l: low, c: close, v: parseInt(d.volume)||0 };
-  });
-
-  // Best current sell price from Fuzzwork hubs (Jita preferred)
-  let currentPrice = null;
-  const hubOrder = ['Jita','Amarr','Dodixie','Rens','Hek'];
-  for (const hub of hubOrder) {
-    const sell = hubs[hub]?.sell?.min;
-    if (sell && parseFloat(sell) > 0) { currentPrice = parseFloat(sell); break; }
-  }
-
-  statusEl.textContent = `${slice.length} days · The Forge`;
-
-  const canvas = document.getElementById('histChart');
-  if (_histChart) { _histChart.destroy(); _histChart = null; }
-
-  const upColor   = 'rgba(47,239,47,0.85)';
-  const downColor = 'rgba(239,47,47,0.85)';
-  const wickColor = 'rgba(180,180,180,0.6)';
-
-  // Chart.js doesn't have built-in candlestick — implement as custom bar chart
-  // Use floating bar chart: bar from low→high, then overlay open→close box
-  const labels = candles.map(c => c.x.slice(5)); // MM-DD
-
-  // Dataset 1: wick (low to high) — thin line via borderWidth trick
-  const wickData = candles.map(c => [c.l, c.h]);
-  // Dataset 2: body (open to close)
-  const bodyData  = candles.map(c => [Math.min(c.o,c.c), Math.max(c.o,c.c)]);
-  const bodyColors = candles.map(c => c.c >= c.o ? upColor : downColor);
-
-  // Dataset 3: current price overlay line
-  const overlayData = currentPrice ? candles.map(() => currentPrice) : [];
-
-  _histChart = new Chart(canvas, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Wick',
-          data: wickData,
-          backgroundColor: wickColor,
-          borderColor: wickColor,
-          borderWidth: 1,
-          barPercentage: 0.15,
-          categoryPercentage: 1.0,
-          order: 2,
-        },
-        {
-          label: 'Body',
-          data: bodyData,
-          backgroundColor: bodyColors,
-          borderColor: bodyColors,
-          borderWidth: 0,
-          barPercentage: 0.6,
-          categoryPercentage: 1.0,
-          order: 1,
-        },
-        ...(currentPrice ? [{
-          label: 'Current Sell (Jita)',
-          data: overlayData,
-          type: 'line',
-          borderColor: 'rgba(74,168,232,0.9)',
-          borderWidth: 1.5,
-          borderDash: [4,3],
-          pointRadius: 0,
-          fill: false,
-          order: 0,
-        }] : []),
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: (items) => {
-              const i = items[0].dataIndex;
-              return slice[i]?.date || '';
-            },
-            label: (item) => {
-              if (item.datasetIndex === 2) return `Current Sell: ${fmtFullISK(item.raw)}`;
-              if (item.datasetIndex === 1) {
-                const c = candles[item.dataIndex];
-                return [
-                  `Open:  ${fmtISK(c.o)} ISK`,
-                  `Close: ${fmtISK(c.c)} ISK`,
-                  `High:  ${fmtISK(c.h)} ISK`,
-                  `Low:   ${fmtISK(c.l)} ISK`,
-                  `Vol:   ${fmtNum(c.v)}`,
-                ];
-              }
-              return null;
-            },
-            filter: (item) => item.datasetIndex !== 0, // hide wick from tooltip
-          },
-          backgroundColor: 'rgba(10,15,24,0.92)',
-          borderColor: 'rgba(60,80,110,0.5)',
-          borderWidth: 1,
-          titleColor: '#e8ecf2',
-          bodyColor: '#8b939e',
-          bodyFont: { family: 'Consolas,Monaco,monospace', size: 11 },
-        },
-      },
-      scales: {
-        x: {
-          ticks: {
-            color: '#4a5060',
-            font: { size: 9 },
-            maxTicksLimit: days <= 7 ? 7 : days <= 30 ? 10 : 12,
-            maxRotation: 0,
-          },
-          grid: { color: 'rgba(60,80,110,0.12)' },
-        },
-        y: {
-          position: 'right',
-          ticks: {
-            color: '#6b7280',
-            font: { family: 'Consolas,Monaco,monospace', size: 10 },
-            callback: (v) => fmtISK(v),
-          },
-          grid: { color: 'rgba(60,80,110,0.12)' },
-        },
-      },
-    }
+  return out;
+}
+function calcBB(arr,n,m){
+  n=n||20;m=m||2;var sma=calcSMA(arr,n);
+  return arr.map(function(_,i){
+    if(sma[i]===null)return{upper:null,mid:null,lower:null};
+    var sl=arr.slice(i-n+1,i+1),std=Math.sqrt(sl.reduce(function(s,v){return s+(v-sma[i])*(v-sma[i]);},0)/n);
+    return{upper:sma[i]+m*std,mid:sma[i],lower:sma[i]-m*std};
   });
 }
-
+function calcRSI(arr,n){
+  n=n||14;var out=new Array(arr.length).fill(null),ag=0,al=0;
+  if(arr.length<=n)return out;
+  for(var i=1;i<=n;i++){var d0=arr[i]-arr[i-1];ag+=Math.max(0,d0)/n;al+=Math.max(0,-d0)/n;}
+  out[n]=al===0?100:100-100/(1+ag/al);
+  for(var i=n+1;i<arr.length;i++){
+    var d0=arr[i]-arr[i-1];
+    ag=(ag*(n-1)+Math.max(0,d0))/n;al=(al*(n-1)+Math.max(0,-d0))/n;
+    out[i]=al===0?100:100-100/(1+ag/al);
+  }
+  return out;
+}
+function calcMACD(arr,fast,slow,sig){
+  fast=fast||12;slow=slow||26;sig=sig||9;
+  var ef=calcEMA(arr,fast),es=calcEMA(arr,slow);
+  var macd=arr.map(function(_,i){return ef[i]!==null&&es[i]!==null?ef[i]-es[i]:null;});
+  var sigK=2/(sig+1),signal=new Array(arr.length).fill(null),sigEma=null,cnt=0,sum=0;
+  for(var i=0;i<arr.length;i++){
+    if(macd[i]===null)continue;cnt++;sum+=macd[i];
+    if(cnt===sig){sigEma=sum/sig;signal[i]=sigEma;}
+    else if(cnt>sig){sigEma=macd[i]*sigK+sigEma*(1-sigK);signal[i]=sigEma;}
+  }
+  return arr.map(function(_,i){return{macd:macd[i],signal:signal[i],hist:macd[i]!==null&&signal[i]!==null?macd[i]-signal[i]:null};});
+}
+function destroyCharts(){
+  [_lwMain,_lwVol,_lwRsi,_lwMacd].forEach(function(c){if(c)try{c.remove();}catch(e){}});
+  _lwMain=_lwVol=_lwRsi=_lwMacd=null;_lwSeries={};
+}
+var _syncing=false;
+function setupSync(){
+  if(!_lwMain)return;
+  _lwMain.timeScale().subscribeVisibleLogicalRangeChange(function(range){
+    if(_syncing||!range)return;_syncing=true;
+    [_lwVol,_lwRsi,_lwMacd].forEach(function(c){if(c)try{c.timeScale().setVisibleLogicalRange(range);}catch(e){}});
+    _syncing=false;renderDrawings();
+  });
+}
+function renderHistChart(days){
+  var statusEl=document.getElementById('histStatus');
+  var history=_currentItem.history||[],hubs=_currentItem.hubs||{};
+  var slice=days>=9999?history:history.slice(-days);
+  if(!slice.length){statusEl.textContent='No history data.';destroyCharts();return;}
+  statusEl.textContent=slice.length+'d · The Forge';
+  destroyCharts();
+  _candleData=slice.map(function(d,i){
+    var avg=parseFloat(d.average)||0,prev=i>0?(parseFloat(slice[i-1].average)||avg):avg;
+    return{time:d.date,open:prev,high:parseFloat(d.highest)||avg,low:parseFloat(d.lowest)||avg,close:avg,vol:parseInt(d.volume)||0};
+  });
+  var closes=_candleData.map(function(c){return c.close;});
+  _lwMain=makeLWC(document.getElementById('lwChartMain'),{
+    rightPriceScale:{scaleMargins:{top:0.08,bottom:0.08},mode:_logScale?LightweightCharts.PriceScaleMode.Logarithmic:LightweightCharts.PriceScaleMode.Normal},
+    timeScale:{visible:true,borderColor:'rgba(60,80,110,0.22)'},
+  });
+  var candleSeries=_lwMain.addCandlestickSeries({upColor:'#2fef2f',downColor:'#ef2f2f',borderUpColor:'#2fef2f',borderDownColor:'#ef2f2f',wickUpColor:'rgba(200,200,200,0.5)',wickDownColor:'rgba(200,200,200,0.5)'});
+  candleSeries.setData(_candleData.map(function(c){return{time:c.time,open:c.open,high:c.high,low:c.low,close:c.close};}));
+  _lwSeries.candle=candleSeries;
+  var hubOrder=['Jita','Amarr','Dodixie','Rens','Hek'],currentPrice=null;
+  for(var hi=0;hi<hubOrder.length;hi++){var hs=hubs[hubOrder[hi]]&&hubs[hubOrder[hi]].sell&&hubs[hubOrder[hi]].sell.min;if(hs&&parseFloat(hs)>0){currentPrice=parseFloat(hs);break;}}
+  if(currentPrice)candleSeries.createPriceLine({price:currentPrice,color:'rgba(74,168,232,0.85)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:'Sell'});
+  if(_activeInd.has('ma')){
+    [{n:20,c:'#f59e0b'},{n:50,c:'#8b5cf6'},{n:200,c:'#ef4444'}].forEach(function(cfg){
+      var vals=calcSMA(closes,cfg.n),data=_candleData.map(function(cd,i){return vals[i]!==null?{time:cd.time,value:vals[i]}:null;}).filter(Boolean);
+      if(data.length)_lwMain.addLineSeries({color:cfg.c,lineWidth:1,priceLineVisible:false,lastValueVisible:false,title:'MA'+cfg.n}).setData(data);
+    });
+  }
+  if(_activeInd.has('ema')){
+    [{n:20,c:'rgba(245,158,11,0.6)'},{n:50,c:'rgba(139,92,246,0.6)'},{n:200,c:'rgba(239,68,68,0.6)'}].forEach(function(cfg){
+      var vals=calcEMA(closes,cfg.n),data=_candleData.map(function(cd,i){return vals[i]!==null?{time:cd.time,value:vals[i]}:null;}).filter(Boolean);
+      if(data.length)_lwMain.addLineSeries({color:cfg.c,lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,priceLineVisible:false,lastValueVisible:false,title:'EMA'+cfg.n}).setData(data);
+    });
+  }
+  if(_activeInd.has('bb')){
+    var bb=calcBB(closes),bbO={lineWidth:1,priceLineVisible:false,lastValueVisible:false};
+    var upper=_candleData.map(function(cd,i){return bb[i].upper!==null?{time:cd.time,value:bb[i].upper}:null;}).filter(Boolean);
+    var mid  =_candleData.map(function(cd,i){return bb[i].mid  !==null?{time:cd.time,value:bb[i].mid  }:null;}).filter(Boolean);
+    var lower=_candleData.map(function(cd,i){return bb[i].lower!==null?{time:cd.time,value:bb[i].lower}:null;}).filter(Boolean);
+    if(upper.length){
+      _lwMain.addLineSeries(Object.assign({},bbO,{color:'rgba(74,168,232,0.45)',title:'BB+'})).setData(upper);
+      _lwMain.addLineSeries(Object.assign({},bbO,{color:'rgba(74,168,232,0.75)',lineStyle:LightweightCharts.LineStyle.Dashed,title:'BB Mid'})).setData(mid);
+      _lwMain.addLineSeries(Object.assign({},bbO,{color:'rgba(74,168,232,0.45)',title:'BB-'})).setData(lower);
+    }
+  }
+  document.getElementById('paneVol').style.display=_activeInd.has('vol')?'block':'none';
+  if(_activeInd.has('vol')){
+    _lwVol=makeLWC(document.getElementById('lwChartVol'),{timeScale:{visible:false},rightPriceScale:{scaleMargins:{top:0.15,bottom:0},borderColor:'rgba(60,80,110,0.22)'}});
+    var volS=_lwVol.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'right'});
+    volS.setData(_candleData.map(function(c){return{time:c.time,value:c.vol,color:c.close>=c.open?'rgba(47,239,47,0.4)':'rgba(239,47,47,0.4)'};}));
+    _lwSeries.vol=volS;
+  }
+  document.getElementById('paneRsi').style.display=_activeInd.has('rsi')?'block':'none';
+  if(_activeInd.has('rsi')){
+    _lwRsi=makeLWC(document.getElementById('lwChartRsi'),{timeScale:{visible:false},rightPriceScale:{scaleMargins:{top:0.1,bottom:0.1},borderColor:'rgba(60,80,110,0.22)'}});
+    var rsiVals=calcRSI(closes);
+    var rsiData=_candleData.map(function(cd,i){return rsiVals[i]!==null?{time:cd.time,value:rsiVals[i]}:null;}).filter(Boolean);
+    if(rsiData.length){
+      var rsiS=_lwRsi.addLineSeries({color:'#a78bfa',lineWidth:1.5,priceLineVisible:false,lastValueVisible:true,title:'RSI'});
+      rsiS.setData(rsiData);
+      rsiS.createPriceLine({price:70,color:'rgba(239,68,68,0.45)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:false,title:''});
+      rsiS.createPriceLine({price:30,color:'rgba(47,239,47,0.45)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:false,title:''});
+      rsiS.createPriceLine({price:50,color:'rgba(107,114,128,0.25)',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dotted,axisLabelVisible:false,title:''});
+      _lwSeries.rsi=rsiS;
+    }
+  }
+  document.getElementById('paneMacd').style.display=_activeInd.has('macd')?'block':'none';
+  if(_activeInd.has('macd')){
+    _lwMacd=makeLWC(document.getElementById('lwChartMacd'),{timeScale:{visible:false},rightPriceScale:{scaleMargins:{top:0.1,bottom:0.1},borderColor:'rgba(60,80,110,0.22)'}});
+    var mv=calcMACD(closes);
+    var mLine=_candleData.map(function(cd,i){return mv[i].macd  !==null?{time:cd.time,value:mv[i].macd}  :null;}).filter(Boolean);
+    var mSig =_candleData.map(function(cd,i){return mv[i].signal!==null?{time:cd.time,value:mv[i].signal}:null;}).filter(Boolean);
+    var mHist=_candleData.map(function(cd,i){return mv[i].hist!==null?{time:cd.time,value:mv[i].hist,color:mv[i].hist>=0?'rgba(47,239,47,0.5)':'rgba(239,47,47,0.5)'}:null;}).filter(Boolean);
+    if(mLine.length){
+      _lwMacd.addLineSeries({color:'#4aa8e8',lineWidth:1.5,priceLineVisible:false,lastValueVisible:true,title:'MACD'}).setData(mLine);
+      if(mSig.length) _lwMacd.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false,lastValueVisible:false,title:'Sig'}).setData(mSig);
+      if(mHist.length)_lwMacd.addHistogramSeries({priceLineVisible:false,lastValueVisible:false}).setData(mHist);
+    }
+  }
+  setupSync();
+  _lwMain.timeScale().fitContent();
+  if(_lwVol)_lwVol.timeScale().fitContent();
+  if(_lwRsi)_lwRsi.timeScale().fitContent();
+  if(_lwMacd)_lwMacd.timeScale().fitContent();
+  var md=document.getElementById('lwChartMain');
+  _resizeOverlay(md.clientWidth,md.clientHeight);
+  _drawings.filter(function(d){return d.type==='hline';}).forEach(function(d){d._pl=null;d._series=null;});
+  renderDrawings();
+}
+function toggleInd(ind,btn){
+  if(_activeInd.has(ind)){_activeInd.delete(ind);btn.classList.remove('active');}
+  else{_activeInd.add(ind);btn.classList.add('active');}
+  if(_currentItem.history&&_currentItem.history.length)renderHistChart(_histRange);
+}
+function toggleLog(btn){
+  _logScale=!_logScale;btn.classList.toggle('active',_logScale);
+  if(_lwMain)_lwMain.priceScale('right').applyOptions({mode:_logScale?LightweightCharts.PriceScaleMode.Logarithmic:LightweightCharts.PriceScaleMode.Normal});
+}
+function setDrawMode(mode,btn){
+  _drawMode=mode;_drawIP=null;
+  document.querySelectorAll('.draw-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  document.getElementById('drawCapture').style.display=mode==='cursor'?'none':'block';
+  renderDrawings();
+}
+function clearDrawings(){
+  _drawings.filter(function(d){return d.type==='hline'&&d._pl&&d._series;}).forEach(function(d){try{d._series.removePriceLine(d._pl);}catch(e){}});
+  _drawings=[];_drawIP=null;
+  document.getElementById('drawOverlay').innerHTML='';
+}
+function _pixelToTP(x,y){
+  if(!_lwMain||!_lwSeries.candle)return null;
+  var price=_lwSeries.candle.coordinateToPrice(y);
+  if(price===null)return null;
+  var time=_lwMain.timeScale().coordinateToTime(x);
+  if(time!==null)return{time:time,price:price};
+  var logIdx=_lwMain.timeScale().coordinateToLogical(x);
+  if(logIdx===null)return null;
+  var idx=Math.max(0,Math.min(_candleData.length-1,Math.round(logIdx)));
+  return{time:_candleData[idx].time,price:price};
+}
+function _resizeOverlay(w,h){var s=document.getElementById('drawOverlay');if(s){s.setAttribute('width',w);s.setAttribute('height',h);}}
+function renderDrawings(){
+  var svg=document.getElementById('drawOverlay');if(!svg)return;svg.innerHTML='';
+  if(!_lwMain||!_lwSeries.candle)return;
+  var W=parseFloat(svg.getAttribute('width'))||0;
+  _drawings.forEach(function(d){
+    if(d.type==='hline'){
+      if(!d._pl&&_lwSeries.candle){
+        d._pl=_lwSeries.candle.createPriceLine({price:d.price,color:'#efb42f',lineWidth:1,lineStyle:LightweightCharts.LineStyle.Dashed,axisLabelVisible:true,title:fmtISK(d.price)});
+        d._series=_lwSeries.candle;
+      }
+    }else if(d.type==='trendline'){
+      var x1=_lwMain.timeScale().timeToCoordinate(d.p1.time),y1=_lwSeries.candle.priceToCoordinate(d.p1.price);
+      var x2=_lwMain.timeScale().timeToCoordinate(d.p2.time),y2=_lwSeries.candle.priceToCoordinate(d.p2.price);
+      if(x1!==null&&y1!==null&&x2!==null&&y2!==null){
+        var slope=(x2-x1)!==0?(y2-y1)/(x2-x1):0;
+        _svgLine(svg,0,y1+slope*(0-x1),W,y1+slope*(W-x1),'rgba(239,180,47,0.65)',1.5,'5,3');
+        _svgDot(svg,x1,y1,'#efb42f');_svgDot(svg,x2,y2,'#efb42f');
+      }
+    }else if(d.type==='fib'){
+      var FIB=[{r:0,a:0.9},{r:0.236,a:0.5},{r:0.382,a:0.65},{r:0.5,a:0.65},{r:0.618,a:0.8},{r:0.786,a:0.5},{r:1,a:0.9}];
+      var pDiff=d.p2.price-d.p1.price;
+      FIB.forEach(function(f){
+        var price=d.p1.price+f.r*pDiff,y=_lwSeries.candle.priceToCoordinate(price);
+        if(y===null)return;
+        _svgLine(svg,0,y,W,y,'rgba(239,180,47,'+f.a+')',1,f.r===0||f.r===1?'':'3,3');
+        _svgText(svg,W-4,y-3,(f.r*100).toFixed(1)+'%','rgba(239,180,47,0.8)',8,'end');
+      });
+      var fx1=_lwMain.timeScale().timeToCoordinate(d.p1.time),fy1=_lwSeries.candle.priceToCoordinate(d.p1.price);
+      var fx2=_lwMain.timeScale().timeToCoordinate(d.p2.time),fy2=_lwSeries.candle.priceToCoordinate(d.p2.price);
+      if(fx1!==null&&fy1!==null&&fx2!==null&&fy2!==null){_svgLine(svg,fx1,fy1,fx2,fy2,'rgba(239,180,47,0.3)',1,'2,4');_svgDot(svg,fx1,fy1,'#efb42f');_svgDot(svg,fx2,fy2,'#efb42f');}
+    }
+  });
+  if(_drawIP&&_drawIP.p1&&_drawIP._mouse){
+    var px1=_lwMain.timeScale().timeToCoordinate(_drawIP.p1.time),py1=_lwSeries.candle.priceToCoordinate(_drawIP.p1.price);
+    if(px1!==null&&py1!==null){_svgLine(svg,px1,py1,_drawIP._mouse.x,_drawIP._mouse.y,'rgba(239,180,47,0.4)',1,'4,3');_svgDot(svg,px1,py1,'#efb42f');}
+  }
+}
+function _svgLine(svg,x1,y1,x2,y2,stroke,sw,dash){
+  var el=document.createElementNS('http://www.w3.org/2000/svg','line');
+  el.setAttribute('x1',x1);el.setAttribute('y1',y1);el.setAttribute('x2',x2);el.setAttribute('y2',y2);
+  el.setAttribute('stroke',stroke);el.setAttribute('stroke-width',sw||1);if(dash)el.setAttribute('stroke-dasharray',dash);svg.appendChild(el);
+}
+function _svgDot(svg,cx,cy,fill){
+  var el=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  el.setAttribute('cx',cx);el.setAttribute('cy',cy);el.setAttribute('r',3);
+  el.setAttribute('fill',fill);el.setAttribute('stroke','rgba(0,0,0,0.5)');el.setAttribute('stroke-width',1);svg.appendChild(el);
+}
+function _svgText(svg,x,y,text,fill,size,anchor){
+  var el=document.createElementNS('http://www.w3.org/2000/svg','text');
+  el.setAttribute('x',x);el.setAttribute('y',y);el.setAttribute('fill',fill||'#efb42f');el.setAttribute('font-size',size||9);
+  el.setAttribute('font-family',LWC_MONO);if(anchor)el.setAttribute('text-anchor',anchor);el.textContent=text;svg.appendChild(el);
+}
+document.addEventListener('DOMContentLoaded',function(){
+  var cap=document.getElementById('drawCapture');if(!cap)return;
+  cap.addEventListener('click',function(e){
+    if(_drawMode==='cursor')return;
+    var b=e.currentTarget.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top,tp=_pixelToTP(x,y);if(!tp)return;
+    if(_drawMode==='hline'){
+      _drawings.push({type:'hline',price:tp.price,_pl:null,_series:null});renderDrawings();setDrawMode('cursor',document.getElementById('draw-cursor'));
+    }else if(_drawMode==='trendline'||_drawMode==='fib'){
+      if(!_drawIP){_drawIP={type:_drawMode,p1:tp,_mouse:{x:x,y:y}};}
+      else{_drawings.push({type:_drawMode,p1:_drawIP.p1,p2:tp});_drawIP=null;renderDrawings();setDrawMode('cursor',document.getElementById('draw-cursor'));}
+    }
+  });
+  cap.addEventListener('mousemove',function(e){
+    if(!_drawIP)return;var b=e.currentTarget.getBoundingClientRect();_drawIP._mouse={x:e.clientX-b.left,y:e.clientY-b.top};renderDrawings();
+  });
+  var md=document.getElementById('lwChartMain');
+  if(md&&window.ResizeObserver){
+    new ResizeObserver(function(entries){var e=entries[0];if(!e)return;_resizeOverlay(e.contentRect.width,e.contentRect.height);renderDrawings();}).observe(md);
+  }
+});
 </script>
 {% endblock %}

@@ -38,9 +38,12 @@
         align-items: stretch;
         padding: 10px 8px 16px;
         gap: 2px;
-        overflow: hidden;
+        overflow-x: hidden;
+        overflow-y: auto;
+        scrollbar-width: none;
         transition: transform .22s cubic-bezier(.4,0,.2,1);
       }
+      #xylon-sidebar::-webkit-scrollbar { display: none; }
       #xylon-sidebar.hidden {
         transform: translateX(calc(-1 * var(--sidebar-w)));
       }
@@ -713,11 +716,14 @@
           if(!r.ok) throw new Error("bad");
           const j = await r.json();
           const txt = (j && j.text) ? String(j.text) : "Corp ops: no data yet";
-          el.textContent = txt;
-          const dur = Math.max(15, Math.round(txt.length / 4));
-          track.style.animationDuration = dur + "s";
+          if(el.textContent !== txt){
+            el.textContent = txt;
+            const dur = Math.max(12, Math.round(txt.length * 8 / 80));
+            track.style.animationDuration = dur + "s";
+          }
         }catch(e){
-          el.textContent = "Corp ops: no data yet";
+          if(el.textContent !== "Corp ops: no data yet")
+            el.textContent = "Corp ops: no data yet";
         }
       }
       refresh();
@@ -775,7 +781,7 @@
       if (!scene) return;
 
       // ── Parallax animation ───────────────────────────────────────────
-      const strength = { bg: 10, mid: 25, fg: 45 };
+      const strength = { bg: 5, mid: 22, fg: 72 };
 
       let targetX = 0, targetY = 0;
       let currentX = 0, currentY = 0;

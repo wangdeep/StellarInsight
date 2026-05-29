@@ -131,6 +131,9 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
 #navContent{display:flex;flex:1;min-height:0;overflow:hidden;}
 .nav-mpane{display:none;flex:1;min-height:0;overflow:hidden;}
 .nav-mpane.active{display:flex;}
+/* Map pane stacks char filter bar above the canvas+panel row */
+#mpane-map{flex-direction:column!important;}
+#mapBody{display:flex;flex:1;min-height:0;overflow:hidden;}
 
 /* ── Full-width Route Finder pane ───────────────────────────── */
 #rfRoot{display:flex;flex:1;min-height:0;overflow:hidden;}
@@ -185,6 +188,75 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
   background:rgba(0,0,0,.55);backdrop-filter:blur(14px);display:flex;flex-direction:column;overflow:hidden;}
 #cmPanelContent{flex:1;overflow-y:auto;}
 #cmToolbar{position:absolute;top:10px;left:10px;z-index:20;display:flex;flex-direction:column;gap:5px;}
+/* ── Char filter bar ─────────────────────────────────────────────── */
+#charFilterBar{
+  display:flex;align-items:center;gap:6px;padding:5px 10px;
+  background:rgba(0,0,0,.35);border-bottom:1px solid rgba(50,182,255,.1);
+  overflow-x:auto;flex-shrink:0;min-height:36px;
+}
+#charFilterBar::-webkit-scrollbar{height:3px;}
+#charFilterBar::-webkit-scrollbar-thumb{background:rgba(50,182,255,.2);border-radius:2px;}
+.char-pill{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px 3px 5px;
+  border-radius:14px;cursor:pointer;border:1px solid rgba(50,182,255,.2);
+  background:rgba(50,182,255,.07);font-size:11px;white-space:nowrap;
+  transition:opacity .15s,background .15s;user-select:none;flex-shrink:0;
+}
+.char-pill.inactive{opacity:.55;background:transparent;}
+.char-pill .cpav{
+  width:22px;height:22px;border-radius:50%;background:rgba(50,182,255,.25);
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;color:var(--accent);flex-shrink:0;
+}
+.char-pill .cpdot{
+  width:7px;height:7px;border-radius:50%;background:#6b7280;flex-shrink:0;
+}
+.char-pill .cpdot.online{background:#4ade80;}
+.cfb-btn{
+  font-size:10px;padding:3px 8px;border-radius:4px;cursor:pointer;
+  border:1px solid rgba(50,182,255,.2);background:rgba(50,182,255,.07);
+  color:var(--muted);white-space:nowrap;flex-shrink:0;
+}
+.cfb-btn:hover{background:rgba(50,182,255,.15);color:var(--text);}
+/* ── Mass state badges ───────────────────────────────────────────── */
+.mass-badge{display:inline-block;padding:1px 7px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.03em;}
+.mass-fresh   {background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3);}
+.mass-halflife{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.3);}
+.mass-critical{background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);}
+.mass-collapsed{background:rgba(107,114,128,.1);color:#9ca3af;border:1px solid rgba(107,114,128,.2);}
+.mass-bar-wrap{height:5px;background:rgba(255,255,255,.07);border-radius:3px;margin-top:4px;overflow:hidden;}
+.mass-bar{height:100%;border-radius:3px;transition:width .4s;}
+.mass-bar.fresh   {background:#22c55e;}
+.mass-bar.halflife{background:#fbbf24;}
+.mass-bar.critical{background:#ef4444;}
+.mass-warning-footer{margin-top:8px;padding:6px 10px;border-radius:5px;font-size:11px;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);color:#fbbf24;}
+/* ── Sig lifecycle ───────────────────────────────────────────────── */
+.sig-row{padding:6px 10px;border-bottom:1px solid rgba(50,182,255,.06);font-size:11px;}
+.sig-row.stale{opacity:.5;}
+.sig-age-bar{height:3px;background:rgba(255,255,255,.07);border-radius:2px;margin:3px 0;overflow:hidden;}
+.sig-age-fill{height:100%;border-radius:2px;transition:width .4s;}
+.sig-age-fill.fresh   {background:#22c55e;}
+.sig-age-fill.aging   {background:#fbbf24;}
+.sig-age-fill.expiring{background:#ef4444;}
+.sig-stale-lbl{font-size:9px;color:#9ca3af;font-style:italic;}
+.sig-wh-row{padding:3px 10px 6px;border-bottom:1px solid rgba(50,182,255,.06);font-size:10px;color:var(--muted);background:rgba(50,182,255,.03);}
+.sig-sync-footer{padding:5px 10px;font-size:10px;color:var(--muted);border-top:1px solid rgba(50,182,255,.06);flex-shrink:0;display:flex;align-items:center;gap:8px;}
+/* ── Intel Notes tab ─────────────────────────────────────────────── */
+.threat-badge{display:inline-block;padding:3px 12px;border-radius:12px;font-size:13px;font-weight:700;letter-spacing:.04em;}
+.threat-Low    {background:rgba(34,197,94,.15);color:#4ade80;border:1px solid rgba(34,197,94,.3);}
+.threat-Medium {background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.3);}
+.threat-High   {background:rgba(239,68,68,.15);color:#f87171;border:1px solid rgba(239,68,68,.3);}
+.threat-Unknown{background:rgba(107,114,128,.1);color:#9ca3af;border:1px solid rgba(107,114,128,.2);}
+.intel-group-row{display:flex;align-items:center;gap:8px;padding:5px 10px;font-size:11px;border-bottom:1px solid rgba(50,182,255,.06);}
+.intel-group-av{width:24px;height:24px;border-radius:4px;background:rgba(50,182,255,.15);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--accent);flex-shrink:0;}
+.intel-label-resident{background:rgba(34,197,94,.12);color:#4ade80;padding:1px 6px;border-radius:10px;font-size:9px;}
+.intel-label-hunter{background:rgba(251,191,36,.12);color:#fbbf24;padding:1px 6px;border-radius:10px;font-size:9px;}
+.sight-row{padding:4px 10px;font-size:11px;border-bottom:1px solid rgba(50,182,255,.06);display:flex;align-items:center;gap:8px;}
+.sight-stationed{color:#4ade80;}
+.sight-passed{color:var(--muted);}
+@keyframes pulseRing{0%,100%{opacity:.55;r:46;}50%{opacity:.12;r:52;}}
+.pulse-ring{animation:pulseRing 2.2s ease-in-out infinite;}
+.tb-btn-active{background:rgba(50,182,255,.25)!important;border-color:rgba(50,182,255,.5)!important;}
 </style>
 
 <div id="navRoot">
@@ -204,12 +276,22 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
   <div class="nav-mpane active" id="mpane-map">
 
   <!-- ── Canvas area ── -->
+  <!-- ── Char filter bar ── -->
+  <div id="charFilterBar">
+    <span style="font-size:9px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;flex-shrink:0;">Chars</span>
+    <div id="cfbPills" style="display:flex;gap:5px;overflow-x:auto;flex:1;"></div>
+    <button class="cfb-btn" onclick="cfbSelectAll()">All</button>
+    <button class="cfb-btn" onclick="cfbSelectNone()">None</button>
+  </div>
+  <div id="mapBody">
   <div id="mapCanvas">
     <div id="toolbar">
       <button class="tb-btn" title="Fit all (Ctrl+F)" onclick="fitAll()">⊡</button>
       <button class="tb-btn" title="Center on me" onclick="centerOnMe()">📍</button>
       <button class="tb-btn" title="Add system" onclick="showAddSys()">＋</button>
       <button class="tb-btn" title="Refresh" onclick="loadMap()">⟳</button>
+      <button id="btnForce" class="tb-btn tb-btn-active" title="Auto layout ON (click to toggle)" onclick="toggleForceLayout()">⊛</button>
+      <button id="btnTrail" class="tb-btn" title="Trail mode (select a character first)" onclick="toggleTrailMode()" style="display:none;">⇢</button>
       <!-- Corp Sharing status indicator — only visible on corp map when sync is configured -->
       <div id="syncStatusBadge" title="Corp Sharing" style="display:none;align-items:center;gap:5px;margin-left:6px;padding:4px 9px;border-radius:6px;background:rgba(50,182,255,.08);border:1px solid rgba(50,182,255,.15);font-size:11px;color:var(--muted);cursor:default;user-select:none;">
         <span id="syncBadgeDot" style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#555;flex-shrink:0;"></span>
@@ -233,6 +315,11 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
         <clipPath id="sysNodeClip">
           <rect width="168" height="82" rx="7"/>
         </clipPath>
+        <!-- Shared sec-class gradients — reused by every node, no per-node defs needed -->
+        <radialGradient id="ng-wh"   cx="15%" cy="50%" r="75%"><stop offset="0%" stop-color="rgba(168,85,247,.28)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
+        <radialGradient id="ng-hi"   cx="15%" cy="50%" r="75%"><stop offset="0%" stop-color="rgba(50,210,120,.18)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
+        <radialGradient id="ng-lo"   cx="15%" cy="50%" r="75%"><stop offset="0%" stop-color="rgba(255,140,30,.18)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
+        <radialGradient id="ng-null" cx="15%" cy="50%" r="75%"><stop offset="0%" stop-color="rgba(220,50,60,.18)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
       </defs>
       <rect width="19999" height="19999" x="-9999" y="-9999" fill="url(#grid)"/>
       <g id="mapG">
@@ -253,10 +340,13 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
   <div id="panelNebulaBg"></div>
     <div id="sideTabs">
       <button class="side-tab active" onclick="showTab('system',this)">System</button>
+      <button class="side-tab" onclick="showTab('kills',this)">Kills</button>
+      <button class="side-tab" onclick="showTab('intel',this)">Intel</button>
       <button class="side-tab" onclick="showTab('sigs',this)">Sigs</button>
       <button class="side-tab" onclick="showTab('structs',this)">Structs</button>
       <button class="side-tab" onclick="showTab('routes',this)">Routes</button>
       <button class="side-tab" onclick="showTab('pilots',this)">Pilots</button>
+      <button class="side-tab" onclick="showTab('notes',this)">Notes</button>
     </div>
 
     <div class="side-pane active" id="pane-system">
@@ -264,6 +354,25 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
         Click a system to view details
       </div>
     </div>
+
+    <div class="side-pane" id="pane-kills">
+  <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;align-items:center;">
+    <span id="killsSysLbl" style="font-size:11px;color:var(--muted);flex:1;">No system</span>
+    <span id="killsRange" style="font-size:9px;color:var(--muted);">3-day</span>
+  </div>
+  <div id="killsList" style="flex:1;overflow-y:auto;">
+    <div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">Select a system first</div>
+  </div>
+</div>
+
+    <div class="side-pane" id="pane-intel">
+  <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;align-items:center;">
+    <span id="intelSysLbl" style="font-size:11px;color:var(--muted);flex:1;">No system</span>
+  </div>
+  <div id="intelList" style="flex:1;overflow-y:auto;">
+    <div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">Select a system first</div>
+  </div>
+</div>
 
     <div class="side-pane" id="pane-sigs">
       <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;align-items:center;">
@@ -273,6 +382,11 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
       </div>
       <div id="sigList" style="flex:1;overflow-y:auto;">
         <div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">Select a system first</div>
+      </div>
+      <div class="sig-sync-footer" id="sigSyncFooter" style="display:none;">
+        <span id="sigSyncAge">Synced just now</span>
+        <span style="opacity:.5;">·</span>
+        <span id="sigWatcherCount" style="color:var(--muted);"></span>
       </div>
     </div>
 
@@ -317,7 +431,17 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
     <div class="side-pane" id="pane-pilots">
       <div id="pilotList" style="flex:1;overflow-y:auto;padding:4px 0;"></div>
     </div>
+    <div class="side-pane" id="pane-notes">
+      <div style="padding:8px;display:flex;gap:6px;border-bottom:1px solid rgba(50,182,255,.08);flex-shrink:0;align-items:center;">
+        <span id="notesSysLbl" style="font-size:11px;color:var(--muted);flex:1;">No system</span>
+        <button class="btn" style="padding:3px 10px;font-size:10px;" onclick="refreshNotes(true)">&#x27F3; Refresh</button>
+      </div>
+      <div id="notesBody" style="flex:1;overflow-y:auto;">
+        <div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">Select a system to view intel</div>
+      </div>
+    </div>
   </div><!-- /sidePanel -->
+  </div><!-- /mapBody -->
   </div><!-- /mpane-map -->
 
   <!-- ══════════════════════════ ROUTE FINDER PANE ═════════════════ -->
@@ -492,8 +616,10 @@ body:not(.sidebar-open) main.wrap { padding-left:0!important; }
 
 <script>
 const API='/app/api';
-const STATIC='/app/static';
+const STATIC='/eve/static';
+const TAG_CFG={safe:{col:'#22c55e',ico:'🟢'},hostile:{col:'#ef4444',ico:'🔴'},loot:{col:'#f59e0b',ico:'🟡'},wh_closed:{col:'#6b7280',ico:'⬛'},caution:{col:'#f97316',ico:'🟠'},poi:{col:'#3b82f6',ico:'🔵'}};
 const NW=168,NH=82; // node width/height
+let _sysExtra = {}; // supplemental per-system data from flat_map (intel, ttl, etc.)
 
 // ── Region → local nebula image filename ─────────────────
 // Files served from /app/static/nebulae/{name}.jpg
@@ -532,6 +658,26 @@ let _sel=null,_selConn=null,_pasteMode='sigs',_addXY=null;
 let _cx=0,_cy=0,_cz=1,_dragging=false,_dsx=0,_dsy=0;
 let _dragNode=null,_dnx0=0,_dny0=0,_dnox=0,_dnoy=0;
 let _connFrom=null,_refreshTimer=null;
+let _mapFingerprint='';
+let _structFingerprint='';
+// Force layout & character path state
+let _forceLayout=true;    // auto-layout ON by default
+let _trailChar=null;      // currently selected character for path highlight (character_id string)
+let _trailMode=false;     // trail timeline view (left=oldest, right=newest)
+let _charPaths={};        // character_paths from last flat_map fetch
+let _trailPosBak={};  // backup of x_pos/y_pos before trail layout override
+function _computeFingerprint(){
+  const sys=_data.systems.map(s=>`${s.system_id}:${Math.round(s.x_pos)}:${Math.round(s.y_pos)}:${s.locked?1:0}:${s.ship_kills||0}:${s.npc_kills||0}:${s.ship_jumps||0}:${s.danger_level||0}`).join('|');
+  const conn=_data.connections.map(c=>`${c.id}:${c.mass_status||''}:${c.time_status||''}:${c.expired?1:0}:${c.mass_kg_passed||0}`).join('|');
+  const pilots=Object.entries(_data.pilots||{}).map(([k,v])=>`${k}:${v.length}`).sort().join('|');
+  const sigs=Object.entries(_data.sig_counts||{}).map(([k,v])=>`${k}:${v}`).sort().join('|');
+  return `${sys}__${conn}__${pilots}__${sigs}`;
+}
+function _computeStructuralFingerprint(){
+  const sys=_data.systems.map(s=>s.system_id).sort().join(',');
+  const conn=_data.connections.map(c=>`${c.from_sys_id}-${c.to_sys_id}`).sort().join(',');
+  return `${sys}|${conn}`;
+}
 
 // DOM shortcuts
 const svg=document.getElementById('mapSvg');
@@ -546,9 +692,10 @@ function clearSysDetail(){
   const el=document.getElementById('sysDetail');
   el.innerHTML='<div style="padding:20px;color:var(--muted);font-size:12px;text-align:center;">Click a system to view details</div>';
 }
-function secCol(s){if(s==null)return'#c080ff';if(s>=.5)return'#2fefef';if(s>0)return'#efef2f';if(s<=-0.5||s===-1)return'#c080ff';return'#ef2f2f';}
+function secCol(s){if(s==null)return'#888888';if(s>=.5)return'#2fefef';if(s>=0)return'#efef2f';return'#ef2f2f';}
 function fmtMass(kg){if(!kg||kg===0)return'?';if(kg>=1e9)return(kg/1e9).toFixed(2)+'Bn kg';return(kg/1e6).toFixed(0)+'M kg';}
 function fmtAge(ts){const s=Math.floor(Date.now()/1000-ts);if(s<60)return s+'s';if(s<3600)return Math.floor(s/60)+'m';return Math.floor(s/3600)+'h';}
+function fmtISK(v){if(!v)return'0 ISK';if(v>=1e12)return(v/1e12).toFixed(2)+'T';if(v>=1e9)return(v/1e9).toFixed(2)+'B';if(v>=1e6)return(v/1e6).toFixed(1)+'M';return Math.round(v).toLocaleString();}
 
 // WH types data
 const WHT={
@@ -623,8 +770,32 @@ async function loadMap(){
   try{
     const r=await fetch(`${API}/map/state?map_id=${_map}`,{credentials:'include'});
     if(!r.ok)return;
-    _data=await r.json();
-    render();renderRoutes();renderPilots();
+    _data=await r.json();_sysExtra={};
+    const fp=_computeFingerprint();
+    if(fp!==_mapFingerprint){_mapFingerprint=fp;render();
+      const _sf=_computeStructuralFingerprint();
+      if(_forceLayout&&_data.systems.length&&_sf!==_structFingerprint){
+        _structFingerprint=_sf;
+        await applyForceLayout();
+        render();
+      }
+    }
+    renderRoutes();renderPilots();
+    // sig_version tracking
+    { const d=_data;
+      const newVersion = d.sig_version || 0;
+      if (typeof window._lastSigVersion === 'undefined') window._lastSigVersion = 0;
+      if (newVersion !== window._lastSigVersion && window._lastSigVersion !== 0 && _sel) {
+        loadSigs(_sel);
+      }
+      window._lastSigVersion = newVersion;
+      window._sigSyncTs = Date.now();
+      const sfEl = document.getElementById('sigSyncFooter');
+      if (sfEl && _sel) {
+        sfEl.style.display = 'flex';
+        document.getElementById('sigSyncAge').textContent = 'Synced just now';
+      }
+    }
     autoSync();
   }catch(e){console.error(e);}
   // Signal splash screen that the app is ready to show
@@ -633,10 +804,22 @@ async function loadMap(){
 
 async function autoSync(){
   try{
-    const r=await fetch(`${API}/nav/flat_map`,{credentials:'include'});
+    const r=await fetch(`${API}/nav/flat_map?${cfbCharIdsParam()}`,{credentials:'include'});
     const d=await r.json();if(!d.systems)return;
+    for(const sys of (d.systems||[])){
+      const sid=sys.id||sys.system_id;
+      if(sid) _sysExtra[sid]={
+        ttl_hours:sys.ttl_hours??null,
+        idle_hours:sys.idle_hours??null,
+        intel_count:sys.intel_count??0,
+        intel_fresh:sys.intel_fresh??false,
+        intel_age_hours:sys.intel_age_hours??null,
+      };
+    }
     const onMap=new Set(_data.systems.map(s=>s.system_id));
-    let added=0;
+    const onMapConn=new Set(_data.connections.map(c=>
+      [Math.min(c.from_sys_id,c.to_sys_id),Math.max(c.from_sys_id,c.to_sys_id)].join('-')));
+    let added=0,connAdded=0;
     for(const sys of (d.systems||[])){
       const sid=sys.id||sys.system_id;
       if(!sid||onMap.has(sid)||onMap.has(String(sid)))continue;
@@ -644,25 +827,40 @@ async function autoSync(){
       const x=300+Math.cos(ang)*dist,y=250+Math.sin(ang)*dist;
       await fetch(`${API}/map/system`,{method:'POST',credentials:'include',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({system_id:sid,system_name:sys.name||sys.system_name,x,y,map_id:_map})});
+        body:JSON.stringify({system_id:sid,system_name:sys.name||sys.system_name,x,y,map_id:_map,sec_status:sys.security_status??null,is_wh:sys.is_jspace||false,region_name:sys.region||null})});
       added++;
     }
     for(const c of (d.connections||[])){
-      if(!c.is_wh)continue;
+      const key=[Math.min(c.from,c.to),Math.max(c.from,c.to)].join('-');
+      if(onMapConn.has(key))continue;
       await fetch(`${API}/map/connection`,{method:'POST',credentials:'include',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({from_sys_id:c.from,to_sys_id:c.to,wh_type:c.wh_type||null,map_id:_map})});
+      connAdded++;
     }
-    if(added>0){const r2=await fetch(`${API}/map/state?map_id=${_map}`,{credentials:'include'});_data=await r2.json();render();}
+    if(d.character_paths) _charPaths=d.character_paths;
+    if(added>0||connAdded>0){const r2=await fetch(`${API}/map/state?map_id=${_map}`,{credentials:'include'});_data=await r2.json();render();}
   }catch(e){}
 }
 
 // ── Render ────────────────────────────────────────────────
 function render(){
   nodesG.innerHTML='';connsG.innerHTML='';
+  svg.querySelector('defs')?.querySelectorAll('[id^="cg-"]').forEach(el=>el.remove());
   const byId={};for(const s of _data.systems)byId[s.system_id]=s;
-  for(const c of _data.connections)drawConn(c,byId);
-  for(const s of _data.systems)drawNode(s);
+  // ── Character path highlight state ────────────────────────────────────
+  const pathSystems=getCharPathSystems();
+  const pathSysIds=pathSystems?new Set(pathSystems.map(p=>p.system_id)):null;
+  const _pathConnKeys=new Set();
+  if(pathSystems&&pathSystems.length>1){
+    for(let i=0;i<pathSystems.length-1;i++){
+      const a=pathSystems[i].system_id,b=pathSystems[i+1].system_id;
+      _pathConnKeys.add(`${Math.min(a,b)}-${Math.max(a,b)}`);
+    }
+  }
+  if(_trailMode&&_trailChar) applyTrailLayout();
+  for(const c of _data.connections)drawConn(c,byId,_pathConnKeys,pathSystems);
+  for(const s of _data.systems)drawNode(s,pathSysIds,pathSystems);
   document.getElementById('stSys').textContent=_data.systems.length+' systems';
   document.getElementById('stConn').textContent=_data.connections.length+' connections';
   if(_sel){const s=_data.systems.find(x=>x.system_id===_sel);if(s)showSysDet(s);}
@@ -671,7 +869,7 @@ function render(){
 
 function connPts(a,b){return[a.x_pos+NW/2,a.y_pos+NH/2,b.x_pos+NW/2,b.y_pos+NH/2];}
 
-function drawConn(c,byId){
+function drawConn(c,byId,_pathConnKeys=null,pathSystems=null){
   const a=byId[c.from_sys_id],b=byId[c.to_sys_id];if(!a||!b)return;
   const[x1,y1,x2,y2]=connPts(a,b);
   const mx=(x1+x2)/2,my=(y1+y2)/2;
@@ -694,13 +892,51 @@ function drawConn(c,byId){
   const lineDash   = isExpired ? '4,5' : isEOL ? '6,4' : 'none';
   const ageLabel   = ageBracket === 1 ? '24h+' : ageBracket === 2 ? '36h+' : ageBracket === 3 ? 'EXP' : '';
 
+  // ── Path highlight ────────────────────────────────────────────────────
+  const connKey=`${Math.min(c.from_sys_id,c.to_sys_id)}-${Math.max(c.from_sys_id,c.to_sys_id)}`;
+  const _onPath=_pathConnKeys&&_pathConnKeys.has(connKey);
+  const dimConn=_pathConnKeys&&_pathConnKeys.size>0&&!_onPath;
+
+  // Find timestamp label for this connection if on path
+  let pathLabel='';
+  if(_onPath&&pathSystems){
+    const idx=pathSystems.findIndex((p,i)=>i<pathSystems.length-1&&
+      ((pathSystems[i].system_id===c.from_sys_id&&pathSystems[i+1].system_id===c.to_sys_id)||
+       (pathSystems[i].system_id===c.to_sys_id&&pathSystems[i+1].system_id===c.from_sys_id)));
+    if(idx>=0){
+      const t=pathSystems[idx].timestamp;
+      if(t){const d=new Date(t*1000);pathLabel=d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+    }
+  }
+
+  // ── Sec-status gradient for connection line ──────────────
+  const isWH_a=/^J\d{6}$/.test(a.system_name||'');
+  const isWH_b=/^J\d{6}$/.test(b.system_name||'');
+  const secA=isWH_a?'#c080ff':secCol(a.sec_status);
+  const secB=isWH_b?'#c080ff':secCol(b.sec_status);
+  const gradId_conn=`cg-${c.id}`;
+  const svgDefs=svg.querySelector('defs');
+  const grad=document.createElementNS('http://www.w3.org/2000/svg','linearGradient');
+  grad.id=gradId_conn;
+  grad.setAttribute('gradientUnits','userSpaceOnUse');
+  grad.setAttribute('x1',x1);grad.setAttribute('y1',y1);
+  grad.setAttribute('x2',x2);grad.setAttribute('y2',y2);
+  grad.innerHTML=`<stop offset="0%" stop-color="${secA}"/><stop offset="100%" stop-color="${secB}"/>`;
+  if(svgDefs) svgDefs.appendChild(grad);
+  const connStroke=`url(#${gradId_conn})`;
+
   const g=document.createElementNS('http://www.w3.org/2000/svg','g');
   g.dataset.cid=c.id;
   g.innerHTML=`
     <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="18" style="cursor:pointer;"/>
     <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
-      stroke="${lineColor}" stroke-width="${isSel?2.5:1.5}"
-      stroke-dasharray="${lineDash}" opacity="${lineOpacity}"/>
+      stroke="${connStroke}" stroke-width="${isSel?2.5:1.5}"
+      stroke-dasharray="${lineDash}" opacity="${dimConn?0.12:lineOpacity}"/>
+    ${_onPath?`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+      stroke="#32b6ff" stroke-width="3" opacity=".35" style="pointer-events:none;"/>
+    ${pathLabel?`<text x="${mx}" y="${my-18}" text-anchor="middle" font-size="8"
+        fill="#32b6ff" style="pointer-events:none;">${esc(pathLabel)}</text>`:''}
+    `:''}
     ${c.save_mass?`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
       stroke="#f97316" stroke-width=".8" stroke-dasharray="2,8" opacity=".7" style="pointer-events:none;"/>`:''}
     ${c.wh_type?`<rect x="${mx-16}" y="${my-16}" width="32" height="13" rx="3"
@@ -733,15 +969,77 @@ function drawConn(c,byId){
   connsG.appendChild(g);
 }
 
-function drawNode(s){
+function drawNode(s,pathSysIds=null,pathSystems=null){
   const sid   = s.system_id;
   const isWH  = /^J\d{6}$/.test(s.system_name||'');
   const np    = (_data.pilots[sid]||[]).length;
   const ns    = _data.sig_counts[sid]||0;
   const isSel = sid===_sel;
-  const sc    = secCol(s.sec_status);
+  const sc    = isWH ? '#c080ff' : secCol(s.sec_status);
   const bc    = isSel?'#32b6ff':s.locked?'#f97316':'rgba(50,182,255,.22)';
   const sec   = s.sec_status??0;
+
+  // ── Path highlight state ───────────────────────────────────────────────
+  const _onPath=pathSysIds&&pathSysIds.has(sid);
+  const _dimNode=pathSysIds&&pathSysIds.size>0&&!_onPath;
+
+  // Path step info (position in trail)
+  let pathStep=null,pathStepTotal=0,pathTs=null;
+  if(_onPath&&pathSystems){
+    pathStep=pathSystems.findIndex(p=>p.system_id===sid);
+    pathStepTotal=pathSystems.length;
+    if(pathStep>=0)pathTs=pathSystems[pathStep].timestamp;
+  }
+
+  // Is this the current location of the trail character?
+  const isTrailCurrent=_trailChar&&pathSystems&&pathSystems.length>0&&
+    pathSystems[pathSystems.length-1].system_id===sid;
+
+  // ── Supplemental data (from flat_map cache) ────────────────────────────
+  const extra=_sysExtra[sid]||{};
+  const ttlH=extra.ttl_hours;
+  const intelCount=extra.intel_count||0;
+  const intelFresh=extra.intel_fresh||false;
+  const intelAgeH=extra.intel_age_hours??null;
+
+  // ── Fog of war opacity ─────────────────────────────────────────────────
+  let fogOpacity=1.0;
+  let fogDash='none';
+  if(ttlH!=null){
+    const idleLim=extra.idle_hours||72;
+    const ratio=Math.max(0,ttlH/idleLim);
+    if(ratio>0.75)fogOpacity=1.0;
+    else if(ratio>0.5)fogOpacity=0.85;
+    else if(ratio>0.25)fogOpacity=0.65;
+    else{fogOpacity=0.4;fogDash='5,3';}
+  }
+
+  // ── Dominant corp badge (WH only, from sidebar cache) ─────────────────
+  const detCache=window._sysDetCache&&_sysDetCache[sid]?.data;
+  const domCorp=(isWH&&detCache?.zkill?.dominant_corp_name)||null;
+  const domPct=detCache?.zkill?.dominant_corp_pct||0;
+
+  // ── Intel badge ───────────────────────────────────────────────────────
+  let intelCol='transparent';let intelOpacity=0;
+  if(intelCount>0&&intelAgeH!=null){
+    if(intelAgeH<1){intelCol='#f59e0b';intelOpacity=1.0;}
+    else if(intelAgeH<4){intelCol='#f59e0b';intelOpacity=0.6;}
+    else if(intelAgeH<8){intelCol='#9ca3af';intelOpacity=0.4;}
+  }
+  const showIntel=intelOpacity>0;
+
+  // ── Tag badge dot ─────────────────────────────────────────────────────
+  const tagCfg=(s.tag&&TAG_CFG[s.tag])||null;
+
+  // ── Pulse rings (characters currently in system) ──────────────────────
+  const pilots=_data.pilots[sid]||[];
+  const pulseRings=pilots.slice(0,3).map((pid,i)=>{
+    const hue=(((typeof pid==='number'?pid:parseInt(String(pid).replace(/\D/g,''))||0)*137+i*73)%360);
+    const col=`hsl(${hue},80%,65%)`;
+    return `<circle cx="${NW/2}" cy="${NH/2}" r="${44+i*5}" fill="none"
+      stroke="${col}" stroke-width="1.5" class="pulse-ring"
+      style="animation-delay:${(i*0.4).toFixed(1)}s;pointer-events:none;"/>`;
+  }).join('');
 
   const g = document.createElementNS('http://www.w3.org/2000/svg','g');
   g.setAttribute('class','sys-node');
@@ -752,14 +1050,9 @@ function drawNode(s){
   const nebFile = regionNebulaFile(s.region_name||(isWH?'J-Space':''), isWH);
   const nebUrl  = nebFile?`${STATIC}/nebulae/${nebFile}.jpg`:null;
 
-  // Subtle sec-class color accent (soft, behind nebula/overlay)
-  let glowC0, glowC1;
-  if(isWH){          glowC0='rgba(168,85,247,.28)'; glowC1='rgba(0,0,0,.0)'; }
-  else if(sec>=0.5){ glowC0='rgba(50,210,120,.18)'; glowC1='rgba(0,0,0,.0)'; }
-  else if(sec>0){    glowC0='rgba(255,140,30,.18)';  glowC1='rgba(0,0,0,.0)'; }
-  else{              glowC0='rgba(220,50,60,.18)';   glowC1='rgba(0,0,0,.0)'; }
-  const gradId = `ng-${sid}`;
-  const clipId = `nc-${sid}`;
+  // Use shared SVG defs — no per-node gradient/clipPath creation needed
+  const gradId = isWH ? 'ng-wh' : sec>=0.5 ? 'ng-hi' : sec>0 ? 'ng-lo' : 'ng-null';
+  const clipId = 'sysNodeClip';
 
   // ── Stats from enriched map state ──────────────────────────────────────
   const shipK  = s.ship_kills  ?? 0;
@@ -831,18 +1124,11 @@ function drawNode(s){
       : '';
 
   g.innerHTML=`
-    <defs>
-      <radialGradient id="${gradId}" cx="15%" cy="50%" r="75%">
-        <stop offset="0%" stop-color="${glowC0}"/>
-        <stop offset="100%" stop-color="${glowC1}"/>
-      </radialGradient>
-      <clipPath id="${clipId}">
-        <rect x="0" y="0" width="${NW}" height="${NH}" rx="7"/>
-      </clipPath>
-    </defs>
+    ${pulseRings}
     <!-- Base: black smoked glass 80% -->
     <rect x="0" y="0" width="${NW}" height="${NH}" rx="7"
       fill="rgba(0,0,0,.80)" stroke="${bc}" stroke-width="${isSel?1.5:.7}"
+      ${fogDash!=='none'?`stroke-dasharray="${fogDash}"`:''}
       ${isSel?'filter="url(#glow)"':''}/>
     <!-- Sec-class color accent (subtle) -->
     <rect x="0" y="0" width="${NW}" height="${NH}" rx="7" fill="url(#${gradId})"/>
@@ -877,6 +1163,16 @@ function drawNode(s){
     <!-- Sig count (top-right, below badge/sec) -->
     ${ns>0?`<text x="${NW-7}" y="26" text-anchor="end" font-size="7.5"
         fill="rgba(200,210,255,.32)" style="pointer-events:none;">${ns}sig</text>`:''}
+    <!-- Intel badge -->
+    ${showIntel?`<text x="${NW-8}" y="${ns>0?36:26}" text-anchor="end" font-size="10"
+        fill="${intelCol}" opacity="${intelOpacity}" style="pointer-events:none;">⚡</text>`:''}
+    <!-- WH owner badge -->
+    ${domCorp?`<rect x="6" y="${NH-38}" width="${Math.min(NW-12,domCorp.length*5+10)}" height="11" rx="3"
+        fill="rgba(245,158,11,.12)" stroke="rgba(245,158,11,.35)" stroke-width=".7"/>
+      <text x="10" y="${NH-29}" font-size="7.5" font-weight="700"
+        fill="#f59e0b" style="pointer-events:none;">⚠ ${esc(domCorp)} (${Math.round(domPct)}%)</text>`:''}
+    <!-- Tag dot -->
+    ${tagCfg?`<circle cx="8" cy="${NH/2}" r="4.5" fill="${tagCfg.col}" opacity=".9" style="pointer-events:none;"/>`:''}
     <!-- Pilot badge (top-right area, stacked under sig count) -->
     ${np>0?`<circle cx="${NW-11}" cy="38" r="8"
         fill="rgba(50,182,255,.18)" stroke="var(--accent)" stroke-width="1"/>
@@ -891,6 +1187,15 @@ function drawNode(s){
         stroke="rgba(50,182,255,.0)" data-sid="${sid}" class="anc"
         style="cursor:crosshair;" data-anc="1"/>`;
     }).join('')}
+    <!-- Path step badge -->
+    ${_onPath&&pathStep>=0?`<rect x="${NW-44}" y="${NH-12}" width="38" height="10" rx="3"
+        fill="rgba(50,182,255,.2)" style="pointer-events:none;"/>
+      <text x="${NW-25}" y="${NH-4}" text-anchor="middle" font-size="7.5" fill="#32b6ff"
+        font-weight="700" style="pointer-events:none;">${pathStep+1}/${pathStepTotal}</text>`:''}
+    <!-- Trail current marker -->
+    ${isTrailCurrent?`<rect x="0" y="0" width="${NW}" height="${NH}" rx="7"
+        fill="none" stroke="#32b6ff" stroke-width="2.5"
+        style="pointer-events:none;" filter="url(#glow)"/>`:''}
   `;
 
   // Hover glow
@@ -913,10 +1218,15 @@ function drawNode(s){
   g.addEventListener('click',e=>{
     if(e.target.dataset.anc)return;
     if(_dragNode)return;
+    // Clear any pending Xylon query poll when switching systems
+    if(_xylonPollTimer){clearInterval(_xylonPollTimer);_xylonPollTimer=null;_xylonQueryId=null;}
     _sel=sid;_selConn=null;render();
     const sys=_data.systems.find(x=>x.system_id===sid);
     if(sys)showSysDet(sys);
-    showTab('system');loadSigs(sid);loadStructs(sid);
+    showTab('system');loadSigs(sid);loadStructs(sid);loadKills(sid);loadIntel(sid);
+    if (document.querySelector('#sideTabs .side-tab.active')?.textContent?.trim() === 'Notes') {
+      loadNotes(_sel);
+    }
   });
 
   g.addEventListener('contextmenu',e=>{
@@ -924,6 +1234,8 @@ function drawNode(s){
     showSysCtx(e.clientX,e.clientY,s);
   });
 
+  if(fogOpacity<1.0) g.setAttribute('opacity',fogOpacity);
+  if(_dimNode) g.setAttribute('opacity',Math.min(fogOpacity,0.2));
   nodesG.appendChild(g);
 }
 
@@ -948,6 +1260,12 @@ function moveNodeEl(sid,nx,ny){
     if(rt){rt.setAttribute('x',mx-16);rt.setAttribute('y',my-16);}
     const tx=el.querySelector('text');
     if(tx){tx.setAttribute('x',mx);tx.setAttribute('y',my-7);}
+    const connGrad=svg.querySelector(`#cg-${c.id}`);
+    if(connGrad){
+      const[nx1,ny1,nx2,ny2]=connPts(a,b);
+      connGrad.setAttribute('x1',nx1);connGrad.setAttribute('y1',ny1);
+      connGrad.setAttribute('x2',nx2);connGrad.setAttribute('y2',ny2);
+    }
   }
 }
 
@@ -1069,13 +1387,6 @@ async function showSysDet(s){
        <span style="color:var(--muted);flex-shrink:0;margin-right:6px;">${lbl}</span>
        <span style="color:${col};text-align:right;">${val}</span></div>`;
 
-  const fmtISK = v => {
-    if(!v) return '0 ISK';
-    if(v>=1e12) return (v/1e12).toFixed(2)+'T';
-    if(v>=1e9)  return (v/1e9).toFixed(2)+'B';
-    if(v>=1e6)  return (v/1e6).toFixed(1)+'M';
-    return Math.round(v).toLocaleString();
-  };
   const fmtNum = v => v!=null ? Number(v).toLocaleString() : '—';
   const PI_COLOR = {
     'Excellent':'#22c55e','Good':'#86efac','Medium':'#fbbf24','Poor':'#f97316','None':'#6b7280',
@@ -1389,8 +1700,42 @@ function showConnDet(c){
         <button class="btn" style="font-size:10px;padding:3px 10px;background:rgba(239,68,68,.1);
           border-color:rgba(239,68,68,.25);color:#f87171;" onclick="delConn(${c.id})">🗑 Remove</button>
       </div>
+      <div id="connMassNew"></div>
     </div>
   `;
+  // Load mass tracker section async
+  loadConnMass(c.from_sys_id, c.to_sys_id).then(md => {
+    const el = document.getElementById('connMassNew');
+    if (!el || !md) return;
+    if (!md.record) {
+      el.innerHTML = `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(50,182,255,.08);">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Mass Tracker</div>
+      <div style="font-size:11px;color:var(--muted);">No mass record yet.</div>
+      <div style="display:flex;gap:4px;margin-top:6px;">
+        <button class="btn" style="font-size:9px;padding:2px 6px;" onclick="initConnMass('${Math.min(c.from_sys_id,c.to_sys_id)}_${Math.max(c.from_sys_id,c.to_sys_id)}',${c.from_sys_id},${c.to_sys_id})">Start Tracking</button>
+      </div></div>`;
+      return;
+    }
+    const rec = md.record;
+    const state = md.state || 'fresh';
+    const pct = rec.total_mass_kg > 0 ? rec.used_mass_kg / rec.total_mass_kg * 100 : 0;
+    const conn_id = `${Math.min(c.from_sys_id,c.to_sys_id)}_${Math.max(c.from_sys_id,c.to_sys_id)}`;
+    el.innerHTML = `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(50,182,255,.08);">
+    <div style="font-size:10px;color:var(--muted);margin-bottom:4px;">Mass Tracker</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      ${massBadgeHtml(state)}
+      <span style="font-size:10px;color:var(--muted);">${fmtMass(rec.used_mass_kg)} / ${fmtMass(rec.total_mass_kg)}</span>
+    </div>
+    ${massBarHtml(state, pct)}
+    ${rec.last_ship_name ? `<div style="font-size:10px;color:var(--muted);margin-top:4px;">Last: ${esc(rec.last_ship_name)}</div>` : ''}
+    <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap;">
+      <button class="btn" style="font-size:9px;padding:2px 6px;" onclick="setConnMassState('${conn_id}','fresh').then(()=>showConnDet(_data.connections.find(c=>c.id===_selConn)))">Fresh</button>
+      <button class="btn" style="font-size:9px;padding:2px 6px;" onclick="setConnMassState('${conn_id}','halflife').then(()=>showConnDet(_data.connections.find(c=>c.id===_selConn)))">Half-Life</button>
+      <button class="btn" style="font-size:9px;padding:2px 6px;" onclick="setConnMassState('${conn_id}','critical').then(()=>showConnDet(_data.connections.find(c=>c.id===_selConn)))">Critical</button>
+      <button class="btn" style="font-size:9px;padding:2px 6px;color:#f87171;" onclick="resetConnMass('${conn_id}').then(()=>showConnDet(_data.connections.find(c=>c.id===_selConn)))">Reset</button>
+    </div>
+  </div>`;
+  });
 }
 
 // ── Context menus ─────────────────────────────────────────
@@ -1413,16 +1758,27 @@ window.addEventListener('click',hideCtx);
 
 function showSysCtx(x,y,s){
   const sid=s.system_id;
-  showCtx(x,y,[
+  const items=[
     {head:s.system_name},
     {l:'✏️ Rename',fn:`()=>editTempName(${sid},'${(s.temp_name||'').replace(/'/g,'')}') `},
     {l:s.locked?'🔓 Unlock':'🔒 Lock',fn:`()=>toggleLock(${sid},${s.locked?0:1})`},
     {sep:true},
+    {l:'🟢 Safe',     fn:`()=>setSystemTag(${sid},'safe')`},
+    {l:'🔴 Hostile',  fn:`()=>setSystemTag(${sid},'hostile')`},
+    {l:'🟡 Loot',     fn:`()=>setSystemTag(${sid},'loot')`},
+    {l:'⬛ WH Closed',fn:`()=>setSystemTag(${sid},'wh_closed')`},
+    {l:'🟠 Caution',  fn:`()=>setSystemTag(${sid},'caution')`},
+    {l:'🔵 POI',      fn:`()=>setSystemTag(${sid},'poi')`},
+  ];
+  if(s.tag)items.push({l:'✕ Clear Tag',fn:`()=>setSystemTag(${sid},null)`});
+  items.push(
+    {sep:true},
     {l:'📋 Paste Sigs',fn:`()=>{_sel=${sid};openPaste('sigs');}`},
     {l:'📡 D-Scan Structs',fn:`()=>{_sel=${sid};openPaste('structs');}`},
     {sep:true},
-    {l:'🗑 Remove System',fn:`()=>deleteSys(${sid})`,d:true},
-  ]);
+    {l:'🗑 Remove System',fn:`()=>deleteSys(${sid})`,d:true}
+  );
+  showCtx(x,y,items);
 }
 
 function showConnCtx(x,y,c){
@@ -1471,6 +1827,126 @@ function centerOnMe(){
   _cx=r.width/2-(s.x_pos+NW/2)*_cz;_cy=r.height/2-(s.y_pos+NH/2)*_cz;applyT();
 }
 
+// ── Force-directed auto-layout ────────────────────────────────────────
+async function runForceLayout(systems,connections,iterations){
+  iterations=iterations||150;
+  if(!systems.length)return;
+  const pos={};
+  for(const s of systems)pos[s.system_id]={x:s.x_pos,y:s.y_pos,vx:0,vy:0};
+  const K=200,REP=80000,DAMP=0.8,DT=0.5;
+  const CHUNK=30;
+  for(let iter=0;iter<iterations;iter++){
+    const ids=Object.keys(pos);
+    for(let i=0;i<ids.length;i++){
+      for(let j=i+1;j<ids.length;j++){
+        const a=pos[ids[i]],b=pos[ids[j]];
+        const dx=b.x-a.x,dy=b.y-a.y;
+        const dist=Math.sqrt(dx*dx+dy*dy)+0.01;
+        const f=REP/(dist*dist);
+        const fx=f*dx/dist,fy=f*dy/dist;
+        a.vx-=fx;a.vy-=fy;b.vx+=fx;b.vy+=fy;
+      }
+    }
+    for(const c of connections){
+      const a=pos[c.from_sys_id],b=pos[c.to_sys_id];
+      if(!a||!b)continue;
+      const dx=b.x-a.x,dy=b.y-a.y;
+      const d=Math.sqrt(dx*dx+dy*dy)+0.01;
+      const f=(d-K)/d*0.5;
+      a.vx+=f*dx;a.vy+=f*dy;
+      b.vx-=f*dx;b.vy-=f*dy;
+    }
+    for(const s of systems){
+      if(s.locked)continue;
+      const p=pos[s.system_id];
+      p.vx*=DAMP;p.vy*=DAMP;
+      p.x+=p.vx*DT;p.y+=p.vy*DT;
+      p.x=Math.max(50,Math.min(p.x,3000));
+      p.y=Math.max(50,Math.min(p.y,2000));
+    }
+    // Yield every CHUNK iterations to avoid blocking UI thread
+    if((iter+1)%CHUNK===0)await new Promise(r=>setTimeout(r,0));
+  }
+  for(const s of systems){
+    if(s.locked)continue;
+    s.x_pos=pos[s.system_id].x;
+    s.y_pos=pos[s.system_id].y;
+  }
+}
+
+async function applyForceLayout(){
+  if(!_forceLayout||!_data.systems.length)return;
+  await runForceLayout(_data.systems,_data.connections,150);
+  // Persist new positions for unlocked nodes
+  await Promise.all(_data.systems.filter(s=>!s.locked).map(s=>
+    fetch(`${API}/map/system/${s.system_id}`,{method:'PUT',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({x_pos:Math.round(s.x_pos),y_pos:Math.round(s.y_pos),map_id:_map})})
+  )).catch(e=>console.error('Force layout persist failed:',e));
+}
+
+function toggleForceLayout(){
+  _forceLayout=!_forceLayout;
+  const btn=document.getElementById('btnForce');
+  if(btn){
+    btn.title=_forceLayout?'Auto layout ON (click to toggle)':'Auto layout OFF (click to toggle)';
+    btn.classList.toggle('tb-btn-active',_forceLayout);
+  }
+  if(_forceLayout)applyForceLayout().then(()=>render());
+}
+
+// ── Character path highlight ──────────────────────────────────────────
+function selectTrailChar(charId){
+  _trailChar=charId||null;
+  _trailMode=false;
+  const btnT=document.getElementById('btnTrail');
+  if(btnT)btnT.classList.remove('tb-btn-active');
+  if(btnT)btnT.style.display=_trailChar?'':'none';
+  render();
+}
+
+function toggleTrailMode(){
+  if(!_trailChar)return;
+  _trailMode=!_trailMode;
+  if(!_trailMode){
+    // Restore original positions
+    for(const [sid,pos] of Object.entries(_trailPosBak)){
+      const s=_data.systems.find(x=>x.system_id===parseInt(sid));
+      if(s){s.x_pos=pos.x;s.y_pos=pos.y;}
+    }
+    _trailPosBak={};
+  }
+  const btn=document.getElementById('btnTrail');
+  if(btn){
+    btn.title=_trailMode?'Trail mode ON':'Trail mode OFF';
+    btn.classList.toggle('tb-btn-active',_trailMode);
+  }
+  render();
+}
+
+function getCharPathSystems(){
+  if(!_trailChar||!_charPaths[_trailChar])return null;
+  return _charPaths[_trailChar].path||[];
+}
+
+function applyTrailLayout(){
+  if(!_trailMode||!_trailChar)return;
+  const path=getCharPathSystems();
+  if(!path||!path.length)return;
+  // Save originals
+  _trailPosBak={};
+  for(const p of path){
+    const s=_data.systems.find(x=>x.system_id===p.system_id);
+    if(s)_trailPosBak[s.system_id]={x:s.x_pos,y:s.y_pos};
+  }
+  const startX=100,startY=400,stepX=220;
+  for(let i=0;i<path.length;i++){
+    const sid=path[i].system_id;
+    const s=_data.systems.find(x=>x.system_id===sid);
+    if(s&&!s.locked){s.x_pos=startX+i*stepX;s.y_pos=startY;}
+  }
+}
+
 // ── System management ─────────────────────────────────────
 function showAddSys(){
   document.getElementById('addSysModal').classList.add('open');
@@ -1502,6 +1978,14 @@ async function confirmAddSys(sid,name){
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({system_id:sid,system_name:name,x,y,map_id:_map})});
   loadMap();
+}
+async function setSystemTag(sid,tag){
+  await fetch(`${API}/map/system/${sid}`,{method:'PUT',credentials:'include',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({tag:tag||null,map_id:_map})});
+  const s=_data.systems.find(x=>x.system_id===sid);
+  if(s)s.tag=tag||null;
+  render();
 }
 async function deleteSys(sid){
   if(!confirm('Remove this system from the map?'))return;
@@ -1562,7 +2046,7 @@ async function loadSigs(sid){
   try{
     const r=await fetch(`${API}/nav/sigs/${sid}`,{credentials:'include'});
     const d=await r.json();
-    renderSigs(d.signatures||[],sid);
+    renderSigRows(d.sigs||[],sid);
   }catch(e){}
 }
 const SIG_COLS={Wormhole:{bg:'rgba(168,85,247,.2)',c:'#c084fc'},Combat:{bg:'rgba(239,68,68,.15)',c:'#f87171'},
@@ -1575,9 +2059,22 @@ function renderSigs(sigs,sid){
   const now=Date.now()/1000,STALE=4*3600;
   const el=document.getElementById('sigList');
   if(!sigs.length){el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No signatures. Paste to add.</div>';return;}
+  const FRIG_HOLES = new Set(['E004','L005','M001','Q003','S005']);
   el.innerHTML=sigs.map(sig=>{
     const g=sig.sig_group||'Unknown',tc=SIG_COLS[g]||SIG_COLS.Unknown;
     const stale=now-sig.updated_ts>STALE;
+    const isWHsig = g === 'Wormhole';
+    const whLifetimeH = isWHsig ? (FRIG_HOLES.has(sig.sig_info||'') ? 4 : 16) : 0;
+    const addedTs = sig.added_ts || sig.created_at || null;
+    const whRemainingH = whLifetimeH && addedTs ? Math.max(0, whLifetimeH - (now - addedTs)/3600) : null;
+    const whPct = whRemainingH!=null ? Math.round(whRemainingH/whLifetimeH*100) : null;
+    const whTimerCol = whRemainingH==null ? '' : whRemainingH < 1 ? '#ef4444' : whRemainingH < 4 ? '#f97316' : '#22c55e';
+    const whTimerLabel = whRemainingH==null ? '' : whRemainingH < 0.017 ? '⚡ EXPIRED' : `${Math.floor(whRemainingH)}h${Math.round((whRemainingH%1)*60)}m`;
+    const whTimerBar = isWHsig && whRemainingH!=null ? `
+  <div style="margin-top:3px;background:rgba(255,255,255,.08);border-radius:2px;height:3px;overflow:hidden;">
+    <div style="height:100%;width:${whPct}%;background:${whTimerCol};border-radius:2px;transition:width .5s;"></div>
+  </div>
+  <div style="font-size:9px;color:${whTimerCol};margin-top:1px;">${whTimerLabel}</div>` : '';
     return`<div class="sig-row${stale?' sig-stale':''}">
       <span class="sig-id">${esc(sig.sig_id)}</span>
       <span class="sig-badge" style="background:${tc.bg};color:${tc.c};">${esc(g)}</span>
@@ -1585,10 +2082,109 @@ function renderSigs(sigs,sid){
       <span class="sig-age">${fmtAge(sig.updated_ts)}${stale?' ⚠️':''}</span>
       <button onclick="delSig(${sig.id},${sid})" style="background:none;border:none;
         color:rgba(239,68,68,.5);cursor:pointer;font-size:10px;padding:0 2px;">✕</button>
+      ${whTimerBar}
     </div>`;
   }).join('');
   _data.sig_counts[sid]=sigs.length;
 }
+// ── Kills ─────────────────────────────────────────────────
+async function loadKills(sid){
+  if(!sid)return;
+  const s=_data.systems.find(x=>x.system_id===sid);
+  document.getElementById('killsSysLbl').textContent=s?s.system_name:`System ${sid}`;
+  const el=document.getElementById('killsList');
+  el.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:11px;">Loading kills…</div>';
+  try{
+    const cached=_sysDetCache[sid];
+    let zkill=null;
+    if(cached&&cached.data?.zkill){
+      zkill=cached.data.zkill;
+    }else{
+      const r=await fetch(`${API}/nav/system_detail/${sid}`,{credentials:'include'});
+      const d=await r.json();
+      _sysDetCache[sid]={data:d,ts:Date.now()};
+      zkill=d.zkill;
+    }
+    renderKills(zkill,sid);
+  }catch(e){
+    el.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:11px;">Failed to load kills</div>';
+  }
+}
+
+function renderKills(zkill,sid){
+  const el=document.getElementById('killsList');
+  if(!zkill||!zkill.kills||!zkill.kills.length){
+    el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No kills in last 3 days</div>';
+    return;
+  }
+  const kills=zkill.kills.slice(0,30);
+  const domInfo=zkill.dominant_corp_name?`
+    <div style="padding:6px 10px;background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.2);font-size:10px;">
+      ⚠ <span style="color:#f59e0b;font-weight:700;">${esc(zkill.dominant_corp_name)}</span>
+      <span style="color:var(--muted);"> likely controls this system (${Math.round(zkill.dominant_corp_pct||0)}% of kills)</span>
+    </div>`:'';
+  el.innerHTML=domInfo+kills.map(k=>{
+    const ts=k.killmail_time?new Date(k.killmail_time).toLocaleDateString([],{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    const val=k.zkb?.totalValue?`<span style="color:#fbbf24;">${fmtISK(k.zkb.totalValue)}</span>`:'';
+    const ship=k.victim?.ship_type_name||k.victim?.ship_type_id||'Unknown';
+    const corp=k.victim?.corporation_name||'';
+    const zkbUrl=k.killmail_id?`https://zkillboard.com/kill/${k.killmail_id}/`:'';
+    return`<div style="padding:6px 10px;border-bottom:1px solid rgba(50,182,255,.05);font-size:11px;display:flex;gap:8px;align-items:flex-start;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#f87171;">💀 ${esc(ship)}</div>
+        <div style="font-size:9px;color:var(--muted);">${esc(corp)}${ts?' · '+ts:''}</div>
+      </div>
+      <div style="flex-shrink:0;text-align:right;">
+        ${val}
+        ${zkbUrl?`<div><a href="${esc(zkbUrl)}" target="_blank" style="font-size:9px;color:rgba(50,182,255,.6);text-decoration:none;">zkb ↗</a></div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Intel ─────────────────────────────────────────────────
+async function loadIntel(sid){
+  if(!sid)return;
+  const s=_data.systems.find(x=>x.system_id===sid);
+  document.getElementById('intelSysLbl').textContent=s?s.system_name:`System ${sid}`;
+  const el=document.getElementById('intelList');
+  el.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:11px;">Loading intel…</div>';
+  try{
+    const r=await fetch(`${API}/nav/intel/${sid}`,{credentials:'include'});
+    const d=await r.json();
+    renderIntel(d.entries||d||[],sid);
+  }catch(e){
+    el.innerHTML='<div style="padding:16px;text-align:center;color:var(--muted);font-size:11px;">No intel available</div>';
+  }
+}
+
+function renderIntel(entries,sid){
+  const el=document.getElementById('intelList');
+  if(!entries.length){
+    el.innerHTML='<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No intel for this system</div>';
+    return;
+  }
+  const now=Date.now()/1000;
+  const sorted=entries.slice().sort((a,b)=>(b.created_at||0)-(a.created_at||0));
+  el.innerHTML=sorted.map(e=>{
+    const ageH=(now-e.created_at)/3600;
+    const ageLbl=ageH<1?`${Math.round(ageH*60)}m ago`:ageH<24?`${Math.floor(ageH)}h ago`:`${Math.floor(ageH/24)}d ago`;
+    const fresh=ageH<4;
+    const srcBadge=e.source==='discord'
+      ?`<span style="background:rgba(88,101,242,.2);border:1px solid rgba(88,101,242,.4);border-radius:3px;padding:1px 5px;font-size:9px;color:#818cf8;">Discord</span>`
+      :`<span style="background:rgba(107,114,128,.15);border:1px solid rgba(107,114,128,.3);border-radius:3px;padding:1px 5px;font-size:9px;color:#9ca3af;">Manual</span>`;
+    return`<div style="padding:8px 10px;border-bottom:1px solid rgba(50,182,255,.05);">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:3px;">
+        ${srcBadge}
+        <span style="font-size:9px;color:${fresh?'#f59e0b':'var(--muted)'};">${esc(ageLbl)}</span>
+        ${e.reported_by?`<span style="font-size:9px;color:var(--muted);">· ${esc(e.reported_by)}</span>`:''}
+      </div>
+      <div style="font-size:11px;color:${fresh?'var(--text)':'rgba(200,210,255,.5)'};">${esc(e.summary||e.content||'No summary')}</div>
+    </div>`;
+  }).join('');
+}
+
+
 async function delSig(id,sid){
   await fetch(`${API}/nav/sig/${id}`,{method:'DELETE',credentials:'include'});
   loadSigs(sid);loadMap();
@@ -1710,6 +2306,14 @@ async function navFindRoute(){
         ${secHtml}
       </div>`;
     }).join('');
+    // Mass degradation warning
+    const degraded = hops.filter(h => h.mass_state && h.mass_state !== 'fresh' && h.mass_state !== null);
+    if (degraded.length > 0) {
+      const worst = degraded.find(h => h.mass_state === 'critical') || degraded[0];
+      const label = worst.mass_state === 'critical' ? '🔴 Critical' : '🟡 Half-Life';
+      res.insertAdjacentHTML('beforeend',
+        `<div class="mass-warning-footer">⚠ Route includes a ${label} WH. Verify mass before jumping.</div>`);
+    }
   }catch(e){ status.textContent = 'Request failed.'; }
 }
 document.getElementById('navRfFrom').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('navRfTo').focus(); });
@@ -1764,8 +2368,9 @@ function showTab(name,btn){
   const p=document.getElementById('pane-'+name);if(p)p.classList.add('active');
   if(btn)btn.classList.add('active');
   else{const tabs=document.querySelectorAll('.side-tab');
-    const idx={system:0,sigs:1,structs:2,routes:3,pilots:4}[name]||0;
+    const idx={system:0,kills:1,intel:2,sigs:3,structs:4,routes:5,pilots:6,notes:7}[name]||0;
     if(tabs[idx])tabs[idx].classList.add('active');}
+  if (name === 'notes' && _sel) loadNotes(_sel);
 }
 
 // ── Map switching ─────────────────────────────────────────
@@ -1780,6 +2385,15 @@ window.addEventListener('DOMContentLoaded',()=>{
   applyT();
   loadMap().then(()=>setTimeout(fitAll,150));
   _refreshTimer=setInterval(loadMap,30000);
+  setInterval(() => {
+    const el = document.getElementById('sigSyncAge');
+    if (el && window._sigSyncTs) {
+      const s = Math.round((Date.now() - window._sigSyncTs) / 1000);
+      el.textContent = s < 5 ? 'Synced just now' : `Synced ${s}s ago`;
+    }
+  }, 5000);
+  cfbInit();
+  setInterval(cfbInit, 60000);
 });
 window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){hideCtx();closePaste();
@@ -2099,7 +2713,7 @@ let _intelChannels=[], _intelSystems=[], _intelSince=0, _intelTimer=null, _intel
 
 async function loadIntelConfig(){
   try{
-    const d=await fetch('/app/api/intel/config',{credentials:'include'}).then(r=>r.json());
+    const d=await fetch('/eve/api/intel/config',{credentials:'include'}).then(r=>r.json());
     document.getElementById('intelDir').value=d.log_dir||'';
     _intelChannels=d.channels||[];
     _intelSystems=d.watch_systems||[];
@@ -2127,7 +2741,7 @@ function addWatchSystem(){
 function removeWatchSystem(s){ _intelSystems=_intelSystems.filter(x=>x!==s);renderIntelTags(); }
 async function saveIntelConfig(){
   const dir=document.getElementById('intelDir').value.trim();
-  await fetch('/app/api/intel/config',{method:'POST',credentials:'include',
+  await fetch('/eve/api/intel/config',{method:'POST',credentials:'include',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({log_dir:dir,channels:_intelChannels,watch_systems:_intelSystems})});
   document.getElementById('intelConfigStatus').textContent='✓ Saved. Watching for new messages…';
@@ -2136,11 +2750,11 @@ async function saveIntelConfig(){
 function startIntelPoll(){
   if(_intelTimer)clearInterval(_intelTimer);
   _intelSince=0;_intelMsgs=[];renderFeed();pollIntel();
-  _intelTimer=setInterval(pollIntel,4000);
+  _intelTimer=setInterval(pollIntel,15000);
 }
 async function pollIntel(){
   try{
-    const d=await fetch(`/app/api/intel/feed?since=${_intelSince}`,{credentials:'include'}).then(r=>r.json());
+    const d=await fetch(`/eve/api/intel/feed?since=${_intelSince}`,{credentials:'include'}).then(r=>r.json());
     const msgs=d.messages||[];
     if(msgs.length){
       _intelSince=Math.max(...msgs.map(m=>m.ts));
@@ -2176,7 +2790,7 @@ async function loadLogList(){
   const el=document.getElementById('intelLogList');
   el.textContent='Scanning…';
   try{
-    const d=await fetch(`/app/api/intel/logs${dir?'?log_dir='+encodeURIComponent(dir):''}`,{credentials:'include'}).then(r=>r.json());
+    const d=await fetch(`/eve/api/intel/logs${dir?'?log_dir='+encodeURIComponent(dir):''}`,{credentials:'include'}).then(r=>r.json());
     const files=d.files||[];
     if(!files.length){el.textContent='No .txt files found.';return;}
     el.innerHTML=files.slice(0,30).map(f=>`
@@ -2608,6 +3222,302 @@ function shareChainMap(){
     systems,
     connections
   });
+}
+// ── Char Filter Bar ───────────────────────────────────────────────
+let _cfbChars = [];      // [{character_id, character_name, online, ...}]
+let _cfbSelected = null; // null = all; Set of character_ids = filtered
+
+async function cfbInit() {
+  try {
+    const d = await fetch('/eve/api/nav/all_chars').then(r => r.json());
+    _cfbChars = d.chars || [];
+    const saved = localStorage.getItem('nav_char_filter');
+    if (saved) {
+      try { _cfbSelected = new Set(JSON.parse(saved)); } catch(e) { _cfbSelected = null; }
+    }
+    cfbRender();
+  } catch(e) { console.warn('cfbInit', e); }
+}
+
+function cfbRender() {
+  const container = document.getElementById('cfbPills');
+  if (!container) return;
+  container.innerHTML = _cfbChars.map(c => {
+    const active = _cfbSelected === null || _cfbSelected.has(c.character_id);
+    const initials = (c.character_name || '?').slice(0, 2).toUpperCase();
+    return `<div class="char-pill${active ? '' : ' inactive'}"
+                 data-cid="${c.character_id}"
+                 onclick="cfbToggle(${c.character_id})"
+                 title="${esc(c.character_name)} · Last: ${esc(c.last_system_name)}">
+              <div class="cpav">${initials}</div>
+              <span>${esc(c.character_name)}</span>
+              <div class="cpdot${c.online ? ' online' : ''}"></div>
+            </div>`;
+  }).join('');
+}
+
+function cfbToggle(cid) {
+  if (_cfbSelected === null) {
+    _cfbSelected = new Set(_cfbChars.map(c => c.character_id).filter(id => id !== cid));
+  } else {
+    if (_cfbSelected.has(cid)) _cfbSelected.delete(cid);
+    else _cfbSelected.add(cid);
+    if (_cfbSelected.size === _cfbChars.length) _cfbSelected = null;
+  }
+  cfbSave();
+  cfbRender();
+  loadMap();
+}
+
+function cfbSelectAll()  { _cfbSelected = null; cfbSave(); cfbRender(); loadMap(); }
+function cfbSelectNone() { _cfbSelected = new Set(); cfbSave(); cfbRender(); loadMap(); }
+
+function cfbSave() {
+  if (_cfbSelected === null) localStorage.removeItem('nav_char_filter');
+  else localStorage.setItem('nav_char_filter', JSON.stringify([..._cfbSelected]));
+}
+
+function cfbCharIdsParam() {
+  if (_cfbSelected === null) return '';               // all — no filter
+  if (_cfbSelected.size === 0) return 'char_ids=-1'; // none — guaranteed no match
+  return 'char_ids=' + [..._cfbSelected].join(',');
+}
+// ── Mass Tracking ─────────────────────────────────────────────────
+function massBadgeHtml(state) {
+  const labels = {fresh:'Fresh',halflife:'Half-Life',critical:'⚠ Critical',collapsed:'✕ Collapsed'};
+  const cls    = {fresh:'mass-fresh',halflife:'mass-halflife',critical:'mass-critical',collapsed:'mass-collapsed'};
+  return `<span class="mass-badge ${cls[state]||'mass-fresh'}">${labels[state]||state}</span>`;
+}
+
+function massBarHtml(state, pctUsed) {
+  if (state === 'collapsed') return '';
+  const cls = {fresh:'fresh',halflife:'halflife',critical:'critical'}[state]||'fresh';
+  const fill = Math.max(0, Math.min(100, 100 - pctUsed));
+  return `<div class="mass-bar-wrap"><div class="mass-bar ${cls}" style="width:${fill}%"></div></div>`;
+}
+
+async function loadConnMass(fromSysId, toSysId) {
+  if (!fromSysId || !toSysId) return null;
+  const lo = Math.min(fromSysId, toSysId);
+  const hi = Math.max(fromSysId, toSysId);
+  try {
+    return await fetch(`/eve/api/nav/wh_mass/${lo}_${hi}`).then(r => r.json());
+  } catch { return null; }
+}
+
+async function setConnMassState(conn_id, state) {
+  await fetch(`/eve/api/nav/wh_mass/${conn_id}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({manual_state: state})
+  });
+}
+
+async function resetConnMass(conn_id) {
+  await fetch(`/eve/api/nav/wh_mass/${conn_id}`, {method:'DELETE'});
+}
+
+async function initConnMass(conn_id, fromSysId, toSysId) {
+  const c = _data.connections.find(c => c.from_sys_id===fromSysId && c.to_sys_id===toSysId ||
+                                        c.from_sys_id===toSysId   && c.to_sys_id===fromSysId);
+  const whi = WHT[c?.wh_type] || {};
+  await fetch(`/eve/api/nav/wh_mass/${conn_id}`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({total_mass_kg: whi.m || 2000000000, used_mass_kg: 0})
+  });
+  showConnDet(_data.connections.find(conn => conn.id===_selConn));
+}
+// ── Sig Lifecycle ─────────────────────────────────────────────────
+function sigAgeInfo(sig) {
+  const now = Date.now() / 1000;
+  const group = (sig.sig_group || '').toLowerCase();
+  const lifetimeH = (sig.wh_lifetime_h) || (group === 'wormhole' ? 24 : 16);
+  const firstSeen   = sig.first_seen_ts   || sig.created_ts  || now;
+  const lastConfirm = sig.last_confirmed_ts || sig.updated_ts || now;
+
+  // Post-downtime stale: both timestamps before today's 11:00 UTC and we're past DT
+  const d = new Date();
+  const dtToday = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 11, 0, 0) / 1000;
+  if (firstSeen < dtToday && lastConfirm < dtToday && now > dtToday) {
+    return {pct: 0, cls: 'expiring', stale: true, label: 'Stale (post-DT)'};
+  }
+
+  const ageH = (now - lastConfirm) / 3600;
+  const pctRemaining = Math.max(0, 1 - ageH / lifetimeH);
+  let cls = 'fresh';
+  if (pctRemaining < 0.1)  cls = 'expiring';
+  else if (pctRemaining < 0.5) cls = 'aging';
+  const stale = pctRemaining <= 0;
+  return {pct: pctRemaining, cls, stale, label: stale ? 'Stale — likely gone' : ''};
+}
+
+function renderSigRows(sigs, systemId) {
+  const el = document.getElementById('sigList');
+  if (!el) return;
+  if (!sigs || sigs.length === 0) {
+    el.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No sigs recorded</div>';
+    return;
+  }
+  el.innerHTML = sigs.map(s => {
+    const ai = sigAgeInfo(s);
+    const isWH = (s.sig_group || '').toLowerCase() === 'wormhole';
+    const whRow = (isWH && s.wh_type_code) ?
+      `<div class="sig-wh-row">
+        <span style="color:var(--accent);font-weight:700;">${esc(s.wh_type_code)}</span>
+        ${s.wh_dest_class ? `<span> → ${esc(s.wh_dest_class)}</span>` : ''}
+        ${s.wh_max_jump_kg ? `<span style="margin-left:8px;">${fmtMass(s.wh_max_jump_kg)}/jump</span>` : ''}
+        ${s.wh_total_kg ? `<span style="margin-left:8px;">${fmtMass(s.wh_total_kg)} total</span>` : ''}
+       </div>` : '';
+    const whInput = isWH && !s.wh_type_code ?
+      `<div style="display:flex;gap:4px;margin-top:3px;">
+         <input id="wht_${s.id}" class="input" placeholder="WH type (e.g. K162)" style="font-size:10px;flex:1;padding:2px 6px;"/>
+         <button class="btn" style="font-size:9px;padding:2px 6px;" onclick="setSigWHType(${s.id},${systemId})">Set</button>
+       </div>` : '';
+    return `<div class="sig-row${ai.stale ? ' stale' : ''}" id="sig-row-${s.id}">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-weight:700;color:var(--accent);font-size:10px;width:44px;flex-shrink:0;">${esc(s.sig_id)}</span>
+        <span style="flex:1;color:var(--text);">${esc(s.sig_group||'Unknown')}</span>
+        <span style="color:var(--muted);font-size:10px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(s.sig_info||'')}">${esc(s.sig_info||'')}</span>
+        <button class="btn" style="font-size:9px;padding:1px 5px;flex-shrink:0;" onclick="confirmSig(${s.id},${systemId})" title="Confirm still present">✓</button>
+        <button class="btn" style="font-size:9px;padding:1px 5px;flex-shrink:0;color:#f87171;" onclick="deleteSig(${s.id},${systemId})">✕</button>
+      </div>
+      <div class="sig-age-bar"><div class="sig-age-fill ${ai.cls}" style="width:${Math.round(ai.pct*100)}%"></div></div>
+      ${ai.stale ? `<div class="sig-stale-lbl">${ai.label}</div>` : ''}
+      ${whInput}
+    </div>${whRow}`;
+  }).join('');
+}
+
+async function confirmSig(sigId, systemId) {
+  await fetch(`/eve/api/nav/sig/${sigId}/confirm`, {method:'POST'});
+  loadSigs(systemId);
+}
+
+async function setSigWHType(sigId, systemId) {
+  const code = (document.getElementById(`wht_${sigId}`)?.value || '').trim().toUpperCase();
+  if (!code) return;
+  const whi = WHT[code] || {};
+  await fetch(`/eve/api/nav/sig/${sigId}/wh_type`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      wh_type_code:   code,
+      wh_dest_class:  whi.d || null,
+      wh_max_jump_kg: whi.j || null,
+      wh_total_kg:    whi.m || null,
+      wh_lifetime_h:  whi.l || null,
+    })
+  });
+  loadSigs(systemId);
+}
+// ── Intel Notes ───────────────────────────────────────────────────
+let _notesSystemId = null;
+let _notesCooldown = 0;
+
+async function loadNotes(systemId, force) {
+  _notesSystemId = systemId;
+  const lbl = document.getElementById('notesSysLbl');
+  const body = document.getElementById('notesBody');
+  if (!body) return;
+  const sysName = (_data.systems||[]).find(s=>s.system_id===systemId)?.system_name || `System ${systemId}`;
+  if (lbl) lbl.textContent = sysName;
+  body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px;">Loading intel…</div>';
+  try {
+    const url = `/eve/api/nav/system_profile/${systemId}${force ? '?force=true' : ''}`;
+    const d = await fetch(url, {credentials:'include'}).then(r => r.json());
+    if (d.error) {
+      body.innerHTML = `<div style="padding:20px;color:#f87171;text-align:center;font-size:11px;">${esc(d.error)}</div>`;
+      return;
+    }
+    const noData = d.kill_count_90d === 0 && (!d.recent_sightings || d.recent_sightings.length === 0);
+    if (noData) {
+      body.innerHTML = '<div style="padding:20px;color:var(--muted);text-align:center;font-size:11px;">No intelligence available for this system</div>';
+      return;
+    }
+    const threatCls = `threat-${d.threat_level}`;
+    const groupsHtml = (d.suspected_groups || []).map(g =>
+      `<div class="intel-group-row">
+         <div class="intel-group-av">${esc((g.corp_name||'?').slice(0,2).toUpperCase())}</div>
+         <div style="flex:1;">
+           <div style="font-weight:600;">${esc(g.corp_name||'Unknown Corp')}</div>
+           <div style="color:var(--muted);font-size:10px;">${g.kills} kills · ${g.losses} losses</div>
+         </div>
+         <span class="intel-label-${g.label.toLowerCase()}">${g.label}</span>
+       </div>`
+    ).join('') || '<div style="padding:8px 10px;font-size:11px;color:var(--muted);">No corp data</div>';
+
+    const sightingsHtml = (d.recent_sightings || []).map(r =>
+      `<div class="sight-row">
+         <span style="flex:1;">${esc(r.character_name)}</span>
+         <span class="sight-${r.status==='stationed'?'stationed':'passed'}">${r.status}</span>
+         <span style="color:var(--muted);font-size:10px;">${esc((r.last_seen||'').slice(0,16))}</span>
+       </div>`
+    ).join('') || '<div style="padding:8px 10px;font-size:11px;color:var(--muted);">No sightings in last 7 days</div>';
+
+    body.innerHTML = `
+      <div style="padding:10px;">
+        <span class="threat-badge ${threatCls}">${d.threat_level}</span>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">${esc(d.summary)}</div>
+      </div>
+      <div style="padding:4px 10px 2px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Suspected Residents</div>
+      ${groupsHtml}
+      <div style="padding:4px 10px 2px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Recent Sightings (7d)</div>
+      ${sightingsHtml}
+      <div style="padding:4px 10px 2px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px;">Manual Notes</div>
+      <div id="intelNotesList" style="padding:4px 10px;"></div>
+      <div style="padding:6px 10px 10px;">
+        <textarea id="intelNoteInput" class="input" rows="3" placeholder="Add a note…"
+          style="width:100%;font-size:11px;resize:vertical;box-sizing:border-box;"></textarea>
+        <button class="btn" style="font-size:10px;padding:3px 12px;margin-top:4px;width:100%;"
+          onclick="saveIntelNote(${systemId})">Save Note</button>
+      </div>`;
+    loadIntelNotes(systemId);
+  } catch(e) {
+    body.innerHTML = `<div style="padding:20px;color:#f87171;text-align:center;font-size:11px;">Error: ${esc(String(e))}</div>`;
+  }
+}
+
+function refreshNotes(manual) {
+  if (!_notesSystemId) return;
+  if (manual) {
+    const now = Date.now();
+    if (now - _notesCooldown < 300000) {
+      alert('Please wait 5 minutes between manual refreshes.');
+      return;
+    }
+    _notesCooldown = now;
+  }
+  loadNotes(_notesSystemId, manual);
+}
+
+async function loadIntelNotes(systemId) {
+  try {
+    const d = await fetch(`/eve/api/nav/intel/${systemId}`, {credentials:'include'}).then(r => r.json());
+    const el = document.getElementById('intelNotesList');
+    if (!el) return;
+    const items = d.intel || [];
+    if (!items.length) {
+      el.innerHTML = '<div style="font-size:11px;color:var(--muted);">No notes yet</div>';
+      return;
+    }
+    el.innerHTML = items.map(n =>
+      `<div style="padding:4px 0;border-bottom:1px solid rgba(50,182,255,.05);font-size:11px;">
+         <span style="color:var(--muted);font-size:10px;">${esc((n.timestamp||'').slice(0,16))} · ${esc(n.character_name||'')}</span>
+         <div style="margin-top:2px;">${esc(n.content)}</div>
+       </div>`
+    ).join('');
+  } catch(e) {}
+}
+
+async function saveIntelNote(systemId) {
+  const inp = document.getElementById('intelNoteInput');
+  const text = (inp?.value || '').trim();
+  if (!text) return;
+  await fetch('/eve/api/nav/intel', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({system_id: systemId, content: text})
+  });
+  if (inp) inp.value = '';
+  loadIntelNotes(systemId);
 }
 </script>
 {% endblock %}

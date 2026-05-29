@@ -276,19 +276,421 @@ body:not(.sidebar-open) main.wrap { padding-left:0 !important; }
 }
 .ia-soon svg { opacity:.2; }
 .ia-soon-title { font-size:14px; font-weight:600; color:rgba(180,210,255,.4); }
+
+/* ── Mobile responsive ───────────────────────────────────────── */
+#intelSidebarToggle {
+  display:none; align-items:center; gap:6px;
+  background:rgba(50,182,255,.08); border:1px solid rgba(50,182,255,.2);
+  border-radius:6px; color:var(--accent); font-size:11px; font-weight:600;
+  letter-spacing:.05em; padding:5px 10px; cursor:pointer; flex-shrink:0;
+}
+@media(max-width:640px) {
+  #intelSidebarToggle { display:flex; }
+  #intelSearch { width:140px; }
+  #intelSidebar {
+    position:fixed; left:0; top:0; bottom:0; z-index:200;
+    transform:translateX(-100%); transition:transform .22s ease;
+    width:220px; padding-top:60px;
+  }
+  #intelSidebar.mobile-open { transform:translateX(0); box-shadow:4px 0 24px rgba(0,0,0,.7); }
+  .ia-body { padding:16px 16px 48px; }
+  .ia-hero-title { font-size:20px; }
+  .ia-levels { grid-template-columns:1fr 1fr; }
+  .ship-grid, .mrd-grid { grid-template-columns:1fr; }
+  #intelContent { width:100%; }
+}
+</style>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   TOP-LEVEL TAB BAR
+   ══════════════════════════════════════════════════════════════ */
+#intelTabBar {
+  display:flex; align-items:stretch; gap:0;
+  background:rgba(0,0,0,.7);
+  border-bottom:1px solid rgba(50,182,255,.18);
+  flex-shrink:0; overflow-x:auto;
+  scrollbar-width:none;
+}
+#intelTabBar::-webkit-scrollbar { display:none; }
+.itab {
+  display:flex; align-items:center; gap:6px;
+  padding:0 16px; height:42px;
+  font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase;
+  color:rgba(180,210,255,.5);
+  cursor:pointer; border-bottom:2px solid transparent;
+  white-space:nowrap; transition:color .15s, border-color .15s;
+  user-select:none; flex-shrink:0;
+}
+.itab:hover { color:rgba(180,210,255,.85); background:rgba(50,182,255,.05); }
+.itab.active { color:var(--accent); border-bottom-color:var(--accent); background:rgba(50,182,255,.07); }
+.itab svg { opacity:.6; }
+.itab.active svg { opacity:1; }
+
+/* Tab content wrapper */
+#intelTabContent { flex:1; min-height:0; overflow:hidden; }
+.itab-pane { display:none; }
+.itab-pane.active {
+  display:block;
+  height:100%;
+  overflow-y:auto; overflow-x:hidden;
+}
+/* Guides tab needs flex + its own internal scroll management */
+#itab-guides.active {
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOOL PANE SHARED STYLES
+   ══════════════════════════════════════════════════════════════ */
+.tool-wrap {
+  padding:28px 32px 60px;
+  max-width:900px; margin:0 auto; width:100%;
+  box-sizing:border-box;
+}
+.tool-header {
+  margin-bottom:22px;
+}
+.tool-title {
+  font-size:18px; font-weight:800; color:var(--text); margin:0 0 4px;
+}
+.tool-sub {
+  font-size:12px; color:var(--muted);
+}
+.tool-search-row {
+  display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;
+}
+.tool-input {
+  flex:1; min-width:180px;
+  background:rgba(255,255,255,.05); border:1px solid rgba(50,182,255,.2);
+  border-radius:7px; color:var(--text); font-size:13px;
+  padding:9px 13px; outline:none; transition:border-color .15s;
+}
+.tool-input:focus { border-color:rgba(50,182,255,.5); }
+.tool-select {
+  background:rgba(255,255,255,.05); border:1px solid rgba(50,182,255,.2);
+  border-radius:7px; color:var(--text); font-size:13px;
+  padding:9px 13px; outline:none; cursor:pointer;
+}
+.tool-select option { background:#0d1a2a; }
+.tool-btn {
+  padding:9px 18px; border-radius:7px; border:1px solid rgba(50,182,255,.35);
+  background:rgba(50,182,255,.12); color:var(--accent); font-size:12px;
+  font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+  cursor:pointer; transition:background .15s, border-color .15s; white-space:nowrap;
+}
+.tool-btn:hover { background:rgba(50,182,255,.22); border-color:rgba(50,182,255,.55); }
+.tool-btn:disabled { opacity:.4; cursor:default; }
+
+/* Result area */
+.tool-result { margin-top:4px; }
+.tool-error {
+  background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.25);
+  border-radius:8px; padding:12px 16px; color:#fca5a5; font-size:12px;
+}
+.tool-empty {
+  color:var(--muted); font-size:13px; padding:40px 0; text-align:center;
+}
+.tool-spinner { color:var(--accent); font-size:12px; padding:20px 0; text-align:center; letter-spacing:.1em; }
+
+/* Entity card */
+.ent-card {
+  background:rgba(255,255,255,.03); border:1px solid rgba(50,182,255,.15);
+  border-radius:12px; overflow:hidden;
+}
+.ent-card-hero {
+  display:flex; align-items:center; gap:18px;
+  padding:20px 22px; border-bottom:1px solid rgba(50,182,255,.1);
+  background:linear-gradient(135deg, rgba(50,182,255,.06), rgba(0,0,0,.3));
+}
+.ent-portrait {
+  width:72px; height:72px; border-radius:8px;
+  border:1px solid rgba(50,182,255,.2); object-fit:cover;
+  background:rgba(0,0,0,.4);
+}
+.ent-portrait-logo {
+  width:64px; height:64px; border-radius:6px;
+  border:1px solid rgba(50,182,255,.2); object-fit:contain;
+  background:rgba(0,0,0,.4);
+}
+.ent-name { font-size:20px; font-weight:800; color:var(--text); }
+.ent-sub  { font-size:12px; color:var(--muted); margin-top:3px; }
+.ent-tags { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.ent-tag  {
+  font-size:10px; padding:2px 8px; border-radius:4px; font-weight:600;
+  background:rgba(50,182,255,.12); color:rgba(130,180,255,.85);
+}
+.ent-tag.danger { background:rgba(239,68,68,.15); color:#fca5a5; }
+.ent-tag.safe   { background:rgba(34,197,94,.15);  color:#4ade80; }
+.ent-tag.warn   { background:rgba(251,146,60,.15); color:#fdba74; }
+
+/* Stats grid */
+.stat-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:1px;
+  background:rgba(50,182,255,.08); border-top:1px solid rgba(50,182,255,.08);
+}
+.stat-cell {
+  background:rgba(0,0,0,.5); padding:13px 16px;
+}
+.stat-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:4px; }
+.stat-val   { font-size:16px; font-weight:700; color:var(--text); }
+.stat-val.green { color:#4ade80; }
+.stat-val.red   { color:#f87171; }
+.stat-val.blue  { color:var(--accent); }
+
+/* Corp history list */
+.corp-hist-list { list-style:none; padding:14px 18px; margin:0; display:flex; flex-direction:column; gap:6px; }
+.corp-hist-item {
+  display:flex; gap:10px; font-size:11px; color:rgba(180,210,255,.7);
+  padding:5px 0; border-bottom:1px solid rgba(50,182,255,.06);
+}
+.corp-hist-item:last-child { border-bottom:none; }
+.corp-hist-date { color:var(--muted); flex-shrink:0; width:75px; }
+.corp-hist-name { color:rgba(200,220,255,.85); }
+
+/* System info card */
+.sys-card {
+  background:rgba(255,255,255,.03); border:1px solid rgba(50,182,255,.15);
+  border-radius:12px; overflow:hidden; margin-bottom:16px;
+}
+.sys-card-title {
+  padding:16px 20px; border-bottom:1px solid rgba(50,182,255,.1);
+  background:linear-gradient(135deg,rgba(50,182,255,.07),rgba(0,0,0,.3));
+}
+.sys-name-big { font-size:22px; font-weight:800; color:var(--text); }
+.sys-sec      { font-size:12px; margin-top:4px; font-weight:700; }
+.sys-sec.hs   { color:#4ade80; }
+.sys-sec.ls   { color:#fdba74; }
+.sys-sec.ns   { color:#f87171; }
+.sys-sec.wh   { color:#c084fc; }
+.sys-links { display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; }
+.sys-link {
+  font-size:10px; padding:3px 10px; border-radius:4px;
+  background:rgba(50,182,255,.1); color:var(--accent);
+  text-decoration:none; border:1px solid rgba(50,182,255,.2);
+  transition:background .12s;
+}
+.sys-link:hover { background:rgba(50,182,255,.2); }
+
+/* WH card */
+.wh-card {
+  background:rgba(255,255,255,.03); border:1px solid rgba(192,132,252,.2);
+  border-radius:12px; overflow:hidden;
+}
+.wh-card-hero {
+  padding:20px 22px; background:linear-gradient(135deg,rgba(192,132,252,.08),rgba(0,0,0,.3));
+  border-bottom:1px solid rgba(192,132,252,.15);
+}
+.wh-name  { font-size:22px; font-weight:800; color:#c084fc; }
+.wh-class { font-size:12px; color:var(--muted); margin-top:3px; }
+.wh-effect-box {
+  margin:12px 0 0; padding:10px 14px;
+  background:rgba(192,132,252,.07); border:1px solid rgba(192,132,252,.2);
+  border-radius:7px; font-size:11px; color:rgba(220,180,255,.8); line-height:1.6;
+}
+.wh-statics { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.wh-static-chip {
+  padding:4px 12px; border-radius:5px; font-size:11px; font-weight:700;
+  background:rgba(50,182,255,.12); color:var(--accent);
+  border:1px solid rgba(50,182,255,.2);
+}
+.wh-static-chip.c1,.wh-static-chip.c2,.wh-static-chip.c3 { background:rgba(34,197,94,.1); color:#4ade80; border-color:rgba(34,197,94,.2); }
+.wh-static-chip.c4,.wh-static-chip.c5,.wh-static-chip.c6 { background:rgba(239,68,68,.1); color:#fca5a5; border-color:rgba(239,68,68,.2); }
+.wh-static-chip.ns,.wh-static-chip.ls,.wh-static-chip.hs { background:rgba(251,146,60,.1); color:#fdba74; border-color:rgba(251,146,60,.2); }
+
+/* Agents table */
+.agents-table { width:100%; border-collapse:collapse; font-size:12px; }
+.agents-table th {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); text-align:left; padding:8px 10px;
+  border-bottom:1px solid rgba(50,182,255,.15); position:sticky; top:0;
+  background:rgba(5,12,25,.95); z-index:1;
+}
+.agents-table td {
+  padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.04);
+  color:rgba(200,220,255,.85); vertical-align:middle;
+}
+.agents-table tr:hover td { background:rgba(50,182,255,.05); }
+.agents-table tr:last-child td { border-bottom:none; }
+.agent-lvl {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:4px; font-size:11px; font-weight:800;
+}
+.agent-lvl.l1 { background:rgba(34,197,94,.2);  color:#4ade80; }
+.agent-lvl.l2 { background:rgba(59,130,246,.2);  color:#93c5fd; }
+.agent-lvl.l3 { background:rgba(245,158,11,.2);  color:#fcd34d; }
+.agent-lvl.l4 { background:rgba(239,68,68,.2);   color:#fca5a5; }
+.agent-lvl.l5 { background:rgba(192,132,252,.2); color:#c084fc; }
+
+/* Appraisal */
+.appraise-textarea {
+  width:100%; box-sizing:border-box;
+  background:rgba(255,255,255,.04); border:1px solid rgba(50,182,255,.2);
+  border-radius:8px; color:var(--text); font-size:12px; font-family:monospace;
+  padding:12px 14px; resize:vertical; outline:none;
+  min-height:120px; transition:border-color .15s;
+}
+.appraise-textarea:focus { border-color:rgba(50,182,255,.45); }
+.appraise-table { width:100%; border-collapse:collapse; font-size:12px; }
+.appraise-table th {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); text-align:left; padding:7px 10px;
+  border-bottom:1px solid rgba(50,182,255,.15);
+}
+.appraise-table td {
+  padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.04);
+  color:rgba(200,220,255,.85);
+}
+.appraise-table tr:last-child td { border-bottom:none; }
+.appraise-total-row {
+  display:flex; justify-content:flex-end; align-items:center; gap:12px;
+  padding:14px 10px 0; font-size:13px;
+}
+.appraise-total-label { color:var(--muted); font-weight:600; }
+.appraise-total-val   { font-size:20px; font-weight:800; color:#4ade80; }
+.appraise-not-found   { color:var(--muted); font-style:italic; }
+
+/* Thera table */
+.thera-table { width:100%; border-collapse:collapse; font-size:12px; }
+.thera-table th {
+  font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); text-align:left; padding:8px 10px;
+  border-bottom:1px solid rgba(50,182,255,.15); position:sticky; top:0;
+  background:rgba(5,12,25,.95); z-index:1;
+}
+.thera-table td {
+  padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.04);
+  color:rgba(200,220,255,.85); vertical-align:middle;
+}
+.thera-table tr:hover td { background:rgba(50,182,255,.05); }
+.thera-table tr:last-child td { border-bottom:none; }
+.thera-sec-hs  { color:#4ade80; font-weight:700; }
+.thera-sec-ls  { color:#fdba74; font-weight:700; }
+.thera-sec-ns  { color:#f87171; font-weight:700; }
+.thera-sec-wh  { color:#c084fc; font-weight:700; }
+.thera-filter-row { display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap; align-items:center; }
+.thera-count { font-size:11px; color:var(--muted); margin-left:auto; }
+
+/* Killmail */
+.km-card {
+  background:rgba(255,255,255,.03); border:1px solid rgba(239,68,68,.2);
+  border-radius:12px; overflow:hidden; margin-bottom:16px;
+}
+.km-card-hero {
+  padding:18px 22px; background:linear-gradient(135deg,rgba(239,68,68,.07),rgba(0,0,0,.3));
+  border-bottom:1px solid rgba(239,68,68,.12);
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+}
+.km-ship-img {
+  width:64px; height:64px; border-radius:8px; object-fit:contain;
+  border:1px solid rgba(239,68,68,.2); background:rgba(0,0,0,.4);
+}
+.km-victim-name { font-size:18px; font-weight:800; color:var(--text); }
+.km-victim-sub  { font-size:12px; color:var(--muted); margin-top:2px; }
+.km-isk         { font-size:14px; font-weight:700; color:#f87171; margin-top:6px; }
+.km-section-title {
+  font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); padding:10px 18px 6px;
+  border-bottom:1px solid rgba(255,255,255,.05);
+}
+.km-attacker-row {
+  display:flex; align-items:center; gap:12px; padding:9px 18px;
+  border-bottom:1px solid rgba(255,255,255,.04); font-size:12px;
+}
+.km-attacker-row:last-child { border-bottom:none; }
+.km-attacker-name { color:rgba(200,220,255,.9); font-weight:600; }
+.km-attacker-ship { color:var(--muted); font-size:11px; }
+.km-attacker-dmg  { margin-left:auto; color:rgba(200,220,255,.6); font-size:11px; }
+.km-final-blow    { padding:1px 6px; font-size:9px; font-weight:700; text-transform:uppercase;
+                    background:rgba(239,68,68,.2); color:#fca5a5; border-radius:3px; margin-left:6px; }
+.km-items-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:6px; padding:12px 18px;
+}
+.km-item {
+  background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07);
+  border-radius:6px; padding:7px 10px; font-size:11px;
+}
+.km-item-name { color:rgba(200,220,255,.85); margin-bottom:3px; }
+.km-item-qty  { color:var(--muted); }
+.km-item-qty .dropped  { color:#4ade80; }
+.km-item-qty .destroyed{ color:#f87171; }
 </style>
 
-<div id="intelTopBar">
-  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-  <h1>Intel</h1>
-  <span class="itb-sub">Guides &amp; Reference</span>
-  <input id="intelSearch" type="text" placeholder="Search guides…" oninput="intelFilter(this.value)" />
+<!-- ══════════════════════════════════════════════════════════
+     TOP-LEVEL TAB BAR
+     ══════════════════════════════════════════════════════════ -->
+<nav id="intelTabBar">
+  <!-- Guides -->
+  <div class="itab active" onclick="switchTab('guides',this)" title="Guides & Reference">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+    Guides
+  </div>
+  <!-- Character -->
+  <div class="itab" onclick="switchTab('char',this)" title="Character Lookup">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+    Character
+  </div>
+  <!-- Corp -->
+  <div class="itab" onclick="switchTab('corp',this)" title="Corporation Lookup">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+    Corp
+  </div>
+  <!-- Alliance -->
+  <div class="itab" onclick="switchTab('alliance',this)" title="Alliance Lookup">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+    Alliance
+  </div>
+  <!-- System -->
+  <div class="itab" onclick="switchTab('system',this)" title="System Lookup">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+    System
+  </div>
+  <!-- W-Space -->
+  <div class="itab" onclick="switchTab('wspace',this)" title="Wormhole Reference">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 000 20"/><path d="M12 2a14.5 14.5 0 010 20"/><path d="M2 12h20"/></svg>
+    W-Space
+  </div>
+  <!-- Agents -->
+  <div class="itab" onclick="switchTab('agents',this)" title="Mission Agents">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></svg>
+    Agents
+  </div>
+  <!-- Loot -->
+  <div class="itab" onclick="switchTab('loot',this)" title="Loot Appraisal">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+    Loot
+  </div>
+  <!-- Thera -->
+  <div class="itab" onclick="switchTab('thera',this)" title="Thera Connections">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>
+    Thera
+  </div>
+  <!-- Killmail -->
+  <div class="itab" onclick="switchTab('killmail',this)" title="Killmail Breakdown">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Killmail
+  </div>
+</nav>
+
+<div id="intelTabContent">
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: GUIDES  (existing sidebar + articles)
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane active" id="itab-guides">
+<div id="intelTopBar" style="display:flex;align-items:center;gap:12px;padding:10px 18px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(50,182,255,.12);flex-shrink:0;">
+  <button id="intelSidebarToggle" onclick="toggleIntelSidebar()" aria-label="Toggle sidebar">
+    <svg viewBox="0 0 20 20" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="3" y1="5" x2="17" y2="5"/><line x1="3" y1="10" x2="17" y2="10"/><line x1="3" y1="15" x2="17" y2="15"/></svg>
+    Guides
+  </button>
+  <span style="font-size:10px;color:var(--muted);letter-spacing:.05em;">GUIDES &amp; REFERENCE</span>
+  <input id="intelSearch" type="text" placeholder="Search guides…" oninput="intelFilter(this.value)"
+    style="margin-left:auto;background:rgba(255,255,255,.05);border:1px solid rgba(50,182,255,.18);border-radius:6px;color:var(--text);font-size:12px;padding:5px 10px;width:200px;outline:none;" />
 </div>
+<div id="intelRoot" style="display:flex;flex:1;min-height:0;overflow:hidden;">
 
-<div id="intelRoot">
-
-  <!-- ── Sidebar ───────────────────────────────────────────── -->
-  <nav id="intelSidebar">
+  <!-- Sidebar -->
+  <nav id="intelSidebar" style="width:220px;flex-shrink:0;background:rgba(0,0,0,.4);border-right:1px solid rgba(50,182,255,.1);overflow-y:auto;padding:10px 0;">
     <div class="is-cat-header">Missions</div>
     <a class="is-article active" data-pane="missions-handbook" onclick="showArticle('missions-handbook',this)">
       Mission Runner's Handbook <span class="is-badge new">Updated</span>
@@ -299,7 +701,6 @@ body:not(.sidebar-open) main.wrap { padding-left:0 !important; }
     <a class="is-article" data-pane="standings-guide" onclick="showArticle('standings-guide',this)">
       Standings &amp; LP Stores <span class="is-badge soon">Soon</span>
     </a>
-
     <div class="is-cat-header">Ships &amp; Fitting</div>
     <a class="is-article" data-pane="fitting-101" onclick="showArticle('fitting-101',this)">
       Fitting 101 <span class="is-badge soon">Soon</span>
@@ -307,7 +708,6 @@ body:not(.sidebar-open) main.wrap { padding-left:0 !important; }
     <a class="is-article" data-pane="marauder-deep" onclick="showArticle('marauder-deep',this)">
       Marauder Deep Dive <span class="is-badge soon">Soon</span>
     </a>
-
     <div class="is-cat-header">Wormholes</div>
     <a class="is-article" data-pane="wh-101" onclick="showArticle('wh-101',this)">
       Wormhole Basics <span class="is-badge soon">Soon</span>
@@ -315,15 +715,14 @@ body:not(.sidebar-open) main.wrap { padding-left:0 !important; }
     <a class="is-article" data-pane="wh-sites" onclick="showArticle('wh-sites',this)">
       WH Site Catalog <span class="is-badge soon">Soon</span>
     </a>
-
     <div class="is-cat-header">Industry</div>
     <a class="is-article" data-pane="industry-101" onclick="showArticle('industry-101',this)">
       Industry Primer <span class="is-badge soon">Soon</span>
     </a>
   </nav>
 
-  <!-- ── Content pane ──────────────────────────────────────── -->
-  <div id="intelContent">
+  <!-- Article content — extract everything from original between intelContent open and close -->
+  <div id="intelContent" style="flex:1;overflow-y:auto;padding:0;">
 
     <!-- ════════════════════════════════════════════════════════
          ARTICLE: Mission Runner's Handbook
@@ -864,21 +1263,215 @@ body:not(.sidebar-open) main.wrap { padding-left:0 !important; }
     </div>
 
   </div><!-- /intelContent -->
+  </div><!-- /intelContent -->
 </div><!-- /intelRoot -->
+</div><!-- /itab-guides -->
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: CHARACTER LOOKUP
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-char">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">Character Lookup</div>
+    <div class="tool-sub">Search any pilot by name — EVE sheet, corp history, zkillboard stats</div>
+  </div>
+  <div class="tool-search-row">
+    <input class="tool-input" id="charName" type="text" placeholder="Character name…" onkeydown="if(event.key==='Enter')lookupChar()" />
+    <button class="tool-btn" onclick="lookupChar()">Search</button>
+  </div>
+  <div class="tool-result" id="charResult"><div class="tool-empty">Enter a character name above to begin.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: CORPORATION LOOKUP
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-corp">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">Corporation Lookup</div>
+    <div class="tool-sub">Search any NPC or player corp — ESI data, alliance, zkillboard stats</div>
+  </div>
+  <div class="tool-search-row">
+    <input class="tool-input" id="corpName" type="text" placeholder="Corporation name…" onkeydown="if(event.key==='Enter')lookupCorp()" />
+    <button class="tool-btn" onclick="lookupCorp()">Search</button>
+  </div>
+  <div class="tool-result" id="corpResult"><div class="tool-empty">Enter a corporation name above to begin.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: ALLIANCE LOOKUP
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-alliance">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">Alliance Lookup</div>
+    <div class="tool-sub">Search any alliance — ESI data, executor corp, zkillboard stats</div>
+  </div>
+  <div class="tool-search-row">
+    <input class="tool-input" id="allianceName" type="text" placeholder="Alliance name…" onkeydown="if(event.key==='Enter')lookupAlliance()" />
+    <button class="tool-btn" onclick="lookupAlliance()">Search</button>
+  </div>
+  <div class="tool-result" id="allianceResult"><div class="tool-empty">Enter an alliance name above to begin.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: SYSTEM LOOKUP
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-system">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">System Lookup</div>
+    <div class="tool-sub">K-space or J-space — structure counts, security, wormhole class, recent kills</div>
+  </div>
+  <div class="tool-search-row">
+    <input class="tool-input" id="systemName" type="text" placeholder="System name or J-number…" onkeydown="if(event.key==='Enter')lookupSystem()" />
+    <button class="tool-btn" onclick="lookupSystem()">Search</button>
+  </div>
+  <div class="tool-result" id="systemResult"><div class="tool-empty">Enter a system name above to begin.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: W-SPACE REFERENCE
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-wspace">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">W-Space Reference</div>
+    <div class="tool-sub">J-system class, statics, and effect description from embedded SDE data</div>
+  </div>
+  <div class="tool-search-row">
+    <input class="tool-input" id="whName" type="text" placeholder="J-number (e.g. J123456)…" onkeydown="if(event.key==='Enter')lookupWH()" />
+    <button class="tool-btn" onclick="lookupWH()">Search</button>
+  </div>
+  <div class="tool-result" id="whResult"><div class="tool-empty">Enter a J-system name above to begin.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: MISSION AGENTS
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-agents">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">Mission Agents</div>
+    <div class="tool-sub">Find security agents by system, region, level, and type (requires SDE)</div>
+  </div>
+  <div class="tool-search-row">
+    <input class="tool-input" id="agentSystem" type="text" placeholder="System (optional)" style="max-width:160px;" />
+    <input class="tool-input" id="agentRegion" type="text" placeholder="Region (optional)" style="max-width:160px;" />
+    <select class="tool-select" id="agentLevel">
+      <option value="">Any Level</option>
+      <option value="1">L1</option>
+      <option value="2">L2</option>
+      <option value="3">L3</option>
+      <option value="4">L4</option>
+      <option value="5">L5</option>
+    </select>
+    <select class="tool-select" id="agentType">
+      <option value="">Any Type</option>
+    </select>
+    <button class="tool-btn" onclick="lookupAgents()">Search</button>
+  </div>
+  <div class="tool-result" id="agentsResult"><div class="tool-empty">Set filters and search to find agents.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: LOOT APPRAISAL
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-loot">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">Loot Appraisal</div>
+    <div class="tool-sub">Paste a loot list (one item per line) — valued against Jita sell</div>
+  </div>
+  <textarea class="appraise-textarea" id="lootText" placeholder="Tritanium x5000&#10;Mexallon 1000&#10;Damage Control II&#10;..."></textarea>
+  <div class="tool-search-row" style="margin-top:10px;">
+    <button class="tool-btn" onclick="appraiseLoot()">Appraise</button>
+    <button class="tool-btn" style="border-color:rgba(255,255,255,.15);color:var(--muted);" onclick="document.getElementById('lootText').value='';document.getElementById('lootResult').innerHTML='<div class=\'tool-empty\'>Paste items above to appraise.</div>'">Clear</button>
+  </div>
+  <div class="tool-result" id="lootResult"><div class="tool-empty">Paste items above to appraise.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: THERA CONNECTIONS
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-thera">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">Thera Connections</div>
+    <div class="tool-sub">Live open wormhole connections via Eve-Scout</div>
+  </div>
+  <div class="thera-filter-row">
+    <input class="tool-input" id="theraFilter" type="text" placeholder="Filter by system or region…" oninput="filterThera()" style="max-width:260px;" />
+    <select class="tool-select" id="theraSecFilter" onchange="filterThera()">
+      <option value="">All Security</option>
+      <option value="hs">Hi-Sec</option>
+      <option value="ls">Low-Sec</option>
+      <option value="ns">Null-Sec</option>
+      <option value="wh">W-Space</option>
+    </select>
+    <button class="tool-btn" onclick="loadThera()">Refresh</button>
+    <span class="thera-count" id="theraCount"></span>
+  </div>
+  <div class="tool-result" id="theraResult"><div class="tool-empty">Click Refresh to load connections.</div></div>
+</div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════
+     TAB: KILLMAIL BREAKDOWN
+     ════════════════════════════════════════════════════════════ -->
+<div class="itab-pane" id="itab-killmail">
+<div class="tool-wrap">
+  <div class="tool-header">
+    <div class="tool-title">Killmail Breakdown</div>
+    <div class="tool-sub">Paste a zkillboard URL to get a full enriched breakdown</div>
+  </div>
+  <div class="tool-search-row">
+    <input class="tool-input" id="kmUrl" type="text" placeholder="https://zkillboard.com/kill/12345678/" onkeydown="if(event.key==='Enter')lookupKM()" />
+    <button class="tool-btn" onclick="lookupKM()">Analyze</button>
+  </div>
+  <div class="tool-result" id="kmResult"><div class="tool-empty">Paste a zkillboard kill URL above.</div></div>
+</div>
+</div>
+
+</div><!-- /intelTabContent -->
 
 <script>
+/* ══════════════════════════════════════════════════════════════
+   TAB SWITCHING
+   ══════════════════════════════════════════════════════════════ */
+function switchTab(key, el) {
+  document.querySelectorAll('.itab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.itab-pane').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  var pane = document.getElementById('itab-' + key);
+  if (pane) pane.classList.add('active');
+  // Auto-load Thera when switching to that tab
+  if (key === 'thera') {
+    var res = document.getElementById('theraResult');
+    if (res && res.querySelector('.tool-empty')) loadThera();
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   GUIDES (existing)
+   ══════════════════════════════════════════════════════════════ */
 function showArticle(key, el) {
-  // Hide all panes
   document.querySelectorAll('.ia-pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.is-article').forEach(a => a.classList.remove('active'));
-  // Show target
   var pane = document.getElementById('pane-' + key);
   if (pane) pane.classList.add('active');
   if (el) el.classList.add('active');
-  // Scroll content to top
-  document.getElementById('intelContent').scrollTop = 0;
+  var ic = document.getElementById('intelContent');
+  if (ic) ic.scrollTop = 0;
 }
-
 function intelFilter(q) {
   q = q.toLowerCase().trim();
   document.querySelectorAll('.is-article').forEach(function(a) {
@@ -886,5 +1479,487 @@ function intelFilter(q) {
     a.style.display = (!q || text.includes(q)) ? '' : 'none';
   });
 }
+
+/* ══════════════════════════════════════════════════════════════
+   HELPERS
+   ══════════════════════════════════════════════════════════════ */
+function _fmtIsk(v) {
+  if (v == null) return '—';
+  var n = parseFloat(v);
+  if (n >= 1e12) return (n/1e12).toFixed(2) + ' T';
+  if (n >= 1e9)  return (n/1e9).toFixed(2)  + ' B';
+  if (n >= 1e6)  return (n/1e6).toFixed(2)  + ' M';
+  if (n >= 1e3)  return (n/1e3).toFixed(1)  + ' K';
+  return n.toLocaleString();
+}
+function _fmtNum(v) {
+  if (v == null) return '—';
+  return parseInt(v).toLocaleString();
+}
+function _secColor(sec) {
+  if (sec == null) return '';
+  var s = parseFloat(sec);
+  if (s >= 0.5) return 'hs';
+  if (s > 0)    return 'ls';
+  return 'ns';
+}
+function _secLabel(sec) {
+  if (sec == null) return '?';
+  var s = parseFloat(sec);
+  if (s >= 0.5) return 'Hi-Sec';
+  if (s > 0)    return 'Low-Sec';
+  return 'Null-Sec';
+}
+async function _api(path) {
+  var r = await fetch(path);
+  if (!r.ok) {
+    var err = {};
+    try { err = await r.json(); } catch(e) {}
+    throw new Error(err.detail || ('HTTP ' + r.status));
+  }
+  return r.json();
+}
+function _loading(el) {
+  el.innerHTML = '<div class="tool-spinner">◈ Loading…</div>';
+}
+function _err(el, msg) {
+  el.innerHTML = '<div class="tool-error">⚠ ' + msg + '</div>';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CHARACTER LOOKUP
+   ══════════════════════════════════════════════════════════════ */
+async function lookupChar() {
+  var name = document.getElementById('charName').value.trim();
+  if (!name) return;
+  var el = document.getElementById('charResult');
+  _loading(el);
+  try {
+    var d = await _api('/app/api/intel/entity/character?name=' + encodeURIComponent(name));
+    var dr = d.zkill || {};
+    var hist = (d.corporation_history || []).slice(0,10);
+    var histHtml = hist.length ? hist.map(function(h){
+      var date = h.start_date ? h.start_date.slice(0,10) : '?';
+      return '<li class="corp-hist-item"><span class="corp-hist-date">' + date + '</span><span class="corp-hist-name">' + (h.corporation_name || ('Corp ID ' + (h.corporation_id||'?'))) + '</span></li>';
+    }).join('') : '<li class="corp-hist-item"><span style="color:var(--muted)">No history</span></li>';
+
+    var danger = dr.danger_ratio != null ? dr.danger_ratio : null;
+    var dangerTag = danger != null
+      ? (danger >= 70 ? '<span class="ent-tag danger">⚠ Dangerous</span>'
+         : danger >= 40 ? '<span class="ent-tag warn">Moderate</span>'
+         : '<span class="ent-tag safe">Low Risk</span>')
+      : '';
+    var soloTag = dr.gang_ratio != null && dr.gang_ratio < 30
+      ? '<span class="ent-tag">Solo Hunter</span>' : '';
+
+    el.innerHTML = '<div class="ent-card">'
+      + '<div class="ent-card-hero">'
+      +   '<img class="ent-portrait" src="' + d.portrait_url + '" onerror="this.style.display=\'none\'" />'
+      +   '<div>'
+      +     '<div class="ent-name">' + (d.name||'?') + '</div>'
+      +     '<div class="ent-sub">' + (d.corporation_name||'Unknown Corp')
+      +       (d.alliance_name ? ' · ' + d.alliance_name : (d.alliance_id ? ' · Alliance: '+d.alliance_id : '')) + '</div>'
+      +     '<div class="ent-sub" style="margin-top:2px;">Born: ' + (d.birthday?d.birthday.slice(0,10):'?') + ' · Sec: ' + (d.security_status!=null?parseFloat(d.security_status).toFixed(1):'?') + '</div>'
+      +     '<div class="ent-tags" style="margin-top:8px;">' + dangerTag + soloTag + '<a href="' + dr.zkill_url + '" target="_blank" class="ent-tag" style="text-decoration:none;">zkillboard ↗</a></div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="stat-grid">'
+      +   '<div class="stat-cell"><div class="stat-label">Kills (7d)</div><div class="stat-val">' + _fmtNum(dr.kills_last_7d) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Total Kills</div><div class="stat-val">' + _fmtNum(dr.kills_total) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">ISK Destroyed</div><div class="stat-val blue">' + _fmtIsk(dr.isk_destroyed) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Solo Kills</div><div class="stat-val">' + _fmtNum(dr.solo_kills) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Danger %</div><div class="stat-val ' + (danger!=null&&danger>=60?'red':danger!=null&&danger>=35?'':'green') + '">' + (danger!=null?danger+'%':'—') + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Ships Destroyed</div><div class="stat-val">' + _fmtNum(dr.ships_destroyed) + '</div></div>'
+      + '</div>'
+      + '<div style="padding:10px 0 4px 16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);">Corp History</div>'
+      + '<ul class="corp-hist-list">' + histHtml + '</ul>'
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CORPORATION LOOKUP
+   ══════════════════════════════════════════════════════════════ */
+async function lookupCorp() {
+  var name = document.getElementById('corpName').value.trim();
+  if (!name) return;
+  var el = document.getElementById('corpResult');
+  _loading(el);
+  try {
+    var d = await _api('/app/api/intel/entity/corporation?name=' + encodeURIComponent(name));
+    var zk = d.zkill || {};
+    el.innerHTML = '<div class="ent-card">'
+      + '<div class="ent-card-hero">'
+      +   '<img class="ent-portrait-logo" src="' + d.logo_url + '" onerror="this.style.display=\'none\'" />'
+      +   '<div>'
+      +     '<div class="ent-name">' + (d.name||'?') + '</div>'
+      +     '<div class="ent-sub">[' + (d.ticker||'?') + '] · ' + _fmtNum(d.member_count) + ' members</div>'
+      +     (d.alliance_name ? '<div class="ent-sub">Alliance: ' + d.alliance_name + '</div>' : '')
+      +     (d.founded ? '<div class="ent-sub">Founded: ' + d.founded.slice(0,10) + '</div>' : '')
+      +     '<div class="ent-tags" style="margin-top:8px;"><a href="' + zk.zkill_url + '" target="_blank" class="ent-tag" style="text-decoration:none;">zkillboard ↗</a></div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="stat-grid">'
+      +   '<div class="stat-cell"><div class="stat-label">Kills (7d)</div><div class="stat-val">' + _fmtNum(zk.kills_last_7d) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Total Kills</div><div class="stat-val">' + _fmtNum(zk.kills_total) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">ISK Destroyed</div><div class="stat-val blue">' + _fmtIsk(zk.isk_destroyed) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Solo Kills</div><div class="stat-val">' + _fmtNum(zk.solo_kills) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Danger %</div><div class="stat-val">' + (zk.danger_ratio!=null?zk.danger_ratio+'%':'—') + '</div></div>'
+      + '</div>'
+      + (d.description ? '<div style="padding:14px 18px;font-size:12px;color:rgba(180,210,255,.65);line-height:1.6;">' + d.description.replace(/</g,'&lt;').slice(0,400) + (d.description.length>400?'…':'') + '</div>' : '')
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ALLIANCE LOOKUP
+   ══════════════════════════════════════════════════════════════ */
+async function lookupAlliance() {
+  var name = document.getElementById('allianceName').value.trim();
+  if (!name) return;
+  var el = document.getElementById('allianceResult');
+  _loading(el);
+  try {
+    var d = await _api('/app/api/intel/entity/alliance?name=' + encodeURIComponent(name));
+    var zk = d.zkill || {};
+    el.innerHTML = '<div class="ent-card">'
+      + '<div class="ent-card-hero">'
+      +   '<img class="ent-portrait-logo" src="' + d.logo_url + '" onerror="this.style.display=\'none\'" />'
+      +   '<div>'
+      +     '<div class="ent-name">' + (d.name||'?') + '</div>'
+      +     '<div class="ent-sub">[' + (d.ticker||'?') + ']' + (d.corp_count ? ' · ' + _fmtNum(d.corp_count) + ' corps' : '') + '</div>'
+      +     (d.executor_corp_name ? '<div class="ent-sub">Executor: ' + d.executor_corp_name + '</div>' : '')
+      +     (d.founded ? '<div class="ent-sub">Founded: ' + d.founded.slice(0,10) + '</div>' : '')
+      +     '<div class="ent-tags" style="margin-top:8px;"><a href="' + zk.zkill_url + '" target="_blank" class="ent-tag" style="text-decoration:none;">zkillboard ↗</a></div>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="stat-grid">'
+      +   '<div class="stat-cell"><div class="stat-label">Kills (7d)</div><div class="stat-val">' + _fmtNum(zk.kills_last_7d) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Total Kills</div><div class="stat-val">' + _fmtNum(zk.kills_total) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">ISK Destroyed</div><div class="stat-val blue">' + _fmtIsk(zk.isk_destroyed) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Solo Kills</div><div class="stat-val">' + _fmtNum(zk.solo_kills) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Danger %</div><div class="stat-val">' + (zk.danger_ratio!=null?zk.danger_ratio+'%':'—') + '</div></div>'
+      + '</div>'
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SYSTEM LOOKUP
+   ══════════════════════════════════════════════════════════════ */
+async function lookupSystem() {
+  var name = document.getElementById('systemName').value.trim();
+  if (!name) return;
+  var el = document.getElementById('systemResult');
+  _loading(el);
+  try {
+    var d = await _api('/app/api/intel/system?name=' + encodeURIComponent(name));
+    var sec = d.security_status != null ? parseFloat(d.security_status) : null;
+    var secCls = d.is_jspace ? 'wh' : _secColor(sec);
+    var secLbl = d.is_jspace ? 'W-Space' : _secLabel(sec);
+    var secStr = sec != null ? sec.toFixed(1) : '?';
+
+    var jHtml = '';
+    if (d.jspace) {
+      var j = d.jspace;
+      var statics = (j.statics||[]).map(function(s){
+        var cls = (s.destination||'').toLowerCase().replace(' ','');
+        return '<span class="wh-static-chip ' + cls + '">' + s.type + ' → ' + (s.destination||'?') + '</span>';
+      }).join('');
+      jHtml = '<div style="padding:14px 18px;border-top:1px solid rgba(50,182,255,.08);">'
+        + '<div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;">Wormhole Data</div>'
+        + '<div style="display:flex;gap:16px;font-size:12px;margin-bottom:8px;">'
+        +   '<span><span style="color:var(--muted)">Class:</span> <strong style="color:#c084fc">' + (j.class||'?') + '</strong></span>'
+        +   (j.effect ? '<span><span style="color:var(--muted)">Effect:</span> <strong style="color:#f59e0b">' + j.effect + '</strong></span>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + statics + '</div>'
+        + '</div>';
+    }
+
+    el.innerHTML = '<div class="sys-card">'
+      + '<div class="sys-card-title">'
+      +   '<div class="sys-name-big">' + (d.name||name) + '</div>'
+      +   '<div class="sys-sec ' + secCls + '">' + secStr + ' · ' + secLbl + '</div>'
+      +   '<div class="sys-links">'
+      +     '<a class="sys-link" href="' + d.dotlan_url + '" target="_blank">Dotlan ↗</a>'
+      +     '<a class="sys-link" href="' + d.zkill_url + '" target="_blank">zKillboard ↗</a>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="stat-grid">'
+      +   '<div class="stat-cell"><div class="stat-label">Planets</div><div class="stat-val">' + (d.planets||0) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Moons</div><div class="stat-val">' + (d.moons||0) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Stargates</div><div class="stat-val">' + (d.stargates||0) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Stations</div><div class="stat-val">' + (d.stations||0) + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Kills 24h</div><div class="stat-val ' + (d.recent_kills_24h>10?'red':d.recent_kills_24h>0?'':'') + '">' + (d.recent_kills_24h||0) + '</div></div>'
+      + '</div>'
+      + jHtml
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   W-SPACE LOOKUP
+   ══════════════════════════════════════════════════════════════ */
+async function lookupWH() {
+  var name = document.getElementById('whName').value.trim();
+  if (!name) return;
+  var el = document.getElementById('whResult');
+  _loading(el);
+  try {
+    var d = await _api('/app/api/intel/wormhole?name=' + encodeURIComponent(name));
+    var statics = (d.statics||[]).map(function(s){
+      var cls = (s.destination||'').toLowerCase().replace(' ','');
+      return '<span class="wh-static-chip ' + cls + '">'
+        + s.type + ' → ' + (s.destination||'?') + '</span>';
+    }).join('');
+    el.innerHTML = '<div class="wh-card">'
+      + '<div class="wh-card-hero">'
+      +   '<div class="wh-name">' + (d.name||name) + '</div>'
+      +   '<div class="wh-class">' + (d.class||'?') + (d.effect?' · '+d.effect:'') + '</div>'
+      +   (d.effect_desc ? '<div class="wh-effect-box">' + d.effect_desc + '</div>' : '')
+      +   '<div class="wh-statics">' + (statics||'<span style="color:var(--muted);font-size:11px;">No statics found</span>') + '</div>'
+      + '</div>'
+      + '<div class="stat-grid">'
+      +   '<div class="stat-cell"><div class="stat-label">System ID</div><div class="stat-val">' + (d.system_id||'?') + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Class</div><div class="stat-val" style="color:#c084fc">' + (d.class||'?') + '</div></div>'
+      +   '<div class="stat-cell"><div class="stat-label">Effect</div><div class="stat-val" style="color:#f59e0b;font-size:12px;">' + (d.effect||'None') + '</div></div>'
+      + '</div>'
+      + (d.zkill_url || d.anoikis_url ? '<div style="padding:12px 16px;display:flex;gap:8px;">'
+        + (d.zkill_url  ? '<a class="sys-link" href="'+d.zkill_url+'" target="_blank">zKillboard ↗</a>' : '')
+        + (d.anoikis_url? '<a class="sys-link" href="'+d.anoikis_url+'" target="_blank">Anoik.is ↗</a>' : '')
+        + '</div>' : '')
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MISSION AGENTS
+   ══════════════════════════════════════════════════════════════ */
+async function lookupAgents() {
+  var el = document.getElementById('agentsResult');
+  _loading(el);
+  var sys   = document.getElementById('agentSystem').value.trim();
+  var reg   = document.getElementById('agentRegion').value.trim();
+  var lvl   = document.getElementById('agentLevel').value;
+  var type  = document.getElementById('agentType').value;
+  var qs    = new URLSearchParams();
+  if (sys)  qs.set('system', sys);
+  if (reg)  qs.set('region', reg);
+  if (lvl)  qs.set('level', lvl);
+  if (type) qs.set('agent_type', type);
+  try {
+    var d = await _api('/app/api/intel/agents?' + qs.toString());
+    // Populate type dropdown once
+    var sel = document.getElementById('agentType');
+    if (sel.options.length <= 1 && d.agent_types && d.agent_types.length) {
+      d.agent_types.forEach(function(t){
+        var opt = document.createElement('option');
+        opt.value = t; opt.textContent = t;
+        sel.appendChild(opt);
+      });
+    }
+    if (!d.agents || !d.agents.length) {
+      el.innerHTML = '<div class="tool-empty">No agents found for that filter combination.</div>';
+      return;
+    }
+    var rows = d.agents.map(function(a){
+      return '<tr>'
+        + '<td><span class="agent-lvl l'+a.level+'">'+a.level+'</span></td>'
+        + '<td>' + (a.agent_name||'?') + '</td>'
+        + '<td style="color:var(--muted)">' + (a.agentType||'?') + '</td>'
+        + '<td>' + (a.corp_name||'?') + '</td>'
+        + '<td>' + (a.stationName||'?') + '</td>'
+        + '<td>' + (a.system_name||'?') + '</td>'
+        + '<td style="color:var(--muted)">' + (a.regionName||'?') + '</td>'
+        + '</tr>';
+    }).join('');
+    el.innerHTML = '<div style="overflow-x:auto;">'
+      + '<table class="agents-table">'
+      + '<thead><tr><th>Lvl</th><th>Agent</th><th>Type</th><th>Corp</th><th>Station</th><th>System</th><th>Region</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '</table>'
+      + '<div style="font-size:10px;color:var(--muted);padding:8px 10px;">'+d.count+' agents found (max 200)</div>'
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LOOT APPRAISAL
+   ══════════════════════════════════════════════════════════════ */
+async function appraiseLoot() {
+  var items = document.getElementById('lootText').value.trim();
+  if (!items) return;
+  var el = document.getElementById('lootResult');
+  _loading(el);
+  try {
+    var r = await fetch('/app/api/intel/appraise', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({items: items})
+    });
+    if (!r.ok) {
+      var err = {}; try { err = await r.json(); } catch(e) {}
+      throw new Error(err.detail || 'HTTP ' + r.status);
+    }
+    var d = await r.json();
+    var rows = d.items.map(function(it){
+      return '<tr>'
+        + '<td>' + it.name + (it.type_id ? ' <span style="color:var(--muted);font-size:10px;">#'+it.type_id+'</span>' : '') + '</td>'
+        + '<td style="text-align:right">' + _fmtNum(it.qty) + '</td>'
+        + '<td style="text-align:right">' + (it.unit_sell != null ? _fmtIsk(it.unit_sell) + ' ISK' : '<span class="appraise-not-found">not found</span>') + '</td>'
+        + '<td style="text-align:right;color:#4ade80">' + (it.line_isk != null ? _fmtIsk(it.line_isk) + ' ISK' : '—') + '</td>'
+        + '</tr>';
+    }).join('');
+    el.innerHTML = '<div style="overflow-x:auto;">'
+      + '<table class="appraise-table">'
+      + '<thead><tr><th>Item</th><th style="text-align:right">Qty</th><th style="text-align:right">Unit Sell (Jita)</th><th style="text-align:right">Line Total</th></tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '</table>'
+      + '<div class="appraise-total-row">'
+      +   '<span class="appraise-total-label">TOTAL:</span>'
+      +   '<span class="appraise-total-val">' + _fmtIsk(d.total_isk) + ' ISK</span>'
+      + '</div>'
+      + '<div style="font-size:10px;color:var(--muted);text-align:right;margin-top:4px;">Source: ' + (d.source||'Jita sell') + '</div>'
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   THERA CONNECTIONS
+   ══════════════════════════════════════════════════════════════ */
+var _theraData = [];
+async function loadThera() {
+  var el = document.getElementById('theraResult');
+  _loading(el);
+  document.getElementById('theraCount').textContent = '';
+  try {
+    var d = await _api('/app/api/intel/thera');
+    _theraData = d.connections || [];
+    filterThera();
+  } catch(e) { _err(el, e.message); }
+}
+function filterThera() {
+  var el  = document.getElementById('theraResult');
+  var q   = (document.getElementById('theraFilter').value||'').toLowerCase().trim();
+  var sec = (document.getElementById('theraSecFilter').value||'');
+  var filtered = _theraData.filter(function(c){
+    if (q && !(
+      (c.out_system||'').toLowerCase().includes(q) ||
+      (c.out_region||'').toLowerCase().includes(q)
+    )) return false;
+    if (sec) {
+      var s = c.out_security != null ? parseFloat(c.out_security) : null;
+      if (sec === 'hs' && (s == null || s < 0.5)) return false;
+      if (sec === 'ls' && (s == null || s >= 0.5 || s <= 0)) return false;
+      if (sec === 'ns' && (s == null || s > 0)) return false;
+      if (sec === 'wh' && (c.out_system||'').toUpperCase().slice(0,1) !== 'J') return false;
+    }
+    return true;
+  });
+  document.getElementById('theraCount').textContent = filtered.length + ' connections';
+  if (!filtered.length) {
+    el.innerHTML = '<div class="tool-empty">No connections match your filter.</div>';
+    return;
+  }
+  var rows = filtered.map(function(c){
+    var s = c.out_security != null ? parseFloat(c.out_security) : null;
+    var cls = (c.out_class||'').toLowerCase();
+    var isWH = cls && !['hs','ls','ns'].includes(cls);
+    var secCls = isWH ? 'thera-sec-wh'
+               : cls === 'hs' ? 'thera-sec-hs'
+               : cls === 'ls' ? 'thera-sec-ls'
+               : cls === 'ns' ? 'thera-sec-ns'
+               : s==null ? '' : s >= 0.5 ? 'thera-sec-hs' : s > 0 ? 'thera-sec-ls' : 'thera-sec-ns';
+    var secTxt = cls ? cls.toUpperCase() : (s != null ? s.toFixed(1) : '?');
+    var links = '';
+    if (c.zkill_url)  links += '<a href="'+c.zkill_url+'" target="_blank" style="color:var(--accent);font-size:10px;text-decoration:none;">zKill ↗</a> ';
+    if (c.dotlan_url) links += '<a href="'+c.dotlan_url+'" target="_blank" style="color:var(--accent);font-size:10px;text-decoration:none;">Dotlan ↗</a>';
+    return '<tr>'
+      + '<td>' + (c.sig_in||'?') + '</td>'
+      + '<td>' + (c.sig_out||'?') + '</td>'
+      + '<td style="font-weight:600">' + (c.out_system||'?') + '</td>'
+      + '<td><span class="'+secCls+'">' + secTxt + '</span></td>'
+      + '<td style="color:var(--muted)">' + (c.out_region||'?') + '</td>'
+      + '<td style="color:var(--accent)">' + (c.wh_type||'?') + '</td>'
+      + '<td style="color:var(--muted)">' + (c.remaining_hours!=null?Math.round(c.remaining_hours)+'h':'?') + '</td>'
+      + '<td>' + links + '</td>'
+      + '</tr>';
+  }).join('');
+  el.innerHTML = '<div style="overflow-x:auto;">'
+    + '<table class="thera-table">'
+    + '<thead><tr><th>Sig In</th><th>Sig Out</th><th>Destination</th><th>Sec</th><th>Region</th><th>Type</th><th>TTL</th><th>Links</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table></div>';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   KILLMAIL BREAKDOWN
+   ══════════════════════════════════════════════════════════════ */
+async function lookupKM() {
+  var url = document.getElementById('kmUrl').value.trim();
+  if (!url) return;
+  var el = document.getElementById('kmResult');
+  _loading(el);
+  try {
+    var d = await _api('/app/api/intel/killmail?url=' + encodeURIComponent(url));
+    var v = d.victim || {};
+    var shipImg = v.ship_id
+      ? 'https://images.evetech.net/types/'+v.ship_id+'/render?size=64'
+      : '';
+    var attackers = (d.attackers||[]).map(function(a){
+      return '<div class="km-attacker-row">'
+        + '<div>'
+        +   '<div class="km-attacker-name">' + (a.character_name||'Unknown') + (a.final_blow?'<span class="km-final-blow">Final Blow</span>':'') + '</div>'
+        +   '<div class="km-attacker-ship">' + (a.corp_name||'') + (a.ship_name?' · '+a.ship_name:'') + '</div>'
+        + '</div>'
+        + '<div class="km-attacker-dmg">' + (a.damage_done!=null?_fmtNum(a.damage_done)+' dmg':'') + '</div>'
+        + '</div>';
+    }).join('');
+
+    var items = (v.items||[]).map(function(it){
+      return '<div class="km-item">'
+        + '<div class="km-item-name">' + (it.type_name||('Type '+it.type_id)) + '</div>'
+        + '<div class="km-item-qty">'
+        +   (it.qty_dropped  ? '<span class="dropped">▲'+it.qty_dropped+'</span> ' : '')
+        +   (it.qty_destroyed? '<span class="destroyed">✕'+it.qty_destroyed+'</span>' : '')
+        + '</div>'
+        + '</div>';
+    }).join('');
+
+    el.innerHTML = '<div class="km-card">'
+      + '<div class="km-card-hero">'
+      +   (shipImg ? '<img class="km-ship-img" src="'+shipImg+'" onerror="this.style.display=\'none\'" />' : '')
+      +   '<div>'
+      +     '<div class="km-victim-name">' + (v.character_name||'Unknown Pilot') + '</div>'
+      +     '<div class="km-victim-sub">' + (v.corp_name||'') + (v.alliance_name?' · '+v.alliance_name:'') + '</div>'
+      +     '<div class="km-victim-sub">Ship: ' + (v.ship_name||'Unknown') + ' · Damage: ' + _fmtNum(v.damage_taken) + '</div>'
+      +     '<div class="km-isk">' + _fmtIsk(d.isk_destroyed) + ' ISK destroyed</div>'
+      +   '</div>'
+      +   '<div style="margin-left:auto;text-align:right;">'
+      +     '<div style="font-size:10px;color:var(--muted);">' + (d.kill_time?d.kill_time.slice(0,10):'') + '</div>'
+      +     '<div style="font-size:11px;color:var(--muted);margin-top:4px;">' + d.attacker_count + ' attackers</div>'
+      +     (d.is_solo ? '<div style="font-size:10px;color:#4ade80;margin-top:2px;">SOLO</div>' : '')
+      +     '<a href="'+d.zkill_url+'" target="_blank" style="font-size:10px;color:var(--accent);text-decoration:none;">zkillboard ↗</a>'
+      +   '</div>'
+      + '</div>'
+      + '<div class="km-section-title">Attackers (' + d.attacker_count + ')</div>'
+      + attackers
+      + (items ? '<div class="km-section-title">Dropped / Destroyed</div><div class="km-items-grid">' + items + '</div>' : '')
+      + '</div>';
+  } catch(e) { _err(el, e.message); }
+}
+
+function toggleIntelSidebar() {
+  var s = document.getElementById('intelSidebar');
+  if (s) s.classList.toggle('mobile-open');
+}
+// Close sidebar when an article is picked on mobile
+document.addEventListener('click', function(e) {
+  if (e.target.closest('.is-article') && window.innerWidth <= 640) {
+    var s = document.getElementById('intelSidebar');
+    if (s) s.classList.remove('mobile-open');
+  }
+});
 </script>
 {% endblock %}
+    
