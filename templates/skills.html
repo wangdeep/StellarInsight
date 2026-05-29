@@ -101,6 +101,20 @@ body:not(.sidebar-open) main.wrap{padding-left:8px !important;}
 .sp-layout { display:grid; grid-template-columns:280px 1fr; gap:16px; }
 @media (max-width:780px) { .sp-layout { grid-template-columns:1fr; } }
 
+@media (max-width:600px) {
+  .sq-item-end { display:none; }
+  .sq-item-rem { width:auto; }
+  .sq-item-name { font-size:12px; }
+  .sq-hero-content { gap:14px; padding:14px 16px; }
+  .sq-hero-name { font-size:16px; }
+  .sq-hero-bar-wrap { max-width:100%; }
+  .sq-summary { gap:12px; padding:10px 14px; }
+  .sk-tabs { overflow-x:auto; scrollbar-width:none; }
+  .sk-tabs::-webkit-scrollbar { display:none; }
+  .sk-tab { padding:9px 14px; font-size:11px; }
+  .sp-browser { max-height:340px; }
+}
+
 /* Left panel — skill browser */
 .sp-browser {
   background:rgba(255,255,255,.02); border:1px solid rgba(255,255,255,.07);

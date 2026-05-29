@@ -18,7 +18,7 @@ def _ua() -> str:
     return (os.getenv("EVE_ESI_USER_AGENT") or os.getenv("EVE_SSO_USER_AGENT") or "xylon-bot").strip()
 
 
-RETRY_STATUSES = {502, 503, 504}  # 420 = rate limit; retrying makes it worse
+RETRY_STATUSES = {420, 502, 503, 504}  # 420 = ESI rate limit — back off and retry
 DEFAULT_TIMEOUT = int(os.getenv("EVE_ESI_TIMEOUT", "20"))
 DEFAULT_RETRIES = int(os.getenv("EVE_ESI_RETRIES", "2"))
 
@@ -46,7 +46,9 @@ async def _esi_request(method: str, url: str, *, headers: dict, params=None, jso
             raise RuntimeError(f"ESI request failed: {e}")
 
         if last_status in RETRY_STATUSES and attempt < retries:
-            await asyncio.sleep(0.6 * (attempt + 1))
+            # 420 rate-limit: back off longer before retrying
+            delay = 5.0 if last_status == 420 else 0.6 * (attempt + 1)
+            await asyncio.sleep(delay)
             continue
         return last_status, last_txt
 

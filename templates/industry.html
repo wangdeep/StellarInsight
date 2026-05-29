@@ -15,9 +15,10 @@
   .ind-shell{display:flex;flex-direction:column;height:calc(100vh - var(--topbar-h,72px) - var(--ticker-h,32px) - 4px);}
 
   /* ── Scanner tab ── */
-  .scan-row{display:flex;align-items:center;padding:4px 10px;border-bottom:1px solid rgba(46,51,59,.3);font-size:11px;transition:background .08s;background:rgba(255,255,255,.03);}
-  .scan-row:hover{background:rgba(50,182,255,.07);}
-  .scan-row:nth-child(even){background:rgba(0,0,0,.15);}
+  .scan-row{display:flex;align-items:center;padding:4px 10px;border-bottom:1px solid rgba(46,51,59,.3);font-size:11px;transition:background .08s;background:rgba(0,0,0,.60);}
+  .scan-row:hover{background:rgba(50,182,255,.15);}
+  .scan-row:nth-child(even){background:rgba(0,0,0,.80);}
+  .scan-row:nth-child(even):hover{background:rgba(50,182,255,.15);}
   .scan-col-hd{cursor:pointer;user-select:none;}
   .scan-col-hd:hover{color:var(--accent);}
 

@@ -6876,3 +6876,865 @@ def _get_all_tokens() -> List[dict]:
     except Exception:
         pass
     return result
+
+
+# ── Intel Lookup Endpoints ────────────────────────────────────────────────────
+
+@app.get("/app/api/intel/entity/character")
+async def api_intel_character(name: str, user=Depends(require_user)):
+    """Resolve character name → ESI data + corp history + zkillboard stats."""
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+            async with s.post(
+                "https://esi.evetech.net/latest/universe/ids/?datasource=tranquility",
+                json=[name],
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            ) as r:
+                if r.status != 200:
+                    raise HTTPException(status_code=404, detail="Name not found")
+                uid = await r.json()
+            chars = uid.get("characters", [])
+            if not chars:
+                raise HTTPException(status_code=404, detail="Character not found")
+            cid = chars[0]["id"]
+
+            async with s.get(f"https://esi.evetech.net/latest/characters/{cid}/") as cr:
+                char_data = await cr.json() if cr.status == 200 else {}
+            async with s.get(f"https://esi.evetech.net/latest/characters/{cid}/corporationhistory/") as hr:
+                corp_hist = await hr.json() if hr.status == 200 else []
+            async with s.get(
+                f"https://zkillboard.com/api/stats/characterID/{cid}/",
+                headers={"Accept-Encoding": "gzip", "User-Agent": "StellarInsight/1.0"},
+            ) as zr:
+                zkill = await zr.json() if zr.status == 200 else {}
+
+            corp_id     = char_data.get("corporation_id")
+            alliance_id = char_data.get("alliance_id")
+
+            hist_slice = corp_hist[:20]
+            all_ids = list({h["corporation_id"] for h in hist_slice if h.get("corporation_id")})
+            if corp_id and corp_id not in all_ids:
+                all_ids.append(corp_id)
+            if alliance_id and alliance_id not in all_ids:
+                all_ids.append(alliance_id)
+
+            id_to_name: dict = {}
+            if all_ids:
+                try:
+                    async with s.post(
+                        "https://esi.evetech.net/latest/universe/names/",
+                        json=all_ids,
+                        headers={"Content-Type": "application/json", "Accept": "application/json"},
+                    ) as nr:
+                        if nr.status == 200:
+                            for item in await nr.json():
+                                id_to_name[item["id"]] = item["name"]
+                except Exception:
+                    pass
+
+        corp_name     = id_to_name.get(corp_id) if corp_id else None
+        alliance_name = id_to_name.get(alliance_id) if alliance_id else None
+        enriched_hist = [
+            {**h, "corporation_name": id_to_name.get(h.get("corporation_id"), "")}
+            for h in hist_slice
+        ]
+
+        return {
+            "id":               cid,
+            "name":             name,
+            "corporation_id":   corp_id,
+            "corporation_name": corp_name,
+            "alliance_id":      alliance_id,
+            "alliance_name":    alliance_name,
+            "security_status":  char_data.get("security_status"),
+            "birthday":         char_data.get("birthday"),
+            "description":      char_data.get("description"),
+            "portrait_url":     f"https://images.evetech.net/characters/{cid}/portrait?size=128",
+            "corporation_history": enriched_hist,
+            "zkill": {
+                "kills_last_7d":   (zkill.get("last7Days") or {}).get("shipsDestroyed") or (zkill.get("last7Days") or {}).get("kills"),
+                "kills_total":     (zkill.get("allTime") or {}).get("shipsDestroyed") or zkill.get("shipsDestroyed"),
+                "isk_destroyed":   (zkill.get("allTime") or {}).get("iskDestroyed") or zkill.get("iskDestroyed"),
+                "danger_ratio":    zkill.get("dangerRatio"),
+                "gang_ratio":      zkill.get("gangRatio"),
+                "solo_kills":      zkill.get("soloKills"),
+                "ships_destroyed": zkill.get("shipsDestroyed"),
+                "zkill_url":       f"https://zkillboard.com/character/{cid}/",
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("api_intel_character error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/app/api/intel/entity/corporation")
+async def api_intel_corporation(name: str, user=Depends(require_user)):
+    """Resolve corporation name → ESI data + zkillboard stats."""
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+            async with s.post(
+                "https://esi.evetech.net/latest/universe/ids/?datasource=tranquility",
+                json=[name],
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            ) as r:
+                if r.status != 200:
+                    raise HTTPException(status_code=404, detail="Name not found")
+                uid = await r.json()
+            corps = uid.get("corporations", [])
+            if not corps:
+                raise HTTPException(status_code=404, detail="Corporation not found")
+            cid = corps[0]["id"]
+
+            async with s.get(f"https://esi.evetech.net/latest/corporations/{cid}/") as cr:
+                corp_data = await cr.json() if cr.status == 200 else {}
+            async with s.get(
+                f"https://zkillboard.com/api/stats/corporationID/{cid}/",
+                headers={"Accept-Encoding": "gzip", "User-Agent": "StellarInsight/1.0"},
+            ) as zr:
+                zkill = await zr.json() if zr.status == 200 else {}
+
+        alliance_id   = corp_data.get("alliance_id")
+        alliance_name = None
+        if alliance_id:
+            try:
+                ad = await esi_get_public_json(f"/alliances/{alliance_id}/")
+                alliance_name = (ad or {}).get("name")
+            except Exception:
+                pass
+
+        last7   = zkill.get("last7Days") or {}
+        alltime = zkill.get("allTime")   or {}
+        def _zk(obj):
+            return obj.get("kills") or obj.get("shipsDestroyed") or None
+
+        return {
+            "id":             cid,
+            "name":           corp_data.get("name", name),
+            "ticker":         corp_data.get("ticker"),
+            "member_count":   corp_data.get("member_count"),
+            "ceo_id":         corp_data.get("ceo_id"),
+            "alliance_id":    alliance_id,
+            "alliance_name":  alliance_name,
+            "founded":        corp_data.get("date_founded"),
+            "description":    corp_data.get("description"),
+            "logo_url":       f"https://images.evetech.net/corporations/{cid}/logo?size=128",
+            "zkill": {
+                "kills_last_7d":   _zk(last7),
+                "kills_total":     _zk(alltime),
+                "isk_destroyed":   alltime.get("iskDestroyed"),
+                "ships_destroyed": alltime.get("shipsDestroyed"),
+                "solo_kills":      zkill.get("soloKills"),
+                "danger_ratio":    zkill.get("dangerRatio"),
+                "zkill_url":       f"https://zkillboard.com/corporation/{cid}/",
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("api_intel_corporation error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/app/api/intel/entity/alliance")
+async def api_intel_alliance(name: str, user=Depends(require_user)):
+    """Resolve alliance name → ESI data + zkillboard stats."""
+    def _zkill_kills(obj):
+        if not obj:
+            return None
+        return obj.get("kills") or obj.get("shipsDestroyed") or None
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+            async with s.post(
+                "https://esi.evetech.net/latest/universe/ids/?datasource=tranquility",
+                json=[name],
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            ) as r:
+                if r.status != 200:
+                    raise HTTPException(status_code=404, detail="Name not found")
+                uid = await r.json()
+            alliances = uid.get("alliances", [])
+            if not alliances:
+                raise HTTPException(status_code=404, detail="Alliance not found")
+            aid = alliances[0]["id"]
+
+            async with s.get(f"https://esi.evetech.net/latest/alliances/{aid}/") as ar:
+                al_data = await ar.json() if ar.status == 200 else {}
+
+            corp_count = None
+            try:
+                async with s.get(f"https://esi.evetech.net/latest/alliances/{aid}/corporations/") as cr:
+                    if cr.status == 200:
+                        corps_list = await cr.json()
+                        corp_count = len(corps_list) if isinstance(corps_list, list) else None
+            except Exception:
+                pass
+
+            async with s.get(
+                f"https://zkillboard.com/api/stats/allianceID/{aid}/",
+                headers={"Accept-Encoding": "gzip", "User-Agent": "StellarInsight/1.0"},
+            ) as zr:
+                zkill = await zr.json() if zr.status == 200 else {}
+
+        executor_corp_id   = al_data.get("executor_corporation_id")
+        executor_corp_name = None
+        if executor_corp_id:
+            try:
+                cd = await esi_get_public_json(f"/corporations/{executor_corp_id}/")
+                executor_corp_name = (cd or {}).get("name")
+            except Exception:
+                pass
+
+        last7   = zkill.get("last7Days") or {}
+        alltime = zkill.get("allTime")   or {}
+
+        return {
+            "id":                  aid,
+            "name":                al_data.get("name", name),
+            "ticker":              al_data.get("ticker"),
+            "executor_corp_id":    executor_corp_id,
+            "executor_corp_name":  executor_corp_name,
+            "corp_count":          corp_count,
+            "founded":             al_data.get("date_founded"),
+            "logo_url":            f"https://images.evetech.net/alliances/{aid}/logo?size=128",
+            "zkill": {
+                "kills_last_7d":   _zkill_kills(last7),
+                "kills_total":     _zkill_kills(alltime),
+                "isk_destroyed":   alltime.get("iskDestroyed"),
+                "ships_destroyed": alltime.get("shipsDestroyed"),
+                "solo_kills":      zkill.get("soloKills"),
+                "danger_ratio":    zkill.get("dangerRatio"),
+                "zkill_url":       f"https://zkillboard.com/alliance/{aid}/",
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("api_intel_alliance error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/app/api/intel/system")
+async def api_intel_system(name: str, user=Depends(require_user)):
+    """Resolve system name → ESI data + J-space info + recent zkill activity."""
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+            async with s.post(
+                "https://esi.evetech.net/latest/universe/ids/?datasource=tranquility",
+                json=[name],
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            ) as r:
+                if r.status != 200:
+                    raise HTTPException(status_code=404, detail="Name not found")
+                uid = await r.json()
+            systems = uid.get("systems", [])
+            if not systems:
+                raise HTTPException(status_code=404, detail="System not found")
+            sid = systems[0]["id"]
+
+            async with s.get(f"https://esi.evetech.net/latest/universe/systems/{sid}/") as sr:
+                sys_data = await sr.json() if sr.status == 200 else {}
+            async with s.get(
+                f"https://zkillboard.com/api/kills/solarSystemID/{sid}/pastSeconds/86400/",
+                headers={"Accept-Encoding": "gzip", "User-Agent": "StellarInsight/1.0"},
+            ) as kr:
+                recent_kills = await kr.json() if kr.status == 200 else []
+
+        jspace = None
+        for k, v in _jspace_static.items():
+            if k.upper() == name.upper():
+                jspace = {"class": v.get("class"), "effect": v.get("effect"), "statics": v.get("statics", [])}
+                break
+
+        planets    = sys_data.get("planets", [])
+        moon_count = sum(len(p.get("moons", [])) for p in planets)
+
+        return {
+            "id":               sid,
+            "name":             sys_data.get("name", name),
+            "security_status":  sys_data.get("security_status"),
+            "star_id":          sys_data.get("star_id"),
+            "constellation_id": sys_data.get("constellation_id"),
+            "stargates":        len(sys_data.get("stargates", [])),
+            "stations":         len(sys_data.get("stations", [])),
+            "planets":          len(planets),
+            "moons":            moon_count,
+            "is_jspace":        jspace is not None,
+            "jspace":           jspace,
+            "recent_kills_24h": len(recent_kills) if isinstance(recent_kills, list) else 0,
+            "dotlan_url":       f"https://evemaps.dotlan.net/system/{name.replace(' ', '_')}",
+            "zkill_url":        f"https://zkillboard.com/system/{sid}/",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("api_intel_system error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/app/api/intel/wormhole")
+async def api_intel_wormhole(name: str, user=Depends(require_user)):
+    """Look up a J-space system by J-name."""
+    key = name.strip()
+    jd = None
+    for k, v in _jspace_static.items():
+        if k.upper() == key.upper():
+            jd = v
+            key = k
+            break
+    if not jd:
+        raise HTTPException(status_code=404, detail="Wormhole system not found")
+
+    effect_desc = None
+    try:
+        import pathlib as _pl
+        _jsd_raw_wh = json.loads(
+            (_pl.Path(__file__).resolve().parent / "data" / "jspace_static.json").read_text()
+        )
+        effect_desc = (_jsd_raw_wh.get("effects") or {}).get(jd.get("effect") or "", None)
+    except Exception:
+        pass
+
+    return {
+        "name":        key,
+        "system_id":   jd.get("system_id"),
+        "class":       jd.get("class"),
+        "effect":      jd.get("effect"),
+        "effect_desc": effect_desc,
+        "statics":     jd.get("statics", []),
+        "zkill_url":   f"https://zkillboard.com/system/{jd['system_id']}/" if jd.get("system_id") else None,
+        "anoikis_url": f"http://anoik.is/systems/{key}" if key.upper().startswith("J") else None,
+    }
+
+
+@app.get("/app/api/intel/agents")
+async def api_intel_agents(
+    system: str = "",
+    region: str = "",
+    level: int = 0,
+    agent_type: str = "",
+    user=Depends(require_user),
+):
+    """Query SDE for mission agents filtered by system, region, level, and/or agent type."""
+    sde_path = os.path.join(os.path.dirname(_db_path()), "sde.sqlite")
+    if not os.path.exists(sde_path):
+        raise HTTPException(status_code=503, detail="SDE not downloaded yet — Settings → SDE to download.")
+    try:
+        con = sqlite3.connect(sde_path)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        sql = """
+            SELECT
+                a.agentID,
+                a.level,
+                a.quality,
+                at.agentType,
+                un_agent.itemName   AS agent_name,
+                un_corp.itemName    AS corp_name,
+                st.stationName,
+                sol.solarSystemName AS system_name,
+                reg.regionName
+            FROM agtAgents          a
+            JOIN agtAgentTypes      at       ON at.agentTypeID   = a.agentTypeID
+            JOIN invUniqueNames     un_agent ON un_agent.itemID  = a.agentID
+            JOIN crpNPCCorporations corp     ON corp.corporationID = a.corporationID
+            JOIN invUniqueNames     un_corp  ON un_corp.itemID   = a.corporationID
+            JOIN staStations        st       ON st.stationID     = a.locationID
+            JOIN mapSolarSystems    sol      ON sol.solarSystemID = st.solarSystemID
+            JOIN mapRegions         reg      ON reg.regionID     = sol.regionID
+            WHERE 1=1
+        """
+        params: list = []
+        if level:
+            sql += " AND a.level = ?"
+            params.append(level)
+        if agent_type:
+            sql += " AND at.agentType = ?"
+            params.append(agent_type)
+        if system:
+            sql += " AND LOWER(sol.solarSystemName) = LOWER(?)"
+            params.append(system)
+        if region:
+            sql += " AND LOWER(reg.regionName) = LOWER(?)"
+            params.append(region)
+        sql += " ORDER BY a.level DESC, reg.regionName, sol.solarSystemName LIMIT 200"
+        cur.execute(sql, params)
+        rows = [dict(r) for r in cur.fetchall()]
+        con.close()
+
+        agent_types: List[str] = []
+        try:
+            con2 = sqlite3.connect(sde_path)
+            con2.row_factory = sqlite3.Row
+            type_rows = con2.execute(
+                "SELECT DISTINCT agentType FROM agtAgentTypes ORDER BY agentType"
+            ).fetchall()
+            con2.close()
+            agent_types = [r[0] for r in type_rows]
+        except Exception:
+            pass
+
+        return {"agents": rows, "count": len(rows), "agent_types": agent_types}
+    except Exception as exc:
+        logger.error("api_intel_agents error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/app/api/intel/appraise")
+async def api_intel_appraise(request: Request, user=Depends(require_user)):
+    """Appraise a multi-line item list against Jita sell prices."""
+    import re as _re_ap
+    body = await request.json()
+    raw  = (body.get("items") or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="No items provided")
+
+    parsed = []
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        m = _re_ap.match(r"^(.+?)\s+[xX](\d[\d,]*)\s*$", line)
+        if not m:
+            m = _re_ap.match(r"^(.+?)\s+(\d[\d,\.]*)\s*$", line)
+        if not m:
+            m2 = _re_ap.match(r"^(\d[\d,\.]*)\s+(.+?)\s*$", line)
+            if m2:
+                item_name = m2.group(2).strip()
+                qty_str   = m2.group(1).replace(",", "")
+                try:
+                    qty = int(float(qty_str))
+                except ValueError:
+                    qty = 1
+                parsed.append({"name": item_name, "qty": qty})
+                continue
+        if m:
+            item_name = m.group(1).strip()
+            qty_str   = m.group(2).replace(",", "")
+            try:
+                qty = int(float(qty_str))
+            except ValueError:
+                qty = 1
+        else:
+            item_name = line
+            qty = 1
+        parsed.append({"name": item_name, "qty": qty})
+
+    if not parsed:
+        raise HTTPException(status_code=400, detail="Could not parse any items")
+
+    names_list = list({p["name"] for p in parsed})
+    type_map: Dict[str, int] = {}
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as s:
+            async with s.post(
+                "https://esi.evetech.net/latest/universe/ids/?datasource=tranquility",
+                json=names_list,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+            ) as r:
+                if r.status == 200:
+                    uid = await r.json()
+                    for inv in uid.get("inventory_types", []):
+                        type_map[inv["name"].lower()] = inv["id"]
+    except Exception as _ae:
+        logger.warning("appraise name resolve error: %s", _ae)
+
+    unique_ids = list(set(type_map.values()))
+
+    async def _jita_price(tid: int) -> Optional[float]:
+        try:
+            url = f"https://market.fuzzwork.co.uk/aggregates/?station=60003760&types={tid}"
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=6)) as s:
+                async with s.get(url) as r:
+                    if r.status == 200:
+                        d    = await r.json()
+                        sell = (d.get(str(tid)) or {}).get("sell", {}).get("min")
+                        if sell:
+                            return float(sell)
+        except Exception:
+            pass
+        return None
+
+    price_results = await asyncio.gather(*[_jita_price(tid) for tid in unique_ids])
+    price_cache: Dict[int, Optional[float]] = dict(zip(unique_ids, price_results))
+
+    total_isk = 0.0
+    rows = []
+    for p in parsed:
+        tid      = type_map.get(p["name"].lower())
+        unit     = price_cache.get(tid) if tid else None
+        line_isk = (unit or 0.0) * p["qty"]
+        total_isk += line_isk
+        rows.append({
+            "name":      p["name"],
+            "qty":       p["qty"],
+            "type_id":   tid,
+            "unit_sell": unit,
+            "line_isk":  line_isk if unit else None,
+            "found":     tid is not None and unit is not None,
+        })
+
+    return {
+        "items":     rows,
+        "total_isk": total_isk,
+        "currency":  "ISK",
+        "source":    "Jita sell (Fuzzwork)",
+    }
+
+
+@app.get("/app/api/intel/thera")
+async def api_intel_thera(user=Depends(require_user)):
+    """Fetch open Thera connections from Eve-Scout v2 API."""
+    EVESCOUT_URL = "https://api.eve-scout.com/v2/public/signatures?systemName=Thera"
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12)) as s:
+            async with s.get(
+                EVESCOUT_URL,
+                headers={"Accept": "application/json", "User-Agent": "StellarInsight/1.0"},
+            ) as r:
+                if r.status != 200:
+                    return {"connections": [], "count": 0, "error": f"Eve-Scout returned {r.status}"}
+                data = await r.json()
+
+        def _class_to_sec(c: str):
+            if not c: return None
+            c = c.lower()
+            if c == "hs": return 0.8
+            if c == "ls": return 0.3
+            if c == "ns": return -0.5
+            return None
+
+        connections = []
+        for sig in (data if isinstance(data, list) else []):
+            is_out_thera = (sig.get("out_system_name") or "").lower() == "thera"
+
+            if is_out_thera:
+                dest_name  = sig.get("in_system_name")
+                dest_id    = sig.get("in_system_id")
+                thera_sig  = sig.get("out_signature", "")
+                dest_sig   = sig.get("in_signature", "")
+                region     = sig.get("in_region_name")
+                sys_class  = sig.get("in_system_class", "")
+            else:
+                dest_name  = sig.get("out_system_name")
+                dest_id    = sig.get("out_system_id")
+                thera_sig  = sig.get("in_signature", "")
+                dest_sig   = sig.get("out_signature", "")
+                region     = sig.get("in_region_name")
+                sys_class  = sig.get("in_system_class", "")
+
+            connections.append({
+                "sig_in":          thera_sig,
+                "sig_out":         dest_sig,
+                "out_system":      dest_name,
+                "out_system_id":   dest_id,
+                "out_security":    _class_to_sec(sys_class),
+                "out_class":       sys_class,
+                "out_region":      region,
+                "wh_type":         sig.get("wh_type"),
+                "max_ship_size":   sig.get("max_ship_size"),
+                "remaining_hours": sig.get("remaining_hours"),
+                "expires_at":      sig.get("expires_at"),
+                "updated_at":      sig.get("updated_at"),
+                "zkill_url":       f"https://zkillboard.com/system/{dest_id}/" if dest_id else None,
+                "dotlan_url":      f"https://evemaps.dotlan.net/system/{dest_name.replace(' ', '_')}" if dest_name else None,
+            })
+
+        return {"connections": connections, "count": len(connections)}
+    except Exception as exc:
+        logger.error("api_intel_thera error: %s", exc)
+        return {"connections": [], "count": 0, "error": str(exc)}
+
+
+@app.get("/app/api/intel/killmail")
+async def api_intel_killmail(url: str, user=Depends(require_user)):
+    """Parse a zkillboard URL and return enriched killmail data."""
+    import re as _re_km
+    m = _re_km.search(r"/kill/(\d+)/?", url)
+    if not m:
+        raise HTTPException(status_code=400, detail="Invalid zkillboard URL — expected /kill/<id>/")
+    kill_id = int(m.group(1))
+
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=12)) as s:
+            async with s.get(
+                f"https://zkillboard.com/api/killID/{kill_id}/",
+                headers={"Accept-Encoding": "gzip", "User-Agent": "StellarInsight/1.0"},
+            ) as r:
+                if r.status != 200:
+                    raise HTTPException(status_code=404, detail="Kill not found on zkillboard")
+                zkdata_list = await r.json()
+
+            if not zkdata_list:
+                raise HTTPException(status_code=404, detail="Kill not found")
+            zkdata  = zkdata_list[0] if isinstance(zkdata_list, list) else zkdata_list
+            zk_pkg  = zkdata.get("zkb", {})
+            km_hash = zk_pkg.get("hash")
+            if not km_hash:
+                raise HTTPException(status_code=502, detail="No killmail hash from zkillboard")
+
+            async with s.get(
+                f"https://esi.evetech.net/latest/killmails/{kill_id}/{km_hash}/",
+                headers={"Accept": "application/json"},
+            ) as r:
+                if r.status != 200:
+                    raise HTTPException(status_code=502, detail="ESI killmail fetch failed")
+                km = await r.json()
+
+        ids_to_resolve: set = set()
+        victim = km.get("victim", {})
+        for field in ("character_id", "corporation_id", "alliance_id", "ship_type_id"):
+            if victim.get(field):
+                ids_to_resolve.add(victim[field])
+        for atk in (km.get("attackers") or [])[:10]:
+            for field in ("character_id", "corporation_id", "ship_type_id", "weapon_type_id"):
+                if atk.get(field):
+                    ids_to_resolve.add(atk[field])
+        for item in (victim.get("items") or [])[:20]:
+            if item.get("item_type_id"):
+                ids_to_resolve.add(item["item_type_id"])
+
+        name_map: Dict[int, str] = {}
+        if ids_to_resolve:
+            try:
+                resolved = await universe_names(list(ids_to_resolve))
+                for entry in (resolved or []):
+                    name_map[entry["id"]] = entry["name"]
+            except Exception:
+                pass
+
+        def _n(eid):
+            return name_map.get(eid, str(eid) if eid else None)
+
+        enriched_attackers = [
+            {
+                "character_id":   atk.get("character_id"),
+                "character_name": _n(atk.get("character_id")),
+                "corp_id":        atk.get("corporation_id"),
+                "corp_name":      _n(atk.get("corporation_id")),
+                "ship_id":        atk.get("ship_type_id"),
+                "ship_name":      _n(atk.get("ship_type_id")),
+                "weapon_id":      atk.get("weapon_type_id"),
+                "weapon_name":    _n(atk.get("weapon_type_id")),
+                "damage_done":    atk.get("damage_done"),
+                "final_blow":     atk.get("final_blow"),
+            }
+            for atk in (km.get("attackers") or [])
+        ]
+
+        enriched_items = [
+            {
+                "type_id":       item.get("item_type_id"),
+                "type_name":     _n(item.get("item_type_id")),
+                "qty_dropped":   item.get("quantity_dropped", 0),
+                "qty_destroyed": item.get("quantity_destroyed", 0),
+                "flag":          item.get("flag"),
+            }
+            for item in (victim.get("items") or [])
+        ]
+
+        return {
+            "kill_id":          kill_id,
+            "kill_time":        km.get("killmail_time"),
+            "solar_system_id":  km.get("solar_system_id"),
+            "victim": {
+                "character_id":   victim.get("character_id"),
+                "character_name": _n(victim.get("character_id")),
+                "corp_id":        victim.get("corporation_id"),
+                "corp_name":      _n(victim.get("corporation_id")),
+                "alliance_id":    victim.get("alliance_id"),
+                "alliance_name":  _n(victim.get("alliance_id")),
+                "ship_id":        victim.get("ship_type_id"),
+                "ship_name":      _n(victim.get("ship_type_id")),
+                "damage_taken":   victim.get("damage_taken"),
+                "items":          enriched_items,
+            },
+            "attackers":      enriched_attackers,
+            "attacker_count": len(km.get("attackers") or []),
+            "isk_destroyed":  zk_pkg.get("totalValue"),
+            "points":         zk_pkg.get("points"),
+            "is_solo":        zk_pkg.get("solo"),
+            "is_awox":        zk_pkg.get("awox"),
+            "zkill_url":      f"https://zkillboard.com/kill/{kill_id}/",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("api_intel_killmail error: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ── WH Mass Tracking Endpoints ───────────────────────────────────────────────
+
+@app.get("/app/api/nav/wh_mass/{conn_id}")
+def api_nav_wh_mass_get(conn_id: str, request: Request, user=Depends(require_user)):
+    mem = MemoryStore(_db_path())
+    rec = mem.wh_mass_get(conn_id)
+    state = mem.wh_mass_state(conn_id)
+    return {"conn_id": conn_id, "record": rec, "state": state}
+
+
+@app.post("/app/api/nav/wh_mass/{conn_id}")
+async def api_nav_wh_mass_post(conn_id: str, request: Request, user=Depends(require_user)):
+    body = await request.json()
+    mem = MemoryStore(_db_path())
+    rec = mem.wh_mass_upsert(
+        conn_id,
+        total_mass_kg     = body.get("total_mass_kg"),
+        used_mass_kg      = body.get("used_mass_kg"),
+        manual_state      = body.get("manual_state"),
+        last_ship_name    = body.get("last_ship_name"),
+        last_ship_mass_kg = body.get("last_ship_mass_kg"),
+    )
+    return {"ok": True, "record": rec, "state": mem.wh_mass_state(conn_id)}
+
+
+@app.delete("/app/api/nav/wh_mass/{conn_id}")
+def api_nav_wh_mass_delete(conn_id: str, request: Request, user=Depends(require_user)):
+    mem = MemoryStore(_db_path())
+    ok = mem.wh_mass_reset(conn_id)
+    return {"ok": ok}
+
+
+@app.post("/app/api/nav/sig/{sig_id}/confirm")
+def api_nav_sig_confirm(sig_id: int, request: Request, user=Depends(require_user)):
+    mem = MemoryStore(_db_path())
+    ok = mem.nav_sig_confirm(sig_id)
+    return {"ok": ok}
+
+
+@app.post("/app/api/nav/sig/{sig_id}/wh_type")
+async def api_nav_sig_wh_type(sig_id: int, request: Request, user=Depends(require_user)):
+    body = await request.json()
+    mem = MemoryStore(_db_path())
+    ok = mem.nav_sig_set_wh_type(
+        sig_id,
+        wh_type_code   = body.get("wh_type_code", ""),
+        wh_dest_class  = body.get("wh_dest_class"),
+        wh_max_jump_kg = body.get("wh_max_jump_kg"),
+        wh_total_kg    = body.get("wh_total_kg"),
+        wh_lifetime_h  = body.get("wh_lifetime_h"),
+    )
+    return {"ok": ok}
+
+
+# ── System Profile Endpoint ───────────────────────────────────────────────────
+
+_profile_cache: dict = {}
+
+
+@app.get("/app/api/nav/system_profile/{system_id}")
+async def api_nav_system_profile(system_id: int, request: Request,
+                                  force: bool = False, user=Depends(require_user)):
+    """Synthesized intel: zkill 90d history + in-app sightings."""
+    import time as _time, datetime as _dt
+    cached = _profile_cache.get(system_id)
+    if cached and not force and (_time.time() - cached["ts"]) < 1800:
+        return cached["data"]
+
+    _c = sqlite3.connect(_db_path())
+    _c.row_factory = sqlite3.Row
+    sight_rows = _c.execute(
+        """SELECT DISTINCT character_id, character_name, MAX(timestamp) as last_seen
+           FROM nav_movements
+           WHERE system_id=? AND timestamp > datetime('now', '-7 days')
+           GROUP BY character_id
+           ORDER BY last_seen DESC""",
+        (system_id,)
+    ).fetchall()
+    stationed_chars = set()
+    for r in sight_rows:
+        loc = _c.execute(
+            "SELECT system_id FROM nav_movements WHERE character_id=? ORDER BY timestamp DESC LIMIT 1",
+            (r["character_id"],)
+        ).fetchone()
+        if loc and loc["system_id"] == system_id:
+            stationed_chars.add(r["character_id"])
+    _c.close()
+
+    recent_sightings = [
+        {
+            "character_id":   r["character_id"],
+            "character_name": r["character_name"] or f"Char {r['character_id']}",
+            "last_seen":      r["last_seen"],
+            "status":         "stationed" if r["character_id"] in stationed_chars else "passed through",
+        }
+        for r in sight_rows
+    ]
+
+    zkill_url  = f"https://zkillboard.com/api/kills/solarSystemID/{system_id}/pastSeconds/7776000/"
+    zkill_kills = []
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as s:
+            async with s.get(zkill_url, headers={
+                "Accept-Encoding": "gzip",
+                "User-Agent": "StellarInsight/1.0",
+            }) as r:
+                if r.status == 200:
+                    zkill_kills = await r.json()
+                    if not isinstance(zkill_kills, list):
+                        zkill_kills = []
+    except Exception:
+        zkill_kills = []
+
+    from collections import defaultdict
+    corp_kills: dict = defaultdict(lambda: {"kills": 0, "losses": 0, "name": "", "id": 0})
+    for km in zkill_kills[:500]:
+        attackers = km.get("attackers") or []
+        victim_corp = (km.get("victim") or {}).get("corporation_id")
+        for atk in attackers:
+            cid = atk.get("corporation_id")
+            cn  = atk.get("corporation_name") or f"Corp {cid}"
+            if cid:
+                corp_kills[cid]["kills"] += 1
+                corp_kills[cid]["name"]   = cn
+                corp_kills[cid]["id"]     = cid
+        if victim_corp:
+            corp_kills[victim_corp]["losses"] += 1
+
+    top_corps = sorted(corp_kills.items(), key=lambda x: x[1]["kills"], reverse=True)[:10]
+    top_corp_ids = [cid for cid, _ in top_corps if cid]
+    corp_name_map: dict = {}
+    if top_corp_ids:
+        try:
+            corp_name_map = await _resolve_entity_names(top_corp_ids)
+        except Exception:
+            pass
+
+    suspected_groups = []
+    for corp_id, d in top_corps:
+        label = "Resident" if d["losses"] > 0 else "Hunter"
+        suspected_groups.append({
+            "corp_id":   corp_id,
+            "corp_name": corp_name_map.get(corp_id) or d["name"] or f"Corp {corp_id}",
+            "kills":     d["kills"],
+            "losses":    d["losses"],
+            "label":     label,
+        })
+
+    total_kills = len(zkill_kills)
+    if total_kills == 0:
+        threat_level = "Unknown"
+        summary = "No kill data available for this system in the last 90 days."
+    elif total_kills < 5:
+        threat_level = "Low"
+        summary = f"{total_kills} kill(s) in 90 days — low activity."
+    elif total_kills < 20:
+        threat_level = "Medium"
+        summary = f"{total_kills} kills in 90 days — moderate activity."
+    else:
+        threat_level = "High"
+        summary = f"{total_kills} kills in 90 days — high activity, approach with caution."
+
+    result = {
+        "system_id":        system_id,
+        "threat_level":     threat_level,
+        "summary":          summary,
+        "suspected_groups": suspected_groups,
+        "recent_sightings": recent_sightings,
+        "kill_count_90d":   total_kills,
+    }
+    _profile_cache[system_id] = {"data": result, "ts": _time.time()}
+    return result

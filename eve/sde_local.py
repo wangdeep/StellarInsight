@@ -899,3 +899,21 @@ def sde_info() -> Dict:
         }
     except Exception as e:
         return {"available": False, "error": str(e)}
+
+
+def get_ship_mass_kg(type_id: int) -> Optional[float]:
+    """Return a ship's mass in kg from SDE invTypes, or None if unavailable."""
+    db = sde_db_path()
+    if not db or not os.path.exists(db):
+        return None
+    try:
+        import sqlite3
+        con = sqlite3.connect(db)
+        con.row_factory = sqlite3.Row
+        row = con.execute(
+            "SELECT mass FROM invTypes WHERE typeID=?", (int(type_id),)
+        ).fetchone()
+        con.close()
+        return float(row["mass"]) if row and row["mass"] else None
+    except Exception:
+        return None
